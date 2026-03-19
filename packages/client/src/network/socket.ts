@@ -27,7 +27,12 @@ export class SocketManager {
 
   connect(token: string) {
     this.disconnect();
-    this.socket = io({ auth: { token } });
+    this.socket = io({
+      auth: { token },
+      // Swarm rolling updates and reverse proxies can route polling requests
+      // to a different task, while a single WebSocket connection avoids SID drift.
+      transports: ['websocket'],
+    });
 
     this.socket.on(S2C.Init, (data: S2C_Init) => {
       this.onInitCallbacks.forEach(cb => cb(data));

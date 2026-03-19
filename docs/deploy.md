@@ -7,6 +7,7 @@
 - `start-first + healthcheck + rollback` 提供近零停机更新
 - 服务端通过 Nest shutdown hooks 做优雅停机
 - 健康检查统一使用 `127.0.0.1`，避免容器内 `localhost` 命中 IPv6 回环导致误判不健康
+- 客户端 Socket.IO 使用 `websocket` 单传输，避免在反向代理和滚动更新期间因 long-polling 缺少 sticky session 而触发 `400 Session ID unknown`
 
 当前默认对外端口规划：
 
