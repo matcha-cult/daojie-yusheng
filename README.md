@@ -110,6 +110,23 @@ pnpm dev:client
 pnpm dev:server
 ```
 
+## 自动部署
+
+项目已接入自动构建与自动部署链路：
+
+- 推送到 `main` 后，GitHub Actions 会自动构建前后端镜像并推送到 GHCR
+- 构建完成后，Actions 会通过 SSH 连接生产服务器并执行 Docker Swarm 发布
+- 生产环境使用 `start-first + healthcheck + rollback` 做近零停机滚动更新
+- 服务端启用健康检查与优雅停机，更新时会先拉起新实例，再摘除旧实例
+
+关键文件：
+
+- [docker-stack.yml](./docker-stack.yml)
+- [.github/workflows/deploy.yml](./.github/workflows/deploy.yml)
+- [docs/deploy.md](./docs/deploy.md)
+
+如果要配置生产环境、GitHub Secrets 或查看回滚方式，请直接参考 [docs/deploy.md](./docs/deploy.md)。
+
 ## 说明
 
 - 客户端不负责游戏规则正确性判定，所有关键状态以服务端为准

@@ -2,6 +2,7 @@ FROM node:20-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
+COPY tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 RUN pnpm install --frozen-lockfile || pnpm install
@@ -13,6 +14,7 @@ FROM node:20-alpine
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=builder /app/pnpm-workspace.yaml /app/package.json ./
+COPY --from=builder /app/tsconfig.base.json ./tsconfig.base.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared/package.json packages/shared/
 COPY --from=builder /app/packages/shared/dist packages/shared/dist
