@@ -6,6 +6,7 @@
 - Docker Swarm 负责滚动更新
 - `start-first + healthcheck + rollback` 提供近零停机更新
 - 服务端通过 Nest shutdown hooks 做优雅停机
+- 健康检查统一使用 `127.0.0.1`，避免容器内 `localhost` 命中 IPv6 回环导致误判不健康
 
 当前默认对外端口规划：
 
