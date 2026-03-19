@@ -1,0 +1,256 @@
+{
+  "id": "sky_ruins",
+  "name": "天穹残宫",
+  "width": 30,
+  "height": 30,
+  "tiles": [
+    "##############################",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,P,,,,,,,,,,,,,,,,,,,,,,,,,P#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,TTT,,,,,#",
+    "#,,,,,#.oooooo.#,,,,,T.T,,,,,#",
+    "#,,,,,#.o....o.#,,,,,TTT,,,,,#",
+    "#,,,,,#.o.++.o.#,,,,,,,,,,,,,#",
+    "#,,,,,#.o....o.#,,,,,,,,,,,,,#",
+    "#,,,,,#.oooooo.#,,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,ooooo,,,,,,,,,ooooo,,,,,,#",
+    "#,,,o...o,,,,,,,,,o...o,,,,,,#",
+    "#,,,o...o,,,,,,,,,o...o,,,,,,#",
+    "#,,,ooooo,,,,,,,,,ooooo,,,,,,#",
+    "#,,,,,,,,,,,,+,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,+++,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,+,,,,,,,,,,,,,,,#",
+    "#,,,,,,TT,,,,,,,,,,,,TT,,,,,,#",
+    "#,,,,,,TT,,,,,,,,,,,,TT,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,########,,,,,########,,#",
+    "#,,,,,#......#,,,,,#......#,,#",
+    "#,,,,,#..P...#,,,,,#...P..#,,#",
+    "#,,,,,#......#,,,,,#......#,,#",
+    "#,,,,,########,,,,,########,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "##############################"
+  ],
+  "portals": [
+    {
+      "x": 2,
+      "y": 2,
+      "targetMapId": "spirit_ridge",
+      "targetX": 15,
+      "targetY": 1
+    },
+    {
+      "x": 28,
+      "y": 2,
+      "targetMapId": "ancient_ruins",
+      "targetX": 20,
+      "targetY": 25
+    },
+    {
+      "x": 14,
+      "y": 25,
+      "targetMapId": "spirit_ridge",
+      "targetX": 15,
+      "targetY": 1
+    },
+    {
+      "x": 20,
+      "y": 25,
+      "targetMapId": "ancient_ruins",
+      "targetX": 20,
+      "targetY": 25
+    }
+  ],
+  "dangerLevel": 5,
+  "recommendedRealm": "Major-Perfection",
+  "spawnPoint": {
+    "x": 3,
+    "y": 3
+  },
+  "npcs": [
+    {
+      "id": "npc_sky_observer",
+      "name": "观星残影",
+      "x": 13,
+      "y": 18,
+      "char": "星",
+      "color": "#e5e6ff",
+      "role": "quest_giver",
+      "dialogue": "天宫已坠，封印仍在。若你能续上封柱，这方天地还可安稳百年。",
+      "quests": [
+        {
+          "id": "q_sky_star_metal",
+          "title": "坠星采金",
+          "desc": "击败天宫猎者并收集星陨金。",
+          "targetMonsterId": "m_void_hunter",
+          "targetCount": 10,
+          "requiredItemId": "star_metal",
+          "requiredItemCount": 6,
+          "reward": [
+            {
+              "itemId": "equip.starfall_spear",
+              "name": "陨星枪",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.starfall_spear",
+              "name": "《陨星枪诀》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_sky_breaker"
+        },
+        {
+          "id": "q_sky_breaker",
+          "title": "噬星终局",
+          "desc": "击杀噬星兽并带回天封核心。",
+          "targetMonsterId": "m_star_devourer",
+          "targetCount": 1,
+          "requiredItemId": "sky_seal_core",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "equip.void_talisman",
+              "name": "空劫符坠",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "equip.celestial_crown",
+              "name": "观星冠",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "pure_yang_pill",
+              "name": "纯阳丹",
+              "type": "consumable",
+              "count": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_void_hunter",
+      "name": "天宫猎者",
+      "char": "猎",
+      "color": "#9d8cff",
+      "x": 8,
+      "y": 16,
+      "radius": 8,
+      "maxAlive": 8,
+      "respawnSec": 18,
+      "level": 10,
+      "hp": 168,
+      "attack": 30,
+      "drops": [
+        {
+          "itemId": "star_metal",
+          "name": "星陨金",
+          "type": "material",
+          "count": 1,
+          "chance": 0.52
+        },
+        {
+          "itemId": "void_shard",
+          "name": "虚蚀碎片",
+          "type": "material",
+          "count": 1,
+          "chance": 0.44
+        }
+      ]
+    },
+    {
+      "id": "m_sky_puppet",
+      "name": "残宫傀仪",
+      "char": "傀",
+      "color": "#96b6d9",
+      "x": 21,
+      "y": 14,
+      "radius": 6,
+      "maxAlive": 6,
+      "respawnSec": 20,
+      "level": 10,
+      "hp": 174,
+      "attack": 32,
+      "drops": [
+        {
+          "itemId": "sky_pattern_page",
+          "name": "天纹残页",
+          "type": "material",
+          "count": 1,
+          "chance": 0.58
+        },
+        {
+          "itemId": "book.spirit_anchor",
+          "name": "《镇灵篇》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.07
+        }
+      ]
+    },
+    {
+      "id": "m_star_devourer",
+      "name": "噬星兽",
+      "char": "噬",
+      "color": "#ff7e7e",
+      "x": 15,
+      "y": 20,
+      "radius": 2,
+      "maxAlive": 1,
+      "respawnSec": 180,
+      "level": 12,
+      "hp": 360,
+      "attack": 48,
+      "drops": [
+        {
+          "itemId": "sky_seal_core",
+          "name": "天封核心",
+          "type": "quest_item",
+          "count": 1,
+          "chance": 1
+        },
+        {
+          "itemId": "equip.starfall_spear",
+          "name": "陨星枪",
+          "type": "equipment",
+          "count": 1,
+          "chance": 0.35
+        },
+        {
+          "itemId": "book.starfall_spear",
+          "name": "《陨星枪诀》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.25
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_sky_core",
+      "name": "封柱核心井",
+      "x": 15,
+      "y": 20,
+      "desc": "噬星兽盘踞于此，掉落主线封印核心。"
+    },
+    {
+      "id": "lm_sky_altar",
+      "name": "残宫观星台",
+      "x": 13,
+      "y": 18,
+      "desc": "从此处可俯瞰下界诸域。"
+    }
+  ]
+}

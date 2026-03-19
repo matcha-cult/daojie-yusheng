@@ -1,0 +1,47 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuthModule } from '../auth/auth.module';
+import { GameGateway } from './game.gateway';
+import { TickService } from './tick.service';
+import { MapService } from './map.service';
+import { PlayerService } from './player.service';
+import { AoiService } from './aoi.service';
+import { AttrService } from './attr.service';
+import { InventoryService } from './inventory.service';
+import { EquipmentService } from './equipment.service';
+import { TechniqueService } from './technique.service';
+import { ActionService } from './action.service';
+import { ContentService } from './content.service';
+import { WorldService } from './world.service';
+import { NavigationService } from './navigation.service';
+import { BotService } from './bot.service';
+import { GmService } from './gm.service';
+import { PerformanceService } from './performance.service';
+import { PlayerEntity } from '../database/entities/player.entity';
+
+@Module({
+  imports: [
+    AuthModule,
+    TypeOrmModule.forFeature([PlayerEntity]),
+  ],
+  providers: [
+    GameGateway,
+    TickService,
+    MapService,
+    PlayerService,
+    AoiService,
+    AttrService,
+    InventoryService,
+    EquipmentService,
+    TechniqueService,
+    ActionService,
+    ContentService,
+    NavigationService,
+    BotService,
+    GmService,
+    PerformanceService,
+    WorldService,
+  ],
+  exports: [MapService, PlayerService],
+})
+export class GameModule {}

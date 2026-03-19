@@ -1,0 +1,277 @@
+{
+  "id": "ancient_ruins",
+  "name": "断碑遗迹",
+  "width": 30,
+  "height": 30,
+  "tiles": [
+    "##############################",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,P,,,,,,,,,,,,,,,,,,,,,,,,,P#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,TTT,,,,,#",
+    "#,,,,,#.oooooo.#,,,,,T.T,,,,,#",
+    "#,,,,,#.o....o.#,,,,,TTT,,,,,#",
+    "#,,,,,#.o.++.o.#,,,,,,,,,,,,,#",
+    "#,,,,,#.o....o.#,,,,,,,,,,,,,#",
+    "#,,,,,#.oooooo.#,,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,ooooo,,,,,,,,,ooooo,,,,,,#",
+    "#,,,o...o,,,,,,,,,o...o,,,,,,#",
+    "#,,,o...o,,,,,,,,,o...o,,,,,,#",
+    "#,,,ooooo,,,,,,,,,ooooo,,,,,,#",
+    "#,,,,,,,,,,,,+,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,+++,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,+,,,,,,,,,,,,,,,#",
+    "#,,,,,,TT,,,,,,,,,,,,TT,,,,,,#",
+    "#,,,,,,TT,,,,,,,,,,,,TT,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,########,,,,,########,,#",
+    "#,,,,,#......#,,,,,#......#,,#",
+    "#,,,,,#..P...#,,,,,#...P..#,,#",
+    "#,,,,,#......#,,,,,#......#,,#",
+    "#,,,,,########,,,,,########,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "##############################"
+  ],
+  "portals": [
+    {
+      "x": 2,
+      "y": 2,
+      "targetMapId": "bamboo_forest",
+      "targetX": 28,
+      "targetY": 22
+    },
+    {
+      "x": 28,
+      "y": 2,
+      "targetMapId": "beast_valley",
+      "targetX": 24,
+      "targetY": 25
+    },
+    {
+      "x": 14,
+      "y": 17,
+      "targetMapId": "spirit_ridge",
+      "targetX": 27,
+      "targetY": 27
+    },
+    {
+      "x": 20,
+      "y": 25,
+      "targetMapId": "sky_ruins",
+      "targetX": 2,
+      "targetY": 27
+    }
+  ],
+  "dangerLevel": 3,
+  "recommendedRealm": "Minor-Major",
+  "spawnPoint": {
+    "x": 3,
+    "y": 3
+  },
+  "npcs": [
+    {
+      "id": "npc_ruin_scholar_spirit",
+      "name": "碑灵学士",
+      "x": 13,
+      "y": 18,
+      "char": "碑",
+      "color": "#d9d2ff",
+      "role": "lore",
+      "dialogue": "武道尽头是炼神，炼神之后才是寻仙。"
+    },
+    {
+      "id": "npc_rune_keeper",
+      "name": "守纹残念",
+      "x": 20,
+      "y": 18,
+      "char": "纹",
+      "color": "#95b3ff",
+      "role": "quest_giver",
+      "dialogue": "替我收束遗迹灵纹，我便告诉你上界路标。",
+      "quests": [
+        {
+          "id": "q_ruin_shard_survey",
+          "title": "散纹回收",
+          "desc": "击溃石卫傀并回收足量断纹石片。",
+          "targetMonsterId": "m_ruin_guardian",
+          "targetCount": 12,
+          "requiredItemId": "rune_shard",
+          "requiredItemCount": 10,
+          "reward": [
+            {
+              "itemId": "equip.rune_robe",
+              "name": "断纹法袍",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "major_qi_pill",
+              "name": "大还灵丹",
+              "type": "consumable",
+              "count": 2
+            }
+          ],
+          "nextQuestId": "q_ruin_watcher"
+        },
+        {
+          "id": "q_ruin_watcher",
+          "title": "符阵看守",
+          "desc": "击杀 4 只符阵看守并带回遗迹钥石。",
+          "targetMonsterId": "m_rune_watcher",
+          "targetCount": 4,
+          "requiredItemId": "ruin_keystone",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book.spirit_anchor",
+              "name": "《镇灵篇》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_ruin_guardian",
+      "name": "石卫傀",
+      "char": "傀",
+      "color": "#b9b3a8",
+      "x": 8,
+      "y": 15,
+      "radius": 7,
+      "maxAlive": 7,
+      "respawnSec": 22,
+      "level": 4,
+      "hp": 84,
+      "attack": 13,
+      "drops": [
+        {
+          "itemId": "rune_shard",
+          "name": "断纹石片",
+          "type": "material",
+          "count": 1,
+          "chance": 0.57
+        }
+      ]
+    },
+    {
+      "id": "m_bone_owl",
+      "name": "骨翎夜鸮",
+      "char": "鸮",
+      "color": "#c4c9d8",
+      "x": 22,
+      "y": 24,
+      "radius": 5,
+      "maxAlive": 5,
+      "respawnSec": 19,
+      "level": 5,
+      "hp": 76,
+      "attack": 15,
+      "drops": [
+        {
+          "itemId": "book_thunder_palm",
+          "name": "《惊雷掌》残卷",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.08
+        },
+        {
+          "itemId": "soul_ink",
+          "name": "魂墨",
+          "type": "material",
+          "count": 1,
+          "chance": 0.4
+        }
+      ]
+    },
+    {
+      "id": "m_rune_watcher",
+      "name": "符阵看守",
+      "char": "阵",
+      "color": "#89a9ff",
+      "x": 16,
+      "y": 17,
+      "radius": 5,
+      "maxAlive": 4,
+      "respawnSec": 28,
+      "level": 6,
+      "hp": 108,
+      "attack": 18,
+      "drops": [
+        {
+          "itemId": "ruin_keystone",
+          "name": "遗迹钥石",
+          "type": "quest_item",
+          "count": 1,
+          "chance": 0.2
+        },
+        {
+          "itemId": "book.spirit_anchor",
+          "name": "《镇灵篇》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.06
+        }
+      ]
+    },
+    {
+      "id": "m_ghost_scribe",
+      "name": "执墨残魂",
+      "char": "魂",
+      "color": "#756fa8",
+      "x": 23,
+      "y": 9,
+      "radius": 4,
+      "maxAlive": 4,
+      "respawnSec": 24,
+      "level": 5,
+      "hp": 82,
+      "attack": 14,
+      "drops": [
+        {
+          "itemId": "soul_ink",
+          "name": "魂墨",
+          "type": "material",
+          "count": 1,
+          "chance": 0.58
+        },
+        {
+          "itemId": "rune_shard",
+          "name": "断纹石片",
+          "type": "material",
+          "count": 1,
+          "chance": 0.42
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_cracked_monument",
+      "name": "裂痕主碑",
+      "x": 13,
+      "y": 18,
+      "desc": "遗迹中心，记录兽谷异变来源。"
+    },
+    {
+      "id": "lm_rune_hall",
+      "name": "符阵中庭",
+      "x": 16,
+      "y": 17,
+      "desc": "看守与残魂频繁游荡，掉落遗迹钥石。"
+    },
+    {
+      "id": "lm_sky_stair",
+      "name": "登穹残阶",
+      "x": 20,
+      "y": 25,
+      "desc": "残阶尽头连接天穹残宫，危险极高。"
+    }
+  ]
+}

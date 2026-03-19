@@ -1,0 +1,274 @@
+{
+  "id": "spirit_ridge",
+  "name": "灵脊岭",
+  "width": 29,
+  "height": 30,
+  "tiles": [
+    "#############################",
+    "#,,,,,,,,,,,,,P,,,,,,,,,,,,,#",
+    "#,P,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,TTTT,,,,,,,,,TTTT,,,,#",
+    "#,,,,,,T..T,,,,,,,,,T..T,,,,#",
+    "#,,,,,,TTTT,,,,,,,,,TTTT,,,,#",
+    "#,,,,,,,,,,,,,,~~~~~,,,,,,,,#",
+    "#,,,,,,,,,,,,,~~~~~~~,,,,,,,#",
+    "#,,,,,,,,,,,,,,~~~~~,,,,,,,,#",
+    "#,,,ooooo,,,,,,,,,,,,,oooo,,#",
+    "#,,,o...o,,,,,,,,,,,,,o..o,,#",
+    "#,,,o...o,,,,,,,,,,,,,o..o,,#",
+    "#,,,ooooo,,,,,,,,,,,,,oooo,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,TT,,TT,,TT,,TT,,TT,,,,,#",
+    "#,,,,TT,,TT,,TT,,TT,,TT,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,ooooo,,#",
+    "#,,,,,#.oooooo.#,,,,,o...o,,#",
+    "#,,,,,#.o....o.#,,,,,o...o,,#",
+    "#,,,,,#.oooooo.#,,,,,ooooo,,#",
+    "#,,,,,#........#,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,P,,,,,,,,,,P,,,,,,,,,,,P,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#############################"
+  ],
+  "portals": [
+    {
+      "x": 15,
+      "y": 1,
+      "targetMapId": "sky_ruins",
+      "targetX": 15,
+      "targetY": 27
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "targetMapId": "spawn",
+      "targetX": 34,
+      "targetY": 34
+    },
+    {
+      "x": 3,
+      "y": 27,
+      "targetMapId": "wildlands",
+      "targetX": 24,
+      "targetY": 10
+    },
+    {
+      "x": 15,
+      "y": 27,
+      "targetMapId": "beast_valley",
+      "targetX": 14,
+      "targetY": 6
+    },
+    {
+      "x": 27,
+      "y": 27,
+      "targetMapId": "ancient_ruins",
+      "targetX": 14,
+      "targetY": 17
+    }
+  ],
+  "dangerLevel": 4,
+  "recommendedRealm": "Major",
+  "spawnPoint": {
+    "x": 3,
+    "y": 3
+  },
+  "npcs": [
+    {
+      "id": "npc_ridge_sage",
+      "name": "守岭老修",
+      "x": 14,
+      "y": 26,
+      "char": "修",
+      "color": "#b0d6ff",
+      "role": "quest_giver",
+      "dialogue": "走到这里，已不只是江湖客了。接下来的路，拼的是神识与心性。",
+      "quests": [
+        {
+          "id": "q_ridge_trial",
+          "title": "灵脊试锋",
+          "desc": "击败 10 头灵脊虎并收集岭兽爪。",
+          "targetMonsterId": "m_spirit_tiger",
+          "targetCount": 10,
+          "requiredItemId": "ridge_beast_claw",
+          "requiredItemCount": 6,
+          "reward": [
+            {
+              "itemId": "equip.spirit_ring",
+              "name": "凝灵戒",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.cloud_blade",
+              "name": "《流云刀谱》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_ridge_frost"
+        },
+        {
+          "id": "q_ridge_frost",
+          "title": "寒华采引",
+          "desc": "猎杀寒翎鹤 8 只并采集霜华精粹。",
+          "targetMonsterId": "m_frost_crane",
+          "targetCount": 8,
+          "requiredItemId": "frost_essence",
+          "requiredItemCount": 4,
+          "reward": [
+            {
+              "itemId": "equip.moonshadow_boots",
+              "name": "月影履",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "frost_heart_paste",
+              "name": "寒心膏",
+              "type": "consumable",
+              "count": 2
+            }
+          ],
+          "nextQuestId": "q_ridge_gate"
+        },
+        {
+          "id": "q_ridge_gate",
+          "title": "守关残魂",
+          "desc": "清理守关残魂并带回灵岭行令。",
+          "targetMonsterId": "m_ridge_ghost",
+          "targetCount": 5,
+          "requiredItemId": "spirit_ridge_sigil",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book.spirit_anchor",
+              "name": "《镇灵篇》",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "equip.celestial_crown",
+              "name": "观星冠",
+              "type": "equipment",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_spirit_tiger",
+      "name": "灵脊虎",
+      "char": "虎",
+      "color": "#d3b06f",
+      "x": 8,
+      "y": 14,
+      "radius": 8,
+      "maxAlive": 7,
+      "respawnSec": 18,
+      "level": 8,
+      "hp": 132,
+      "attack": 24,
+      "drops": [
+        {
+          "itemId": "ridge_beast_claw",
+          "name": "岭兽爪",
+          "type": "material",
+          "count": 1,
+          "chance": 0.6
+        },
+        {
+          "itemId": "equip.spirit_ring",
+          "name": "凝灵戒",
+          "type": "equipment",
+          "count": 1,
+          "chance": 0.08
+        }
+      ]
+    },
+    {
+      "id": "m_frost_crane",
+      "name": "寒翎鹤",
+      "char": "鹤",
+      "color": "#b7d6ff",
+      "x": 22,
+      "y": 12,
+      "radius": 7,
+      "maxAlive": 6,
+      "respawnSec": 20,
+      "level": 8,
+      "hp": 126,
+      "attack": 23,
+      "drops": [
+        {
+          "itemId": "frost_essence",
+          "name": "霜华精粹",
+          "type": "material",
+          "count": 1,
+          "chance": 0.52
+        },
+        {
+          "itemId": "book.frost_sutra",
+          "name": "《寒魄经》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.06
+        }
+      ]
+    },
+    {
+      "id": "m_ridge_ghost",
+      "name": "守岭残魂",
+      "char": "魂",
+      "color": "#8f8fc9",
+      "x": 15,
+      "y": 20,
+      "radius": 5,
+      "maxAlive": 4,
+      "respawnSec": 26,
+      "level": 9,
+      "hp": 148,
+      "attack": 28,
+      "drops": [
+        {
+          "itemId": "spirit_ridge_sigil",
+          "name": "灵岭行令",
+          "type": "quest_item",
+          "count": 1,
+          "chance": 0.24
+        },
+        {
+          "itemId": "void_shard",
+          "name": "虚蚀碎片",
+          "type": "material",
+          "count": 1,
+          "chance": 0.4
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_ridge_gate",
+      "name": "岭顶关门",
+      "x": 14,
+      "y": 26,
+      "desc": "从这里起，怪物强度显著跃迁。"
+    },
+    {
+      "id": "lm_ridge_sky_lift",
+      "name": "升穹阵",
+      "x": 15,
+      "y": 1,
+      "desc": "可直达天穹残宫。"
+    }
+  ]
+}

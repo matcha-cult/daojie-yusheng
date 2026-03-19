@@ -1,0 +1,489 @@
+{
+  "id": "spawn",
+  "name": "云来镇",
+  "width": 40,
+  "height": 40,
+  "tiles": [
+    "########################################",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,T,TTTT,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,TTTTTT,,,,T,,,,,,,,,,,ooooooo,,,,,,,,#",
+    "#,,TT,TTT,,,,T,,,,,,,,,,o.....o,,,,,,,,#",
+    "#,,TTTTT,,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
+    "#,,,T,T,T,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
+    "#,,,,,,,,,...........,,,o.....o,,,,,,,,#",
+    "#,,,,,,,,,.,,,,,,,,,.,,,ooooooo,,,,,,,,#",
+    "#,,,,#####.######,,,.,,,,,,,,,,,,,,o,,,#",
+    "#,,,,#..........#,,,.,,,,,,,,,,,,,,,o,,#",
+    "#,,,,#..........#,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,#..........#,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,#..........#,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,o,#..........#,,,.,,,,,,,,,,,,T,,,,,#",
+    "#,,,o#..........#,,,.,,,,,,,,,,,,,T,,,,#",
+    "#,,,,############,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,.,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,~~~~~~~,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,~~~~~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,~~~~~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,~~~~~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,~~~~~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,~~~~~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,o,,,,~~~~~~~,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,o,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,TTTT,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,TT,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,TT,T,,,,#",
+    "#,,,,,,,,,T,,,,,,,,,,,,,,,,,,,T,,T,,T,,#",
+    "#,,,,,,,,,,T,,,,,,,,,,,,,,,,,,,T,TT,TT,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,T,T,T,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "########################################"
+  ],
+  "portals": [
+    {
+      "x": 20,
+      "y": 20,
+      "targetMapId": "wildlands",
+      "targetX": 42,
+      "targetY": 47
+    },
+    {
+      "x": 32,
+      "y": 10,
+      "targetMapId": "bamboo_forest",
+      "targetX": 3,
+      "targetY": 2
+    },
+    {
+      "x": 34,
+      "y": 34,
+      "targetMapId": "spirit_ridge",
+      "targetX": 2,
+      "targetY": 2
+    }
+  ],
+  "dangerLevel": 1,
+  "recommendedRealm": "Entry",
+  "spawnPoint": {
+    "x": 15,
+    "y": 21
+  },
+  "npcs": [
+    {
+      "id": "npc_qingxuan",
+      "name": "清玄执事",
+      "x": 16,
+      "y": 21,
+      "char": "执",
+      "color": "#f6d365",
+      "role": "quest_giver",
+      "dialogue": "先立脚，再问道。江湖路走稳了，仙途才走得远。",
+      "quests": [
+        {
+          "id": "q_forest_cleanup",
+          "title": "清林试炼",
+          "desc": "前往青竹林清理 8 只噬灵狼，证明你已具备外出历练资格。",
+          "targetMonsterId": "m_spirit_wolf",
+          "targetCount": 8,
+          "reward": [
+            {
+              "itemId": "book_wind_step",
+              "name": "《踏风步》",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "minor_qi_pill",
+              "name": "小还灵丹",
+              "type": "consumable",
+              "count": 3
+            }
+          ],
+          "nextQuestId": "q_mine_beacon"
+        },
+        {
+          "id": "q_mine_beacon",
+          "title": "矿洞信标",
+          "desc": "进入玄铁矿洞，击杀 5 只矿魈并取回失落信标。",
+          "targetMonsterId": "m_mine_ghoul",
+          "targetCount": 5,
+          "requiredItemId": "mine_signal_core",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book_thunder_palm",
+              "name": "《惊雷掌》残卷",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "equip.black_iron_sword",
+              "name": "玄铁长剑",
+              "type": "equipment",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_valley_probe"
+        },
+        {
+          "id": "q_valley_probe",
+          "title": "兽谷侦行",
+          "desc": "深入噬魂兽谷，击败 1 只谷主级目标并带回兽谷核心。",
+          "targetMonsterId": "m_valley_alpha",
+          "targetCount": 1,
+          "requiredItemId": "valley_core",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book_stillheart",
+              "name": "《止念诀》",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "spirit_iron_fragment",
+              "name": "灵铁碎片",
+              "type": "material",
+              "count": 6
+            }
+          ],
+          "nextQuestId": "q_ruin_cipher"
+        },
+        {
+          "id": "q_ruin_cipher",
+          "title": "断碑密钥",
+          "desc": "清剿断碑遗迹的符阵看守并带回遗迹钥石。",
+          "targetMonsterId": "m_rune_watcher",
+          "targetCount": 4,
+          "requiredItemId": "ruin_keystone",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book.spirit_anchor",
+              "name": "《镇灵篇》",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "equip.rune_robe",
+              "name": "断纹法袍",
+              "type": "equipment",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_ridge_scout"
+        },
+        {
+          "id": "q_ridge_scout",
+          "title": "灵岭勘探",
+          "desc": "前往灵脊岭，击退 8 头灵脊虎并带回灵岭行令。",
+          "targetMonsterId": "m_spirit_tiger",
+          "targetCount": 8,
+          "requiredItemId": "spirit_ridge_sigil",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "equip.spirit_ring",
+              "name": "凝灵戒",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.frost_sutra",
+              "name": "《寒魄经》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_sky_pillar"
+        },
+        {
+          "id": "q_sky_pillar",
+          "title": "天穹封柱",
+          "desc": "进入天穹残宫，斩杀噬星兽并回收天封核心。",
+          "targetMonsterId": "m_star_devourer",
+          "targetCount": 1,
+          "requiredItemId": "sky_seal_core",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "book.starfall_spear",
+              "name": "《陨星枪诀》",
+              "type": "skill_book",
+              "count": 1
+            },
+            {
+              "itemId": "equip.void_talisman",
+              "name": "空劫符坠",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "pure_yang_pill",
+              "name": "纯阳丹",
+              "type": "consumable",
+              "count": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "npc_blacksmith_han",
+      "name": "韩铁匠",
+      "x": 13,
+      "y": 20,
+      "char": "匠",
+      "color": "#e38f66",
+      "role": "craft",
+      "dialogue": "想打好兵器，先学会从妖物身上找料。",
+      "quests": [
+        {
+          "id": "q_han_rat_hunt",
+          "title": "磨刃鼠患",
+          "desc": "清理镇外鼠患，击杀 12 只灰尾鼠。",
+          "targetMonsterId": "m_town_rat",
+          "targetCount": 12,
+          "reward": [
+            {
+              "itemId": "equip.rust_saber",
+              "name": "旧铁长刀",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "equip.hunter_cap",
+              "name": "猎风帽",
+              "type": "equipment",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_han_bandit_seal"
+        },
+        {
+          "id": "q_han_bandit_seal",
+          "title": "锻铁买路钱",
+          "desc": "清掉夜袭匪徒，击杀 10 名镇外暴徒并收集腰牌。",
+          "targetMonsterId": "m_town_thug",
+          "targetCount": 10,
+          "requiredItemId": "bandit_insignia",
+          "requiredItemCount": 4,
+          "reward": [
+            {
+              "itemId": "equip.leather_vest",
+              "name": "硬皮护衣",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.iron_bone_art",
+              "name": "《铁骨功》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "npc_herbalist_lan",
+      "name": "兰药师",
+      "x": 22,
+      "y": 20,
+      "char": "药",
+      "color": "#8ccf9b",
+      "role": "support",
+      "dialogue": "武者先养脉，修士先养神，药都不能断。",
+      "quests": [
+        {
+          "id": "q_lan_serpent_gall",
+          "title": "青竹胆汁",
+          "desc": "前往青竹林击杀 6 条青鳞竹蛇并收集蛇胆。",
+          "targetMonsterId": "m_bamboo_serpent",
+          "targetCount": 6,
+          "requiredItemId": "serpent_gall",
+          "requiredItemCount": 2,
+          "reward": [
+            {
+              "itemId": "major_qi_pill",
+              "name": "大还灵丹",
+              "type": "consumable",
+              "count": 3
+            },
+            {
+              "itemId": "equip.step_boots",
+              "name": "游侠靴",
+              "type": "equipment",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_lan_swamp_silk"
+        },
+        {
+          "id": "q_lan_swamp_silk",
+          "title": "阴沼医绢",
+          "desc": "在荒野沼地猎杀 8 只阴沼毒蛛，采集完整阴沼丝。",
+          "targetMonsterId": "m_mire_spider",
+          "targetCount": 8,
+          "requiredItemId": "spider_silk",
+          "requiredItemCount": 4,
+          "reward": [
+            {
+              "itemId": "frost_heart_paste",
+              "name": "寒心膏",
+              "type": "consumable",
+              "count": 2
+            },
+            {
+              "itemId": "equip.cloud_boots",
+              "name": "踏云履",
+              "type": "equipment",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "npc_wenji",
+      "name": "文籍师叔",
+      "x": 12,
+      "y": 14,
+      "char": "籍",
+      "color": "#a0c4ff",
+      "role": "lore",
+      "dialogue": "江湖是修仙的地基，没地基的人，飞起来也会摔下来。"
+    },
+    {
+      "id": "npc_healer_su",
+      "name": "素问医女",
+      "x": 23,
+      "y": 12,
+      "char": "医",
+      "color": "#f9c5d1",
+      "role": "support",
+      "dialogue": "外伤能治，心劫只能靠你自己破。"
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_town_rat",
+      "name": "灰尾鼠",
+      "char": "鼠",
+      "color": "#9b9b9b",
+      "x": 7,
+      "y": 30,
+      "radius": 3,
+      "maxAlive": 4,
+      "respawnSec": 15,
+      "level": 1,
+      "hp": 18,
+      "attack": 4,
+      "drops": [
+        {
+          "itemId": "rat_tail",
+          "name": "鼠尾",
+          "type": "material",
+          "count": 1,
+          "chance": 0.6
+        }
+      ]
+    },
+    {
+      "id": "m_town_thug",
+      "name": "镇外暴徒",
+      "char": "匪",
+      "color": "#ba6f5a",
+      "x": 30,
+      "y": 33,
+      "radius": 4,
+      "maxAlive": 4,
+      "respawnSec": 20,
+      "level": 2,
+      "hp": 30,
+      "attack": 6,
+      "drops": [
+        {
+          "itemId": "bandit_insignia",
+          "name": "匪徒腰牌",
+          "type": "material",
+          "count": 1,
+          "chance": 0.52
+        },
+        {
+          "itemId": "equip.rust_saber",
+          "name": "旧铁长刀",
+          "type": "equipment",
+          "count": 1,
+          "chance": 0.08
+        }
+      ]
+    },
+    {
+      "id": "m_night_bandit",
+      "name": "夜行刀客",
+      "char": "刀",
+      "color": "#8b3d3d",
+      "x": 33,
+      "y": 36,
+      "radius": 3,
+      "maxAlive": 2,
+      "respawnSec": 30,
+      "level": 3,
+      "hp": 44,
+      "attack": 9,
+      "drops": [
+        {
+          "itemId": "bandit_insignia",
+          "name": "匪徒腰牌",
+          "type": "material",
+          "count": 1,
+          "chance": 0.72
+        },
+        {
+          "itemId": "book.iron_bone_art",
+          "name": "《铁骨功》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.05
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_town_square",
+      "name": "云来镇集议石台",
+      "x": 15,
+      "y": 21,
+      "desc": "新手集结点，主线任务从此处展开。"
+    },
+    {
+      "id": "lm_bamboo_gate",
+      "name": "青竹林界门",
+      "x": 32,
+      "y": 10,
+      "desc": "通往第一条野外推进线。"
+    },
+    {
+      "id": "lm_iron_anvil",
+      "name": "镇防铁砧",
+      "x": 13,
+      "y": 20,
+      "desc": "韩铁匠常驻此地，提供基础装备成长线。"
+    },
+    {
+      "id": "lm_spirit_plaque",
+      "name": "灵岭引路碑",
+      "x": 34,
+      "y": 34,
+      "desc": "碑上刻着“武道尽头，便是仙门”八字。"
+    }
+  ]
+}

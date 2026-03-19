@@ -1,0 +1,296 @@
+{
+  "id": "beast_valley",
+  "name": "噬魂兽谷",
+  "width": 30,
+  "height": 30,
+  "tiles": [
+    "##############################",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,P,,,,,,,,,,,,,,,,,,,,,,,,,P#",
+    "#,,,,,TTTTT,,,,,,,,,TTTTT,,,,#",
+    "#,,,,,T...T,,,,,,,,,T...T,,,,#",
+    "#,,,,,TTTTT,,,,,,,,,TTTTT,,,,#",
+    "#,,,,,,,,,,,,~~~~~,,,,,,,,,,,#",
+    "#,,,,,,,,,,,~~~~~~~,,,,,,,,,,#",
+    "#,,,,,,,,,,,,~~~~~,,,,,,,,,,,#",
+    "#,,,ooooo,,,,,,,,,,,,,ooooo,,#",
+    "#,,,o...o,,,,,,,,,,,,,o...o,,#",
+    "#,,,o...o,,,,,,,,,,,,,o...o,,#",
+    "#,,,ooooo,,,,,,,,,,,,,ooooo,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,TT,,TT,,TT,,TT,,TT,,TT,,,,#",
+    "#,,TT,,TT,,TT,,TT,,TT,,TT,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,#........#,,,,,ooooo,,,#",
+    "#,,,,,#.oooooo.#,,,,,o...o,,,#",
+    "#,,,,,#.o....o.#,,,,,o...o,,,#",
+    "#,,,,,#.oooooo.#,,,,,ooooo,,,#",
+    "#,,,,,#........#,,,,,,,,,,,,,#",
+    "#,,,,,##########,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,P,,,,,,,,,,,,,,,,,P,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "##############################"
+  ],
+  "portals": [
+    {
+      "x": 2,
+      "y": 2,
+      "targetMapId": "bamboo_forest",
+      "targetX": 14,
+      "targetY": 26
+    },
+    {
+      "x": 28,
+      "y": 2,
+      "targetMapId": "ancient_ruins",
+      "targetX": 28,
+      "targetY": 2
+    },
+    {
+      "x": 6,
+      "y": 25,
+      "targetMapId": "black_iron_mine",
+      "targetX": 28,
+      "targetY": 2
+    },
+    {
+      "x": 24,
+      "y": 25,
+      "targetMapId": "ancient_ruins",
+      "targetX": 28,
+      "targetY": 2
+    },
+    {
+      "x": 14,
+      "y": 6,
+      "targetMapId": "spirit_ridge",
+      "targetX": 15,
+      "targetY": 27
+    }
+  ],
+  "dangerLevel": 5,
+  "recommendedRealm": "Major+",
+  "spawnPoint": {
+    "x": 3,
+    "y": 3
+  },
+  "npcs": [
+    {
+      "id": "npc_wounded_patrol",
+      "name": "重伤巡山弟子",
+      "x": 4,
+      "y": 3,
+      "char": "伤",
+      "color": "#ff9e9e",
+      "role": "warning",
+      "dialogue": "谷底有王级妖兽，没准备好就立刻回传。",
+      "quests": [
+        {
+          "id": "q_valley_bone_pile",
+          "title": "压制狼群",
+          "desc": "击杀 12 只裂齿妖狼并回收妖狼骨。",
+          "targetMonsterId": "m_valley_wolf",
+          "targetCount": 12,
+          "requiredItemId": "demon_wolf_bone",
+          "requiredItemCount": 8,
+          "reward": [
+            {
+              "itemId": "equip.valley_fang_blade",
+              "name": "裂齿妖刃",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "major_qi_pill",
+              "name": "大还灵丹",
+              "type": "consumable",
+              "count": 3
+            }
+          ],
+          "nextQuestId": "q_valley_emperor"
+        },
+        {
+          "id": "q_valley_emperor",
+          "title": "谷皇镇杀",
+          "desc": "击败裂渊谷皇并提交其本命獠牙。",
+          "targetMonsterId": "m_valley_emperor",
+          "targetCount": 1,
+          "requiredItemId": "valley_emperor_fang",
+          "requiredItemCount": 1,
+          "reward": [
+            {
+              "itemId": "equip.rift_guard_armor",
+              "name": "裂隙镇守甲",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.frost_sutra",
+              "name": "《寒魄经》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_valley_wolf",
+      "name": "裂齿妖狼",
+      "char": "妖",
+      "color": "#d2b48c",
+      "x": 10,
+      "y": 14,
+      "radius": 9,
+      "maxAlive": 9,
+      "respawnSec": 16,
+      "level": 6,
+      "hp": 105,
+      "attack": 19,
+      "drops": [
+        {
+          "itemId": "demon_wolf_bone",
+          "name": "妖狼骨",
+          "type": "material",
+          "count": 1,
+          "chance": 0.62
+        }
+      ]
+    },
+    {
+      "id": "m_blood_crow",
+      "name": "血羽鸦",
+      "char": "鸦",
+      "color": "#8f1d21",
+      "x": 21,
+      "y": 11,
+      "radius": 7,
+      "maxAlive": 7,
+      "respawnSec": 18,
+      "level": 7,
+      "hp": 112,
+      "attack": 21,
+      "drops": [
+        {
+          "itemId": "blood_feather",
+          "name": "血羽",
+          "type": "material",
+          "count": 1,
+          "chance": 0.53
+        }
+      ]
+    },
+    {
+      "id": "m_valley_alpha",
+      "name": "裂渊狼主",
+      "char": "王",
+      "color": "#ff6b6b",
+      "x": 15,
+      "y": 20,
+      "radius": 3,
+      "maxAlive": 1,
+      "respawnSec": 90,
+      "level": 9,
+      "hp": 220,
+      "attack": 34,
+      "drops": [
+        {
+          "itemId": "book_stillheart",
+          "name": "《止念诀》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.25
+        },
+        {
+          "itemId": "valley_core",
+          "name": "兽谷核心",
+          "type": "quest_item",
+          "count": 1,
+          "chance": 1
+        }
+      ]
+    },
+    {
+      "id": "m_valley_serpent",
+      "name": "赤脊谷蛇",
+      "char": "蛇",
+      "color": "#b94747",
+      "x": 23,
+      "y": 20,
+      "radius": 5,
+      "maxAlive": 5,
+      "respawnSec": 20,
+      "level": 7,
+      "hp": 118,
+      "attack": 20,
+      "drops": [
+        {
+          "itemId": "serpent_scale",
+          "name": "谷蛇逆鳞",
+          "type": "material",
+          "count": 1,
+          "chance": 0.54
+        }
+      ]
+    },
+    {
+      "id": "m_valley_emperor",
+      "name": "裂渊谷皇",
+      "char": "皇",
+      "color": "#de5050",
+      "x": 14,
+      "y": 19,
+      "radius": 2,
+      "maxAlive": 1,
+      "respawnSec": 120,
+      "level": 10,
+      "hp": 285,
+      "attack": 40,
+      "drops": [
+        {
+          "itemId": "valley_emperor_fang",
+          "name": "谷皇獠牙",
+          "type": "quest_item",
+          "count": 1,
+          "chance": 1
+        },
+        {
+          "itemId": "equip.rift_guard_armor",
+          "name": "裂隙镇守甲",
+          "type": "equipment",
+          "count": 1,
+          "chance": 0.25
+        },
+        {
+          "itemId": "book.spirit_anchor",
+          "name": "《镇灵篇》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.12
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_valley_rift",
+      "name": "谷底裂隙",
+      "x": 15,
+      "y": 20,
+      "desc": "高危点位，掉落核心任务物品与高阶技能书。"
+    },
+    {
+      "id": "lm_valley_lift_gate",
+      "name": "升灵界门",
+      "x": 14,
+      "y": 6,
+      "desc": "通往灵脊岭，标志江湖层进入修仙层。"
+    }
+  ]
+}

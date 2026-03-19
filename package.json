@@ -1,0 +1,13 @@
+{
+  "name": "daojie-yusheng",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev:client": "pnpm --filter @mud/client dev",
+    "dev:server": "pnpm --filter @mud/server start:dev",
+    "start:server": "pnpm --filter @mud/server start"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

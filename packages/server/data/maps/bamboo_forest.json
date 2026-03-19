@@ -1,0 +1,294 @@
+{
+  "id": "bamboo_forest",
+  "name": "青竹林",
+  "width": 30,
+  "height": 30,
+  "description": "从江湖试炼过渡到修炼世界的第一层野外区域，狼群、蛇妖与竹灵并存。",
+  "tiles": [
+    "##############################",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,P,,,,,,,,,,,T,,,,,,,,,,,,P#",
+    "#,,,TTT,,,,,,,,T,,,,,,,TTT,,,#",
+    "#,,,T.T,,,,,,,,,,,,,,,,T.T,,,#",
+    "#,,,,TT,,,,,~~~~~,,,,,,TT,,,,#",
+    "#,,,,,,,,,,,~~~~~,,,,,,,,,,,,#",
+    "#,,TT,,,,,,,~~~~~,,,,,,,TT,,,#",
+    "#,,TT,,,,,,,,,,,,,,,,,,,TT,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,ooooo,,,,,,,,ooooo,,,,,#",
+    "#,,,,,o...o,,,,,,,,o...o,,,,,#",
+    "#,,,,,o...o,,,,,,,,o...o,,,,,#",
+    "#,,,,,ooooo,,,,,,,,ooooo,,,,,#",
+    "#,,,,,,,,,,,,,,+,,,,,,,,,,,,,#",
+    "#,,,,TTT,,,,,,,,,,,,,TTT,,,,,#",
+    "#,,,,T.T,,,,,,,,,,,,,T.T,,,,,#",
+    "#,,,,TTT,,,,,,,,,,,,,TTT,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,~~~~~,,,,,,,,,,,,,,,#",
+    "#,,,,,,,~~~~~~~,,,,,,,,,,,,,,#",
+    "#,,,,,,,,~~~~~,,,,,,,,,,,,,,,#",
+    "#,,P,,,,,,,,,,,,,,,,,,,,,,,,P#",
+    "#,,,,,,,,,,TT,,,,TT,,,,,,,,,,#",
+    "#,,,,,,,,,,TT,,,,TT,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,P,,,,,,,,,,,,,,#",
+    "#,,,,P,,,,,,,,,,,,,,,,,,,,,,,#",
+    "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+    "##############################"
+  ],
+  "portals": [
+    {
+      "x": 3,
+      "y": 2,
+      "targetMapId": "spawn",
+      "targetX": 32,
+      "targetY": 10
+    },
+    {
+      "x": 28,
+      "y": 2,
+      "targetMapId": "black_iron_mine",
+      "targetX": 2,
+      "targetY": 2
+    },
+    {
+      "x": 28,
+      "y": 22,
+      "targetMapId": "ancient_ruins",
+      "targetX": 2,
+      "targetY": 2
+    },
+    {
+      "x": 14,
+      "y": 26,
+      "targetMapId": "beast_valley",
+      "targetX": 2,
+      "targetY": 2
+    },
+    {
+      "x": 5,
+      "y": 27,
+      "targetMapId": "wildlands",
+      "targetX": 8,
+      "targetY": 45
+    }
+  ],
+  "dangerLevel": 2,
+  "recommendedRealm": "后天-先天",
+  "spawnPoint": {
+    "x": 4,
+    "y": 4
+  },
+  "npcs": [
+    {
+      "id": "npc_bamboo_scout",
+      "name": "巡林弟子·阿栖",
+      "x": 6,
+      "y": 6,
+      "char": "巡",
+      "color": "#89d185",
+      "role": "quest_hint",
+      "dialogue": "沿主径走，别钻竹海。矿洞与遗迹都在林子尽头。"
+    },
+    {
+      "id": "npc_broken_cart",
+      "name": "翻倒的运材车",
+      "x": 15,
+      "y": 14,
+      "char": "车",
+      "color": "#c2a878",
+      "role": "scene",
+      "dialogue": "车辙通向东北矿洞，血迹通向东南遗迹。"
+    },
+    {
+      "id": "npc_bamboo_hermit",
+      "name": "竹隐客",
+      "x": 18,
+      "y": 18,
+      "char": "隐",
+      "color": "#8ac6a0",
+      "role": "quest_giver",
+      "dialogue": "你若能在这片竹海站稳，便说明已不只是初入江湖的菜鸟。",
+      "quests": [
+        {
+          "id": "q_bamboo_heart",
+          "title": "竹海蕴心",
+          "desc": "清理竹海妖狼与竹灵，带回翠竹心作为淬体药引。",
+          "targetMonsterId": "m_bamboo_sprite",
+          "targetCount": 6,
+          "requiredItemId": "bamboo_heart",
+          "requiredItemCount": 4,
+          "reward": [
+            {
+              "itemId": "equip.leather_vest",
+              "name": "硬皮护衣",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "book.iron_bone_art",
+              "name": "《铁骨功》",
+              "type": "skill_book",
+              "count": 1
+            }
+          ],
+          "nextQuestId": "q_bamboo_mantis"
+        },
+        {
+          "id": "q_bamboo_mantis",
+          "title": "斩螳开路",
+          "desc": "击退刃竹螳并收回足量螳锋，为深入矿洞做准备。",
+          "targetMonsterId": "m_bamboo_mantis",
+          "targetCount": 8,
+          "requiredItemId": "mantis_blade",
+          "requiredItemCount": 5,
+          "reward": [
+            {
+              "itemId": "equip.rust_saber",
+              "name": "旧铁长刀",
+              "type": "equipment",
+              "count": 1
+            },
+            {
+              "itemId": "major_qi_pill",
+              "name": "大还灵丹",
+              "type": "consumable",
+              "count": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "monsterSpawns": [
+    {
+      "id": "m_spirit_wolf",
+      "name": "噬灵狼",
+      "char": "狼",
+      "color": "#b3b7c1",
+      "x": 20,
+      "y": 11,
+      "radius": 7,
+      "maxAlive": 8,
+      "respawnSec": 18,
+      "level": 2,
+      "hp": 40,
+      "attack": 8,
+      "drops": [
+        {
+          "itemId": "wolf_fang",
+          "name": "狼牙",
+          "type": "material",
+          "count": 1,
+          "chance": 0.58
+        },
+        {
+          "itemId": "book_wind_step",
+          "name": "《踏风步》残页",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.07
+        }
+      ]
+    },
+    {
+      "id": "m_bamboo_serpent",
+      "name": "青鳞竹蛇",
+      "char": "蛇",
+      "color": "#67b56f",
+      "x": 10,
+      "y": 21,
+      "radius": 5,
+      "maxAlive": 6,
+      "respawnSec": 20,
+      "level": 3,
+      "hp": 52,
+      "attack": 10,
+      "drops": [
+        {
+          "itemId": "serpent_gall",
+          "name": "竹蛇胆",
+          "type": "material",
+          "count": 1,
+          "chance": 0.5
+        }
+      ]
+    },
+    {
+      "id": "m_bamboo_sprite",
+      "name": "竹心灵",
+      "char": "灵",
+      "color": "#91d88d",
+      "x": 13,
+      "y": 8,
+      "radius": 5,
+      "maxAlive": 5,
+      "respawnSec": 20,
+      "level": 3,
+      "hp": 58,
+      "attack": 9,
+      "drops": [
+        {
+          "itemId": "bamboo_heart",
+          "name": "翠竹心",
+          "type": "material",
+          "count": 1,
+          "chance": 0.45
+        },
+        {
+          "itemId": "book.iron_bone_art",
+          "name": "《铁骨功》",
+          "type": "skill_book",
+          "count": 1,
+          "chance": 0.05
+        }
+      ]
+    },
+    {
+      "id": "m_bamboo_mantis",
+      "name": "刃竹螳",
+      "char": "螳",
+      "color": "#7fbf5f",
+      "x": 23,
+      "y": 18,
+      "radius": 6,
+      "maxAlive": 5,
+      "respawnSec": 22,
+      "level": 4,
+      "hp": 68,
+      "attack": 12,
+      "drops": [
+        {
+          "itemId": "mantis_blade",
+          "name": "螳锋",
+          "type": "material",
+          "count": 1,
+          "chance": 0.5
+        },
+        {
+          "itemId": "equip.rust_saber",
+          "name": "旧铁长刀",
+          "type": "equipment",
+          "count": 1,
+          "chance": 0.05
+        }
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "lm_bamboo_crossroad",
+      "name": "三岔竹路",
+      "x": 15,
+      "y": 14,
+      "desc": "向东北去矿洞，向东南去遗迹，直南入兽谷。"
+    },
+    {
+      "id": "lm_bamboo_pool",
+      "name": "月照竹潭",
+      "x": 11,
+      "y": 20,
+      "desc": "灵气稍聚的水潭，常有竹灵和蛇妖出没。"
+    }
+  ]
+}
