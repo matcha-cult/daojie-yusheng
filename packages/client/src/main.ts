@@ -341,6 +341,7 @@ socket.onAttrUpdate((data) => {
     myPlayer.realmName = data.realm?.name;
     myPlayer.realmStage = data.realm?.shortName;
     myPlayer.breakthroughReady = data.realm?.breakthroughReady;
+    techniquePanel.update(myPlayer.techniques, myPlayer.cultivatingTechId, myPlayer.numericStats?.spellAtk ?? 0);
   }
   attrPanel.update(data);
   refreshUiChrome();
@@ -358,7 +359,7 @@ socket.onTechniqueUpdate((data) => {
     myPlayer.techniques = data.techniques;
     myPlayer.cultivatingTechId = data.cultivatingTechId;
   }
-  techniquePanel.update(data.techniques, data.cultivatingTechId);
+  techniquePanel.update(data.techniques, data.cultivatingTechId, myPlayer?.numericStats?.spellAtk ?? 0);
   refreshUiChrome();
 });
 socket.onActionsUpdate((data) => {

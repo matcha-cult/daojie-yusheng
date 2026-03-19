@@ -1352,6 +1352,29 @@
       background: var(--paper-white);
       border: 1px solid var(--wash-ink);
     }
+    .tech-card.expanded {
+      border-color: rgba(139, 48, 35, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(139, 48, 35, 0.06);
+    }
+    .tech-summary {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      text-align: left;
+      cursor: pointer;
+    }
+    .tech-summary-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
     .tech-name { font-family: var(--font-heading-sub); font-size: 15px; color: var(--ink-black); }
     .tech-realm { font-size: 12px; color: var(--stamp-red); margin-left: 6px; }
     .tech-head {
@@ -1359,6 +1382,28 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+    }
+    .tech-layer {
+      font-size: 12px;
+      color: var(--ink-grey);
+    }
+    .tech-arrow {
+      font-size: 13px;
+      color: var(--ink-grey);
+      transition: transform 0.18s ease;
+      flex-shrink: 0;
+    }
+    .tech-card.expanded .tech-arrow {
+      transform: rotate(90deg);
+    }
+    .tech-details {
+      display: none;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(60, 47, 39, 0.08);
+    }
+    .tech-card.expanded .tech-details {
+      display: block;
     }
     .tech-exp-bar {
       height: 6px;
@@ -1374,10 +1419,38 @@
     .tech-meta {
       display: flex;
       justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
       gap: 8px;
       font-size: 12px;
       color: var(--ink-grey);
       margin-bottom: 8px;
+    }
+    .tech-growth-list {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .tech-section-title {
+      margin: 10px 0 6px;
+      font-family: var(--font-heading-sub);
+      font-size: 13px;
+      color: var(--ink-black);
+      letter-spacing: 1px;
+    }
+    .tech-growth-row {
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--ink-grey);
+      padding: 7px 8px;
+      background: rgba(255,255,255,0.42);
+      border: 1px solid rgba(60, 47, 39, 0.08);
+    }
+    .tech-growth-layer {
+      min-width: 72px;
+      color: var(--ink-black);
+      font-family: var(--font-heading-sub);
     }
     .tech-skills {
       display: grid;
@@ -1388,6 +1461,10 @@
       padding: 8px;
       border: 1px solid var(--wash-ink);
       background: rgba(255,255,255,0.4);
+      cursor: help;
+    }
+    .skill-chip.locked {
+      opacity: 0.68;
     }
     .skill-chip-title {
       font-size: 13px;
@@ -1397,6 +1474,40 @@
       margin-top: 4px;
       font-size: 11px;
       color: var(--ink-grey);
+    }
+    .tech-tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(34,26,19,0.15);
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      font-size: 13px;
+      color: #1a120a;
+      z-index: 2000;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      min-width: 180px;
+      max-width: 280px;
+    }
+    .tech-tooltip.visible {
+      opacity: 1;
+    }
+    .tech-tooltip-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      line-height: 1.45;
+    }
+    .tech-tooltip-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      color: #5c5349;
+    }
+    .tech-tooltip-line {
+      display: block;
     }
 
     /* 任务卡片 */
