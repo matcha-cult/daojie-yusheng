@@ -46,7 +46,7 @@ export const SERVER_PORT = 3000;
 // ===== 修仙系统常量 =====
 
 /** 默认背包容量 */
-export const DEFAULT_INVENTORY_CAPACITY = 30;
+export const DEFAULT_INVENTORY_CAPACITY = 100;
 
 /** 默认六维属性 */
 export const DEFAULT_BASE_ATTRS = {
@@ -59,22 +59,22 @@ export const DEFAULT_BASE_ATTRS = {
 } as const;
 
 /** 基础最大灵力 */
-export const BASE_MAX_QI = 20;
+export const BASE_MAX_QI = 50;
 
 /** 基础物理攻击 */
-export const BASE_PHYS_ATK = 3;
+export const BASE_PHYS_ATK = 10;
 
 /** 基础法术攻击 */
-export const BASE_SPELL_ATK = 3;
+export const BASE_SPELL_ATK = 5;
 
 /** 基础物理防御 */
-export const BASE_PHYS_DEF = 2;
+export const BASE_PHYS_DEF = 0;
 
 /** 基础法术防御 */
-export const BASE_SPELL_DEF = 2;
+export const BASE_SPELL_DEF = 0;
 
 /** 基础命中 */
-export const BASE_HIT = 10;
+export const BASE_HIT = 0;
 
 /** 基础灵力输出速率 */
 export const BASE_MAX_QI_OUTPUT_PER_TICK = 10;
@@ -83,13 +83,13 @@ export const BASE_MAX_QI_OUTPUT_PER_TICK = 10;
 export const BASE_HP_REGEN_RATE = 50;
 
 /** 基础灵力自动回复（万分比） */
-export const BASE_QI_REGEN_RATE = 100;
+export const BASE_QI_REGEN_RATE = 50;
 
 /** 体质 → 最大HP 系数 */
 export const HP_PER_CONSTITUTION = 10;
 
 /** 基础最大HP */
-export const BASE_MAX_HP = 50;
+export const BASE_MAX_HP = 100;
 
 type AttrPercentStatKey = 'maxHp' | 'maxQi' | 'physAtk' | 'spellAtk';
 
