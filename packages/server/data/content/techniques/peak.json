@@ -1,0 +1,108 @@
+[
+  {
+    "id": "stillheart",
+    "name": "止念诀",
+    "grade": "heaven",
+    "attrCurves": {
+      "spirit": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.7 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 1.1 },
+        { "startLevel": 11, "gainPerLevel": 0.55 }
+      ],
+      "comprehension": [
+        { "startLevel": 1, "endLevel": 6, "gainPerLevel": 1.0 },
+        { "startLevel": 7, "gainPerLevel": 0.45 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.stillheart_seal",
+        "name": "止念印",
+        "desc": "以神识压迫敌念，对四格内目标造成强力打击。",
+        "cooldown": 5,
+        "cost": 12,
+        "range": 4,
+        "power": 30,
+        "unlockRealm": "Entry",
+        "unlockPlayerRealm": "QiRefining"
+      }
+    ]
+  },
+  {
+    "id": "spirit_anchor",
+    "name": "镇灵篇",
+    "grade": "spirit",
+    "attrCurves": {
+      "spirit": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.9 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 1.2 },
+        { "startLevel": 11, "gainPerLevel": 0.6 }
+      ],
+      "comprehension": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.1 },
+        { "startLevel": 6, "gainPerLevel": 0.5 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.anchor_pulse",
+        "name": "镇灵冲",
+        "desc": "神识冲击近中距离目标。",
+        "cooldown": 3,
+        "cost": 8,
+        "range": 2,
+        "power": 26,
+        "unlockRealm": "Entry"
+      },
+      {
+        "id": "skill.soul_chain",
+        "name": "缚魄锁",
+        "desc": "以灵链拘束并重创四格内敌人。",
+        "cooldown": 5,
+        "cost": 14,
+        "range": 4,
+        "power": 40,
+        "unlockRealm": "Major"
+      }
+    ]
+  },
+  {
+    "id": "starfall_spear",
+    "name": "陨星枪诀",
+    "grade": "saint",
+    "attrCurves": {
+      "constitution": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.3 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 0.8 },
+        { "startLevel": 11, "gainPerLevel": 0.4 }
+      ],
+      "perception": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.9 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 1.2 },
+        { "startLevel": 11, "gainPerLevel": 0.6 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.starfall_thrust",
+        "name": "坠星刺",
+        "desc": "枪意贯空，穿刺三格内目标。",
+        "cooldown": 3,
+        "cost": 9,
+        "range": 3,
+        "power": 30,
+        "unlockRealm": "Entry"
+      },
+      {
+        "id": "skill.meteor_break",
+        "name": "陨焰破",
+        "desc": "牵引星火猛击，粉碎远距强敌。",
+        "cooldown": 6,
+        "cost": 15,
+        "range": 4,
+        "power": 48,
+        "unlockRealm": "Major"
+      }
+    ]
+  }
+]

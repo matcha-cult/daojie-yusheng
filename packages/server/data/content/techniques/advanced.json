@@ -1,0 +1,137 @@
+[
+  {
+    "id": "redflame_art",
+    "name": "赤焰诀",
+    "grade": "mystic",
+    "attrCurves": {
+      "spirit": [
+        { "startLevel": 1, "endLevel": 4, "gainPerLevel": 1.6 },
+        { "startLevel": 5, "endLevel": 8, "gainPerLevel": 1.0 },
+        { "startLevel": 9, "gainPerLevel": 0.5 }
+      ],
+      "comprehension": [
+        { "startLevel": 1, "endLevel": 6, "gainPerLevel": 0.7 },
+        { "startLevel": 7, "gainPerLevel": 0.25 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.fire_talisman",
+        "name": "离火符",
+        "desc": "引燃符火，攻击三格内的目标。",
+        "cooldown": 3,
+        "cost": 7,
+        "range": 3,
+        "power": 18,
+        "unlockRealm": "Entry",
+        "unlockPlayerRealm": "Meridian"
+      }
+    ]
+  },
+  {
+    "id": "thunder_palm",
+    "name": "惊雷掌",
+    "grade": "earth",
+    "attrCurves": {
+      "constitution": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.1 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 0.7 },
+        { "startLevel": 11, "gainPerLevel": 0.35 }
+      ],
+      "spirit": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.0 },
+        { "startLevel": 6, "gainPerLevel": 0.45 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.thunder_palm",
+        "name": "惊雷掌",
+        "desc": "掌心引雷，重创近中距离目标。",
+        "cooldown": 4,
+        "cost": 9,
+        "range": 2,
+        "power": 24,
+        "unlockRealm": "Entry",
+        "unlockPlayerRealm": "Innate"
+      }
+    ]
+  },
+  {
+    "id": "cloud_blade",
+    "name": "流云刀谱",
+    "grade": "mystic",
+    "attrCurves": {
+      "constitution": [
+        { "startLevel": 1, "endLevel": 4, "gainPerLevel": 0.9 },
+        { "startLevel": 5, "endLevel": 8, "gainPerLevel": 0.5 },
+        { "startLevel": 9, "gainPerLevel": 0.2 }
+      ],
+      "perception": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.4 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 0.9 },
+        { "startLevel": 11, "gainPerLevel": 0.45 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.cloud_cut",
+        "name": "流云断",
+        "desc": "刀势如云，斩击两格内目标。",
+        "cooldown": 2,
+        "cost": 7,
+        "range": 2,
+        "power": 21,
+        "unlockRealm": "Entry"
+      },
+      {
+        "id": "skill.dragon_turn",
+        "name": "回龙转锋",
+        "desc": "连环变招，重创三格内目标。",
+        "cooldown": 4,
+        "cost": 11,
+        "range": 3,
+        "power": 34,
+        "unlockRealm": "Major"
+      }
+    ]
+  },
+  {
+    "id": "frost_sutra",
+    "name": "寒魄经",
+    "grade": "earth",
+    "attrCurves": {
+      "spirit": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.2 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 0.8 },
+        { "startLevel": 11, "gainPerLevel": 0.35 }
+      ],
+      "talent": [
+        { "startLevel": 1, "endLevel": 6, "gainPerLevel": 0.9 },
+        { "startLevel": 7, "gainPerLevel": 0.4 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.frost_mark",
+        "name": "霜痕",
+        "desc": "冰灵附刃，远距点杀目标。",
+        "cooldown": 3,
+        "cost": 8,
+        "range": 3,
+        "power": 24,
+        "unlockRealm": "Entry"
+      },
+      {
+        "id": "skill.cold_moon_seal",
+        "name": "寒月印",
+        "desc": "凝寒印镇压四格内敌手。",
+        "cooldown": 5,
+        "cost": 12,
+        "range": 4,
+        "power": 36,
+        "unlockRealm": "Minor"
+      }
+    ]
+  }
+]

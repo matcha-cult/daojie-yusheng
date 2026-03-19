@@ -1,0 +1,98 @@
+[
+  {
+    "id": "qingmu_sword",
+    "name": "青木剑诀",
+    "grade": "yellow",
+    "attrCurves": {
+      "perception": [
+        { "startLevel": 1, "endLevel": 4, "gainPerLevel": 1.2 },
+        { "startLevel": 5, "endLevel": 8, "gainPerLevel": 0.8 },
+        { "startLevel": 9, "gainPerLevel": 0.4 }
+      ],
+      "spirit": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 0.8 },
+        { "startLevel": 6, "gainPerLevel": 0.3 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.qingmu_slash",
+        "name": "青木斩",
+        "desc": "将灵气灌入剑锋，对近身妖物造成稳定伤害。",
+        "cooldown": 2,
+        "cost": 4,
+        "range": 1,
+        "power": 14,
+        "unlockRealm": "Entry",
+        "unlockPlayerRealm": "Mortal"
+      }
+    ]
+  },
+  {
+    "id": "wind_step",
+    "name": "踏风步",
+    "grade": "yellow",
+    "attrCurves": {
+      "perception": [
+        { "startLevel": 1, "endLevel": 5, "gainPerLevel": 1.8 },
+        { "startLevel": 6, "endLevel": 10, "gainPerLevel": 1.1 },
+        { "startLevel": 11, "gainPerLevel": 0.55 }
+      ],
+      "luck": [
+        { "startLevel": 1, "endLevel": 8, "gainPerLevel": 0.2 },
+        { "startLevel": 9, "gainPerLevel": 0.08 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.wind_edge",
+        "name": "风痕",
+        "desc": "借步法切入身位，对两格内目标打出轻快一击。",
+        "cooldown": 2,
+        "cost": 5,
+        "range": 2,
+        "power": 16,
+        "unlockRealm": "Entry",
+        "unlockPlayerRealm": "BodyTempering"
+      }
+    ]
+  },
+  {
+    "id": "iron_bone_art",
+    "name": "铁骨功",
+    "grade": "mortal",
+    "attrCurves": {
+      "constitution": [
+        { "startLevel": 1, "endLevel": 6, "gainPerLevel": 2.0 },
+        { "startLevel": 7, "endLevel": 12, "gainPerLevel": 1.2 },
+        { "startLevel": 13, "gainPerLevel": 0.6 }
+      ],
+      "talent": [
+        { "startLevel": 1, "endLevel": 8, "gainPerLevel": 0.8 },
+        { "startLevel": 9, "gainPerLevel": 0.3 }
+      ]
+    },
+    "skills": [
+      {
+        "id": "skill.iron_bone_strike",
+        "name": "铁骨崩拳",
+        "desc": "以内劲震骨，近身爆发伤害。",
+        "cooldown": 2,
+        "cost": 6,
+        "range": 1,
+        "power": 18,
+        "unlockRealm": "Entry"
+      },
+      {
+        "id": "skill.iron_guard_roar",
+        "name": "震罡怒吼",
+        "desc": "鼓荡护体罡气，轰击中距离目标。",
+        "cooldown": 4,
+        "cost": 10,
+        "range": 2,
+        "power": 29,
+        "unlockRealm": "Minor"
+      }
+    ]
+  }
+]

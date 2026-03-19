@@ -1,0 +1,17 @@
+[
+  { "itemId": "equip.rust_saber", "name": "旧铁长刀", "type": "equipment", "desc": "镇防旧库翻出的制式长刀。", "equipSlot": "weapon", "equipStats": { "physAtk": 6, "hit": 2 } },
+  { "itemId": "equip.hunter_cap", "name": "猎风帽", "type": "equipment", "desc": "荒野猎户常用的轻便头具。", "equipSlot": "head", "equipStats": { "dodge": 3, "crit": 1 } },
+  { "itemId": "equip.leather_vest", "name": "硬皮护衣", "type": "equipment", "desc": "由粗皮与铜扣缝制的护身衣。", "equipSlot": "body", "equipStats": { "maxHp": 24, "physDef": 4 } },
+  { "itemId": "equip.step_boots", "name": "游侠靴", "type": "equipment", "desc": "鞋底附有防滑纹路，适合野外奔袭。", "equipSlot": "legs", "equipStats": { "moveSpeed": 25, "dodge": 2 } },
+  { "itemId": "equip.black_iron_sword", "name": "玄铁长剑", "type": "equipment", "desc": "经矿洞灵铁锻造，兼具锋锐与韧性。", "equipSlot": "weapon", "equipStats": { "physAtk": 11, "spellAtk": 4, "hit": 4 } },
+  { "itemId": "equip.miner_helmet", "name": "矿卫盔", "type": "equipment", "desc": "旧矿卫制式铁盔，防护结实。", "equipSlot": "head", "equipStats": { "maxHp": 18, "physDef": 6, "resolvePower": 2 } },
+  { "itemId": "equip.rune_robe", "name": "断纹法袍", "type": "equipment", "desc": "遗迹残纹织就的法袍，能稳固神识。", "equipSlot": "body", "equipStats": { "maxQi": 32, "spellAtk": 7, "spellDef": 5 } },
+  { "itemId": "equip.cloud_boots", "name": "踏云履", "type": "equipment", "desc": "鞋底镶有浮云阵纹，行走轻灵。", "equipSlot": "legs", "equipStats": { "moveSpeed": 40, "dodge": 4, "hit": 2 } },
+  { "itemId": "equip.spirit_ring", "name": "凝灵戒", "type": "equipment", "desc": "可缓慢聚拢逸散灵气的戒指。", "equipSlot": "accessory", "equipStats": { "maxQi": 28, "qiRegenRate": 120, "crit": 2 } },
+  { "itemId": "equip.valley_fang_blade", "name": "裂齿妖刃", "type": "equipment", "desc": "以妖狼獠牙打磨出的偏锋战刃。", "equipSlot": "weapon", "equipStats": { "physAtk": 13, "spellAtk": 8, "breakPower": 3 } },
+  { "itemId": "equip.rift_guard_armor", "name": "裂隙镇守甲", "type": "equipment", "desc": "兽谷旧镇守使战甲，残存阵纹庇护。", "equipSlot": "body", "equipStats": { "maxHp": 42, "physDef": 8, "spellDef": 5, "resolvePower": 4 } },
+  { "itemId": "equip.moonshadow_boots", "name": "月影履", "type": "equipment", "desc": "夜行无声，适合高危区域机动。", "equipSlot": "legs", "equipStats": { "moveSpeed": 55, "dodge": 6, "crit": 3 } },
+  { "itemId": "equip.celestial_crown", "name": "观星冠", "type": "equipment", "desc": "破碎天宫遗留的仪礼冠冕。", "equipSlot": "head", "equipStats": { "maxQi": 36, "spellDef": 8, "hit": 3, "viewRange": 1 } },
+  { "itemId": "equip.starfall_spear", "name": "陨星枪", "type": "equipment", "desc": "铭刻星砂纹路的重枪，杀伐极强。", "equipSlot": "weapon", "equipStats": { "physAtk": 16, "spellAtk": 10, "hit": 5, "breakPower": 4 } },
+  { "itemId": "equip.void_talisman", "name": "空劫符坠", "type": "equipment", "desc": "能压制杂念与心魔的古老符坠。", "equipSlot": "accessory", "equipStats": { "maxQi": 40, "spellDef": 8, "techniqueExpRate": 200, "playerExpRate": 200 } }
+]
