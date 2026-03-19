@@ -1,44 +1,192 @@
 import { Injectable } from '@nestjs/common';
 import {
+  ATTR_TO_NUMERIC_WEIGHTS,
   Attributes,
   AttrBonus,
   AttrKey,
+  DEFAULT_PLAYER_REALM_STAGE,
   PlayerState,
-  HP_PER_CONSTITUTION,
-  BASE_MAX_HP,
+  PLAYER_REALM_NUMERIC_TEMPLATES,
+  PlayerRealmStage,
+  VIEW_RADIUS,
+  addPartialNumericStats,
+  cloneNumericRatioDivisors,
+  createNumericStats,
+  NumericRatioDivisors,
+  NumericStats,
+  resetNumericStats,
 } from '@mud/shared';
 
 const ATTR_KEYS: AttrKey[] = ['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'];
 
+function createAttributeSnapshot(initial = 0): Attributes {
+  return {
+    constitution: initial,
+    spirit: initial,
+    perception: initial,
+    talent: initial,
+    comprehension: initial,
+    luck: initial,
+  };
+}
+
 @Injectable()
 export class AttrService {
   /** 合并基础属性与所有加成，得到最终属性 */
-  computeFinal(base: Attributes, bonuses: AttrBonus[]): Attributes {
-    const result = { ...base };
+  computeFinal(base: Attributes, bonuses: AttrBonus[], target?: Attributes): Attributes {
+    const result = target ?? createAttributeSnapshot();
+    result.constitution = base.constitution;
+    result.spirit = base.spirit;
+    result.perception = base.perception;
+    result.talent = base.talent;
+    result.comprehension = base.comprehension;
+    result.luck = base.luck;
+
     for (const bonus of bonuses) {
-      for (const key of ATTR_KEYS) {
-        if (bonus.attrs[key]) {
-          result[key] += bonus.attrs[key]!;
-        }
-      }
+      const attrs = bonus.attrs;
+      if (attrs.constitution !== undefined) result.constitution += attrs.constitution;
+      if (attrs.spirit !== undefined) result.spirit += attrs.spirit;
+      if (attrs.perception !== undefined) result.perception += attrs.perception;
+      if (attrs.talent !== undefined) result.talent += attrs.talent;
+      if (attrs.comprehension !== undefined) result.comprehension += attrs.comprehension;
+      if (attrs.luck !== undefined) result.luck += attrs.luck;
     }
+
     return result;
   }
 
-  /** 根据体质计算最大HP */
-  computeMaxHp(finalAttrs: Attributes): number {
-    return BASE_MAX_HP + finalAttrs.constitution * HP_PER_CONSTITUTION;
+  getPlayerFinalAttrs(player: PlayerState): Attributes {
+    if (!player.finalAttrs) {
+      player.finalAttrs = this.computeFinal(player.baseAttrs, player.bonuses);
+    }
+    return player.finalAttrs;
   }
 
-  /** 重算玩家属性并更新 maxHp */
+  getPlayerNumericStats(player: PlayerState): NumericStats {
+    if (!player.numericStats) {
+      this.recalcPlayer(player);
+    }
+    return player.numericStats!;
+  }
+
+  getPlayerRatioDivisors(player: PlayerState): NumericRatioDivisors {
+    if (!player.ratioDivisors) {
+      this.recalcPlayer(player);
+    }
+    return player.ratioDivisors!;
+  }
+
+  /** 重算玩家六维缓存、具体属性缓存，并同步 HP/QI 上限等运行时字段 */
   recalcPlayer(player: PlayerState): void {
-    const final = this.computeFinal(player.baseAttrs, player.bonuses);
-    const newMaxHp = this.computeMaxHp(final);
-    // maxHp 变化时按比例调整当前 hp
+    const previousMaxQi = Math.max(0, Math.round(player.numericStats?.maxQi ?? player.qi ?? 0));
+    const finalAttrs = this.computeFinal(
+      player.baseAttrs,
+      player.bonuses,
+      player.finalAttrs ?? createAttributeSnapshot(),
+    );
+    const stage = player.realm?.stage ?? DEFAULT_PLAYER_REALM_STAGE;
+    const stats = this.computeNumericStats(
+      finalAttrs,
+      player.bonuses,
+      stage,
+      player.numericStats ?? createNumericStats(),
+    );
+    const ratioDivisors = this.getRatioDivisorsForStage(
+      stage,
+      player.ratioDivisors,
+    );
+
+    player.finalAttrs = finalAttrs;
+    player.numericStats = stats;
+    player.ratioDivisors = ratioDivisors;
+
+    const newMaxHp = Math.max(1, Math.round(stats.maxHp));
     if (player.maxHp > 0 && newMaxHp !== player.maxHp) {
       const ratio = player.hp / player.maxHp;
       player.hp = Math.max(1, Math.round(ratio * newMaxHp));
     }
     player.maxHp = newMaxHp;
+    const newMaxQi = Math.max(0, Math.round(stats.maxQi));
+    if (previousMaxQi > 0 && newMaxQi !== previousMaxQi) {
+      const ratio = player.qi / previousMaxQi;
+      player.qi = Math.max(0, Math.min(newMaxQi, Math.round(ratio * newMaxQi)));
+    } else if (previousMaxQi <= 0 && player.qi <= 0) {
+      player.qi = newMaxQi;
+    } else if (!Number.isFinite(player.qi)) {
+      player.qi = newMaxQi;
+    } else {
+      player.qi = Math.max(0, Math.min(newMaxQi, Math.round(player.qi)));
+    }
+    player.viewRange = Math.max(1, Math.round(stats.viewRange || VIEW_RADIUS));
+  }
+
+  private getRatioDivisorsForStage(stage: PlayerRealmStage, previous?: NumericRatioDivisors): NumericRatioDivisors {
+    const template = PLAYER_REALM_NUMERIC_TEMPLATES[stage] ?? PLAYER_REALM_NUMERIC_TEMPLATES[DEFAULT_PLAYER_REALM_STAGE];
+    const snapshot = cloneNumericRatioDivisors(template.ratioDivisors);
+    if (!previous) {
+      return snapshot;
+    }
+    previous.dodge = snapshot.dodge;
+    previous.crit = snapshot.crit;
+    previous.breakPower = snapshot.breakPower;
+    previous.resolvePower = snapshot.resolvePower;
+    previous.cooldownSpeed = snapshot.cooldownSpeed;
+    previous.moveSpeed = snapshot.moveSpeed;
+    previous.elementDamageReduce.metal = snapshot.elementDamageReduce.metal;
+    previous.elementDamageReduce.wood = snapshot.elementDamageReduce.wood;
+    previous.elementDamageReduce.water = snapshot.elementDamageReduce.water;
+    previous.elementDamageReduce.fire = snapshot.elementDamageReduce.fire;
+    previous.elementDamageReduce.earth = snapshot.elementDamageReduce.earth;
+    return previous;
+  }
+
+  private computeNumericStats(
+    finalAttrs: Attributes,
+    bonuses: AttrBonus[],
+    stage: PlayerRealmStage,
+    target: NumericStats,
+  ): NumericStats {
+    const template = PLAYER_REALM_NUMERIC_TEMPLATES[stage] ?? PLAYER_REALM_NUMERIC_TEMPLATES[DEFAULT_PLAYER_REALM_STAGE];
+    resetNumericStats(target);
+    addPartialNumericStats(target, template.stats);
+
+    for (const key of ATTR_KEYS) {
+      const value = finalAttrs[key];
+      if (value === 0) continue;
+      this.applyAttrWeight(target, key, value);
+    }
+
+    for (const bonus of bonuses) {
+      addPartialNumericStats(target, bonus.stats);
+    }
+
+    return target;
+  }
+
+  private applyAttrWeight(target: NumericStats, key: AttrKey, value: number): void {
+    const weight = ATTR_TO_NUMERIC_WEIGHTS[key];
+    if (!weight) return;
+
+    if (weight.maxHp !== undefined) target.maxHp += weight.maxHp * value;
+    if (weight.maxQi !== undefined) target.maxQi += weight.maxQi * value;
+    if (weight.physAtk !== undefined) target.physAtk += weight.physAtk * value;
+    if (weight.spellAtk !== undefined) target.spellAtk += weight.spellAtk * value;
+    if (weight.physDef !== undefined) target.physDef += weight.physDef * value;
+    if (weight.spellDef !== undefined) target.spellDef += weight.spellDef * value;
+    if (weight.hit !== undefined) target.hit += weight.hit * value;
+    if (weight.dodge !== undefined) target.dodge += weight.dodge * value;
+    if (weight.crit !== undefined) target.crit += weight.crit * value;
+    if (weight.critDamage !== undefined) target.critDamage += weight.critDamage * value;
+    if (weight.breakPower !== undefined) target.breakPower += weight.breakPower * value;
+    if (weight.resolvePower !== undefined) target.resolvePower += weight.resolvePower * value;
+    if (weight.maxQiOutputPerTick !== undefined) target.maxQiOutputPerTick += weight.maxQiOutputPerTick * value;
+    if (weight.qiRegenRate !== undefined) target.qiRegenRate += weight.qiRegenRate * value;
+    if (weight.hpRegenRate !== undefined) target.hpRegenRate += weight.hpRegenRate * value;
+    if (weight.cooldownSpeed !== undefined) target.cooldownSpeed += weight.cooldownSpeed * value;
+    if (weight.auraPowerRate !== undefined) target.auraPowerRate += weight.auraPowerRate * value;
+    if (weight.techniqueExpRate !== undefined) target.techniqueExpRate += weight.techniqueExpRate * value;
+    if (weight.lootRate !== undefined) target.lootRate += weight.lootRate * value;
+    if (weight.rareLootRate !== undefined) target.rareLootRate += weight.rareLootRate * value;
+    if (weight.moveSpeed !== undefined) target.moveSpeed += weight.moveSpeed * value;
   }
 }

@@ -61,8 +61,12 @@ export class EquipmentService {
     const bonuses: AttrBonus[] = [];
     for (const slot of EQUIP_SLOTS) {
       const item = equipment[slot];
-      if (item?.equipAttrs) {
-        bonuses.push({ source: `equip:${slot}`, attrs: item.equipAttrs });
+      if (item?.equipAttrs || item?.equipStats) {
+        bonuses.push({
+          source: `equip:${slot}`,
+          attrs: item.equipAttrs ?? {},
+          stats: item.equipStats,
+        });
       }
     }
     return bonuses;

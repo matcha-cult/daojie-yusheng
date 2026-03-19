@@ -38,6 +38,9 @@ export class PlayerEntity {
   @Column({ type: 'int' })
   maxHp!: number;
 
+  @Column({ type: 'int', default: 0 })
+  qi!: number;
+
   @Column({ type: 'boolean', default: false })
   dead!: boolean;
 

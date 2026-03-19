@@ -142,6 +142,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       viewRange: VIEW_RADIUS,
       hp: initMaxHp,
       maxHp: initMaxHp,
+      qi: 0,
       dead: false,
       baseAttrs: { ...DEFAULT_BASE_ATTRS },
       bonuses: [],
@@ -225,7 +226,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.playerService.enqueueCommand(player.mapId, {
       playerId,
       type: 'action',
-      data: { actionId: data.type },
+      data: { actionId: data.actionId ?? data.type, target: data.target },
       timestamp: Date.now(),
     });
   }

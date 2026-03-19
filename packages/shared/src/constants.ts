@@ -1,9 +1,14 @@
 import {
   Attributes,
+  AttrKey,
   BreakthroughItemRequirement,
   PlayerRealmStage,
   TechniqueRealm,
 } from './types';
+import type {
+  PartialNumericStats,
+  RealmNumericTemplate,
+} from './numeric';
 
 /** Tick 间隔（毫秒） */
 export const TICK_INTERVAL = 1000;
@@ -53,11 +58,82 @@ export const DEFAULT_BASE_ATTRS = {
   luck: 10,
 } as const;
 
+/** 基础最大灵力 */
+export const BASE_MAX_QI = 20;
+
+/** 基础物理攻击 */
+export const BASE_PHYS_ATK = 3;
+
+/** 基础法术攻击 */
+export const BASE_SPELL_ATK = 3;
+
+/** 基础物理防御 */
+export const BASE_PHYS_DEF = 2;
+
+/** 基础法术防御 */
+export const BASE_SPELL_DEF = 2;
+
+/** 基础命中 */
+export const BASE_HIT = 10;
+
+/** 基础灵力输出速率 */
+export const BASE_MAX_QI_OUTPUT_PER_TICK = 10;
+
+/** 基础生命自动回复（万分比） */
+export const BASE_HP_REGEN_RATE = 50;
+
+/** 基础灵力自动回复（万分比） */
+export const BASE_QI_REGEN_RATE = 100;
+
 /** 体质 → 最大HP 系数 */
 export const HP_PER_CONSTITUTION = 10;
 
 /** 基础最大HP */
 export const BASE_MAX_HP = 50;
+
+/** 六维到具体属性的初版权重 */
+export const ATTR_TO_NUMERIC_WEIGHTS: Record<AttrKey, PartialNumericStats> = {
+  constitution: {
+    maxHp: 10,
+    physAtk: 1,
+    physDef: 1,
+    hpRegenRate: 8,
+  },
+  spirit: {
+    maxQi: 12,
+    spellAtk: 1,
+    spellDef: 1,
+    maxQiOutputPerTick: 1,
+    qiRegenRate: 10,
+  },
+  perception: {
+    hit: 2,
+    dodge: 1,
+    crit: 1,
+    cooldownSpeed: 1,
+    moveSpeed: 1,
+  },
+  talent: {
+    maxHp: 4,
+    maxQi: 4,
+    physDef: 1,
+    spellDef: 1,
+    resolvePower: 1,
+  },
+  comprehension: {
+    spellAtk: 1,
+    cooldownSpeed: 1,
+    auraPowerRate: 25,
+    techniqueExpRate: 50,
+  },
+  luck: {
+    crit: 1,
+    critDamage: 25,
+    breakPower: 1,
+    lootRate: 50,
+    rareLootRate: 20,
+  },
+};
 
 /** 修炼每 tick 获得经验 */
 export const CULTIVATE_EXP_PER_TICK = 5;
@@ -195,6 +271,152 @@ export const PLAYER_REALM_CONFIG: Record<PlayerRealmStage, RealmConfig> = {
     minTechniqueLevel: 12,
     minTechniqueRealm: TechniqueRealm.Perfection,
   },
+};
+
+function makeElementZero() {
+  return { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 };
+}
+
+function makeRealmNumericTemplate(
+  stage: PlayerRealmStage,
+  scalar: PartialNumericStats,
+  ratioDivisor: number,
+): RealmNumericTemplate {
+  return {
+    stage,
+    stats: {
+      maxHp: BASE_MAX_HP + (scalar.maxHp ?? 0),
+      maxQi: BASE_MAX_QI + (scalar.maxQi ?? 0),
+      physAtk: BASE_PHYS_ATK + (scalar.physAtk ?? 0),
+      spellAtk: BASE_SPELL_ATK + (scalar.spellAtk ?? 0),
+      physDef: BASE_PHYS_DEF + (scalar.physDef ?? 0),
+      spellDef: BASE_SPELL_DEF + (scalar.spellDef ?? 0),
+      hit: BASE_HIT + (scalar.hit ?? 0),
+      dodge: scalar.dodge ?? 0,
+      crit: scalar.crit ?? 0,
+      critDamage: scalar.critDamage ?? 0,
+      breakPower: scalar.breakPower ?? 0,
+      resolvePower: scalar.resolvePower ?? 0,
+      maxQiOutputPerTick: BASE_MAX_QI_OUTPUT_PER_TICK + (scalar.maxQiOutputPerTick ?? 0),
+      qiRegenRate: BASE_QI_REGEN_RATE + (scalar.qiRegenRate ?? 0),
+      hpRegenRate: BASE_HP_REGEN_RATE + (scalar.hpRegenRate ?? 0),
+      cooldownSpeed: scalar.cooldownSpeed ?? 0,
+      auraCostReduce: scalar.auraCostReduce ?? 0,
+      auraPowerRate: scalar.auraPowerRate ?? 0,
+      playerExpRate: scalar.playerExpRate ?? 0,
+      techniqueExpRate: scalar.techniqueExpRate ?? 0,
+      lootRate: scalar.lootRate ?? 0,
+      rareLootRate: scalar.rareLootRate ?? 0,
+      viewRange: VIEW_RADIUS + (scalar.viewRange ?? 0),
+      moveSpeed: scalar.moveSpeed ?? 0,
+      elementDamageBonus: { ...makeElementZero(), ...(scalar.elementDamageBonus ?? {}) },
+      elementDamageReduce: { ...makeElementZero(), ...(scalar.elementDamageReduce ?? {}) },
+    },
+    ratioDivisors: {
+      dodge: ratioDivisor,
+      crit: ratioDivisor,
+      breakPower: ratioDivisor,
+      resolvePower: ratioDivisor,
+      cooldownSpeed: ratioDivisor,
+      moveSpeed: ratioDivisor,
+      elementDamageReduce: {
+        metal: ratioDivisor,
+        wood: ratioDivisor,
+        water: ratioDivisor,
+        fire: ratioDivisor,
+        earth: ratioDivisor,
+      },
+    },
+  };
+}
+
+/** 按境界提供的具体属性基准与 RatioValue 基数 */
+export const PLAYER_REALM_NUMERIC_TEMPLATES: Record<PlayerRealmStage, RealmNumericTemplate> = {
+  [PlayerRealmStage.Mortal]: makeRealmNumericTemplate(PlayerRealmStage.Mortal, {}, 100),
+  [PlayerRealmStage.BodyTempering]: makeRealmNumericTemplate(PlayerRealmStage.BodyTempering, {
+    maxHp: 20,
+    physAtk: 2,
+    physDef: 2,
+    hpRegenRate: 10,
+  }, 120),
+  [PlayerRealmStage.BoneForging]: makeRealmNumericTemplate(PlayerRealmStage.BoneForging, {
+    maxHp: 45,
+    maxQi: 10,
+    physAtk: 4,
+    physDef: 4,
+    spellDef: 2,
+    maxQiOutputPerTick: 2,
+    hpRegenRate: 20,
+  }, 150),
+  [PlayerRealmStage.Meridian]: makeRealmNumericTemplate(PlayerRealmStage.Meridian, {
+    maxHp: 80,
+    maxQi: 25,
+    physAtk: 6,
+    spellAtk: 4,
+    physDef: 6,
+    spellDef: 5,
+    hit: 4,
+    maxQiOutputPerTick: 4,
+    qiRegenRate: 20,
+    hpRegenRate: 25,
+    cooldownSpeed: 4,
+  }, 190),
+  [PlayerRealmStage.Innate]: makeRealmNumericTemplate(PlayerRealmStage.Innate, {
+    maxHp: 130,
+    maxQi: 45,
+    physAtk: 10,
+    spellAtk: 8,
+    physDef: 10,
+    spellDef: 8,
+    hit: 8,
+    dodge: 4,
+    crit: 4,
+    breakPower: 4,
+    resolvePower: 4,
+    maxQiOutputPerTick: 8,
+    qiRegenRate: 30,
+    hpRegenRate: 30,
+    cooldownSpeed: 8,
+  }, 240),
+  [PlayerRealmStage.QiRefining]: makeRealmNumericTemplate(PlayerRealmStage.QiRefining, {
+    maxHp: 190,
+    maxQi: 90,
+    physAtk: 14,
+    spellAtk: 16,
+    physDef: 14,
+    spellDef: 15,
+    hit: 12,
+    dodge: 6,
+    crit: 6,
+    critDamage: 100,
+    breakPower: 6,
+    resolvePower: 6,
+    maxQiOutputPerTick: 14,
+    qiRegenRate: 45,
+    hpRegenRate: 35,
+    cooldownSpeed: 12,
+    auraPowerRate: 50,
+  }, 300),
+  [PlayerRealmStage.Foundation]: makeRealmNumericTemplate(PlayerRealmStage.Foundation, {
+    maxHp: 270,
+    maxQi: 150,
+    physAtk: 22,
+    spellAtk: 24,
+    physDef: 22,
+    spellDef: 22,
+    hit: 18,
+    dodge: 10,
+    crit: 10,
+    critDamage: 200,
+    breakPower: 10,
+    resolvePower: 10,
+    maxQiOutputPerTick: 24,
+    qiRegenRate: 60,
+    hpRegenRate: 45,
+    cooldownSpeed: 18,
+    auraPowerRate: 100,
+    viewRange: 1,
+  }, 380),
 };
 
 /** 装备槽位列表 */

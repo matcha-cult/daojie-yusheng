@@ -1,12 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ActionDef,
+  calcQiCostWithOutputLimit,
   CombatEffect,
+  createNumericStats,
+  DEFAULT_RATIO_DIVISOR,
   Direction,
+  ElementKey,
   ItemStack,
+  NumericRatioDivisors,
+  NumericStats,
   PlayerState,
   QuestState,
   RenderEntity,
+  ratioValue,
   SkillDef,
 } from '@mud/shared';
 import { AttrService } from './attr.service';
@@ -18,6 +25,7 @@ import { TechniqueService } from './technique.service';
 
 type MessageKind = 'system' | 'quest' | 'combat' | 'loot';
 type WorldDirtyFlag = 'inv' | 'quest' | 'actions' | 'tech' | 'attr';
+type DamageKind = 'physical' | 'spell';
 
 interface RuntimeMonster extends MonsterSpawnConfig {
   runtimeId: string;
@@ -55,6 +63,53 @@ export interface WorldUpdate {
 }
 
 const EMPTY_UPDATE: WorldUpdate = { messages: [], dirty: [] };
+const DEFAULT_MONSTER_RATIO_DIVISORS: NumericRatioDivisors = {
+  dodge: DEFAULT_RATIO_DIVISOR,
+  crit: DEFAULT_RATIO_DIVISOR,
+  breakPower: DEFAULT_RATIO_DIVISOR,
+  resolvePower: DEFAULT_RATIO_DIVISOR,
+  cooldownSpeed: DEFAULT_RATIO_DIVISOR,
+  moveSpeed: DEFAULT_RATIO_DIVISOR,
+  elementDamageReduce: {
+    metal: DEFAULT_RATIO_DIVISOR,
+    wood: DEFAULT_RATIO_DIVISOR,
+    water: DEFAULT_RATIO_DIVISOR,
+    fire: DEFAULT_RATIO_DIVISOR,
+    earth: DEFAULT_RATIO_DIVISOR,
+  },
+};
+const SKILL_ELEMENTS: Partial<Record<string, ElementKey>> = {
+  'skill.qingmu_slash': 'wood',
+  'skill.fire_talisman': 'fire',
+  'skill.wind_edge': 'wood',
+  'skill.thunder_palm': 'metal',
+  'skill.stillheart_seal': 'earth',
+  'skill.iron_bone_strike': 'earth',
+  'skill.iron_guard_roar': 'earth',
+  'skill.cloud_cut': 'metal',
+  'skill.dragon_turn': 'metal',
+  'skill.frost_mark': 'water',
+  'skill.cold_moon_seal': 'water',
+  'skill.anchor_pulse': 'earth',
+  'skill.soul_chain': 'earth',
+  'skill.starfall_thrust': 'metal',
+  'skill.meteor_break': 'fire',
+};
+
+interface CombatSnapshot {
+  stats: NumericStats;
+  ratios: NumericRatioDivisors;
+}
+
+interface ResolvedHit {
+  hit: boolean;
+  damage: number;
+  crit: boolean;
+  dodged: boolean;
+  resolved: boolean;
+  broken: boolean;
+  qiCost: number;
+}
 
 @Injectable()
 export class WorldService {
@@ -127,7 +182,7 @@ export class WorldService {
       actions.push(breakthroughAction);
     }
 
-    const portal = this.mapService.getPortalAt(player.mapId, player.x, player.y);
+    const portal = this.mapService.getPortalNear(player.mapId, player.x, player.y, 1);
     if (portal) {
       const targetMap = this.mapService.getMapMeta(portal.targetMapId);
       actions.push({
@@ -244,29 +299,33 @@ export class WorldService {
     const target = this.resolveCombatTarget(player) ?? this.findNearestLivingMonster(player, 8);
     if (!target) return EMPTY_UPDATE;
     player.combatTargetId = target.runtimeId;
-    const finalAttrs = this.attrService.computeFinal(player.baseAttrs, player.bonuses);
 
     const availableSkill = player.actions
       .filter((action) => action.type === 'skill' && action.cooldownLeft === 0)
       .map((action) => this.contentService.getSkill(action.id))
       .find((skill): skill is SkillDef => Boolean(skill));
 
-    if (availableSkill && this.distance(player.x, player.y, target.x, target.y) <= availableSkill.range) {
+    if (availableSkill && this.isWithinRange(player.x, player.y, target.x, target.y, availableSkill.range)) {
       this.faceToward(player, target.x, target.y);
-      return {
-        ...this.attackMonster(
-          player,
-          target,
-          availableSkill.power + Math.floor((finalAttrs.spirit + finalAttrs.perception) / 2),
-          `${availableSkill.name}击中`,
-        ),
-        usedActionId: availableSkill.id,
-      };
+      const update = this.attackMonster(
+        player,
+        target,
+        availableSkill.power,
+        `${availableSkill.name}击中`,
+        'spell',
+        availableSkill,
+      );
+      if (!update.error) {
+        return { ...update, usedActionId: availableSkill.id };
+      }
+      if (this.isWithinRange(player.x, player.y, target.x, target.y, 1)) {
+        return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
+      }
     }
 
-    if (this.distance(player.x, player.y, target.x, target.y) <= 1) {
+    if (this.isWithinRange(player.x, player.y, target.x, target.y, 1)) {
       this.faceToward(player, target.x, target.y);
-      return this.attackMonster(player, target, 6 + Math.floor(finalAttrs.constitution / 2), '你挥剑斩中');
+      return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
     }
 
     const facing = this.stepToward(player.mapId, player, target.x, target.y, player.id);
@@ -297,19 +356,20 @@ export class WorldService {
     if (!target) {
       return { ...EMPTY_UPDATE, error: '目标不存在或不可选中' };
     }
-    if (this.distance(player.x, player.y, target.x, target.y) > skill.range) {
+    if (!this.isWithinRange(player.x, player.y, target.x, target.y, skill.range)) {
       return { ...EMPTY_UPDATE, error: '目标超出技能范围' };
     }
 
     this.faceToward(player, target.x, target.y);
-    const finalAttrs = this.attrService.computeFinal(player.baseAttrs, player.bonuses);
-    const damage = skill.power + Math.floor((finalAttrs.spirit + finalAttrs.perception) / 2);
-
     if (target.kind === 'monster') {
-      return this.attackMonster(player, target.monster, damage, `${skill.name}击中`);
+      return this.attackMonster(player, target.monster, skill.power, `${skill.name}击中`, 'spell', skill);
     }
 
-    return this.attackTerrain(player, target.x, target.y, damage, skill.name, target.tileType ?? '目标');
+    const qiCost = this.consumeQiForSkill(player, skill);
+    if (typeof qiCost === 'string') {
+      return { ...EMPTY_UPDATE, error: qiCost };
+    }
+    return this.attackTerrain(player, target.x, target.y, skill.power + Math.round(this.attrService.getPlayerNumericStats(player).spellAtk), skill.name, target.tileType ?? '目标');
   }
 
   engageTarget(player: PlayerState, targetRef?: string): WorldUpdate {
@@ -341,6 +401,7 @@ export class WorldService {
     player.y = pos.y;
     player.facing = Direction.South;
     player.hp = player.maxHp;
+    player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
     player.dead = false;
     player.autoBattle = false;
     player.combatTargetId = undefined;
@@ -383,8 +444,8 @@ export class WorldService {
       const target = this.findNearestPlayer(monster, players);
       if (!target) continue;
 
-      if (this.distance(monster.x, monster.y, target.x, target.y) <= 1) {
-        target.hp = Math.max(0, target.hp - monster.attack);
+      if (this.isWithinRange(monster.x, monster.y, target.x, target.y, 1)) {
+        const resolved = this.resolveMonsterAttack(monster, target);
         if (target.hp > 0 && target.autoRetaliate !== false && !target.autoBattle) {
           target.autoBattle = true;
           this.navigationService.clearMoveTarget(target.id);
@@ -402,20 +463,10 @@ export class WorldService {
           type: 'float',
           x: target.x,
           y: target.y,
-          text: `-${monster.attack}`,
+          text: resolved.hit ? `-${resolved.damage}` : '闪',
           color: '#ff8a7a',
         });
-        allMessages.push({
-          playerId: target.id,
-          text: `${monster.name}扑击你，造成 ${monster.attack} 点伤害。`,
-          kind: 'combat',
-          floating: {
-            x: target.x,
-            y: target.y,
-            text: `-${monster.attack}`,
-            color: '#ff8a7a',
-          },
-        });
+        allMessages.push(this.buildMonsterAttackMessage(monster, target, resolved));
         if (target.hp <= 0) {
           allMessages.push({
             playerId: target.id,
@@ -521,7 +572,7 @@ export class WorldService {
   }
 
   private handlePortalTravel(player: PlayerState): WorldUpdate {
-    const portal = this.mapService.getPortalAt(player.mapId, player.x, player.y);
+    const portal = this.mapService.getPortalNear(player.mapId, player.x, player.y, 1);
     if (!portal) {
       return { ...EMPTY_UPDATE, error: '你需要站在传送阵上才能传送' };
     }
@@ -552,8 +603,19 @@ export class WorldService {
     };
   }
 
-  private attackMonster(player: PlayerState, monster: RuntimeMonster, damage: number, prefix: string): WorldUpdate {
-    monster.hp = Math.max(0, monster.hp - damage);
+  private attackMonster(
+    player: PlayerState,
+    monster: RuntimeMonster,
+    baseDamage: number,
+    prefix: string,
+    damageKind: DamageKind = 'physical',
+    skill?: SkillDef,
+  ): WorldUpdate {
+    const resolved = this.resolvePlayerAttack(player, monster, baseDamage, damageKind, skill);
+    if (typeof resolved === 'string') {
+      return { ...EMPTY_UPDATE, error: resolved };
+    }
+
     this.pushEffect(player.mapId, {
       type: 'attack',
       fromX: player.x,
@@ -566,20 +628,10 @@ export class WorldService {
       type: 'float',
       x: monster.x,
       y: monster.y,
-      text: `-${damage}`,
+      text: resolved.hit ? `-${resolved.damage}` : '闪',
       color: '#ffd27a',
     });
-    const messages: WorldMessage[] = [{
-      playerId: player.id,
-      text: `${prefix} ${monster.name}，造成 ${damage} 点伤害。`,
-      kind: 'combat',
-      floating: {
-        x: monster.x,
-        y: monster.y,
-        text: `-${damage}`,
-        color: '#ffd27a',
-      },
-    }];
+    const messages: WorldMessage[] = [this.buildPlayerAttackMessage(player, monster, prefix, resolved)];
     const dirty = new Set<WorldDirtyFlag>();
 
     if (monster.hp <= 0) {
@@ -597,7 +649,7 @@ export class WorldService {
       }
 
       for (const drop of monster.drops) {
-        if (Math.random() > drop.chance) continue;
+        if (Math.random() > this.getEffectiveDropChance(player, drop)) continue;
         const loot = this.createItemFromDrop(drop);
         if (!loot) continue;
         if (this.inventoryService.addItem(player, loot)) {
@@ -623,6 +675,199 @@ export class WorldService {
     }
 
     return { messages, dirty: [...dirty] };
+  }
+
+  private resolvePlayerAttack(
+    player: PlayerState,
+    monster: RuntimeMonster,
+    baseDamage: number,
+    damageKind: DamageKind,
+    skill?: SkillDef,
+  ): ResolvedHit | string {
+    const attacker = this.getPlayerCombatSnapshot(player);
+    const defender = this.getMonsterCombatSnapshot(monster);
+    const qiCost = skill ? this.consumeQiForSkill(player, skill) : 0;
+    if (typeof qiCost === 'string') {
+      return qiCost;
+    }
+    return this.resolveHit(attacker, defender, baseDamage, damageKind, qiCost, skill ? SKILL_ELEMENTS[skill.id] : undefined, (damage) => {
+      monster.hp = Math.max(0, monster.hp - damage);
+    });
+  }
+
+  private resolveMonsterAttack(monster: RuntimeMonster, player: PlayerState): ResolvedHit {
+    const attacker = this.getMonsterCombatSnapshot(monster);
+    const defender = this.getPlayerCombatSnapshot(player);
+    const element = this.inferMonsterElement(monster);
+    return this.resolveHit(attacker, defender, monster.attack, element ? 'spell' : 'physical', 0, element, (damage) => {
+      player.hp = Math.max(0, player.hp - damage);
+    });
+  }
+
+  private resolveHit(
+    attacker: CombatSnapshot,
+    defender: CombatSnapshot,
+    baseDamage: number,
+    damageKind: DamageKind,
+    qiCost: number,
+    element: ElementKey | undefined,
+    applyDamage: (damage: number) => void,
+  ): ResolvedHit {
+    const breakOverflow = Math.max(0, attacker.stats.breakPower - defender.stats.resolvePower);
+    const breakChance = ratioValue(breakOverflow, attacker.ratios.breakPower);
+    const broken = breakOverflow > 0 && Math.random() < breakChance;
+
+    const hitStat = attacker.stats.hit * (broken ? 2 : 1);
+    const dodgeGap = Math.max(0, defender.stats.dodge - hitStat);
+    const dodged = dodgeGap > 0 && Math.random() < ratioValue(dodgeGap, defender.ratios.dodge);
+    if (dodged) {
+      return {
+        hit: false,
+        damage: 0,
+        crit: false,
+        dodged: true,
+        resolved: false,
+        broken,
+        qiCost,
+      };
+    }
+
+    const resolveGap = Math.max(0, defender.stats.resolvePower - attacker.stats.breakPower);
+    const resolved = !broken && resolveGap > 0 && Math.random() < ratioValue(resolveGap, defender.ratios.resolvePower);
+    const critStat = attacker.stats.crit * (broken ? 2 : 1);
+    const crit = critStat > 0 && Math.random() < ratioValue(critStat, attacker.ratios.crit);
+
+    let damage = Math.max(1, Math.round(baseDamage + (damageKind === 'physical' ? attacker.stats.physAtk : attacker.stats.spellAtk)));
+    if (element) {
+      damage = Math.max(1, Math.round(damage * (1 + Math.max(0, attacker.stats.elementDamageBonus[element]) / 100)));
+    }
+
+    let defense = damageKind === 'physical' ? defender.stats.physDef : defender.stats.spellDef;
+    if (resolved) {
+      defense *= 2;
+    }
+    let reduction = Math.max(0, ratioValue(defense, DEFAULT_RATIO_DIVISOR));
+    if (element) {
+      const elementReduce = Math.max(0, ratioValue(defender.stats.elementDamageReduce[element], defender.ratios.elementDamageReduce[element]));
+      reduction = 1 - (1 - reduction) * (1 - elementReduce);
+    }
+    damage = Math.max(1, Math.round(damage * (1 - Math.min(0.95, reduction))));
+
+    if (crit) {
+      damage = Math.max(1, Math.round(damage * ((200 + Math.max(0, attacker.stats.critDamage) / 10) / 100)));
+    }
+
+    applyDamage(damage);
+    return {
+      hit: true,
+      damage,
+      crit,
+      dodged: false,
+      resolved,
+      broken,
+      qiCost,
+    };
+  }
+
+  private buildPlayerAttackMessage(player: PlayerState, monster: RuntimeMonster, prefix: string, resolved: ResolvedHit): WorldMessage {
+    const suffix: string[] = [];
+    if (resolved.broken) suffix.push('破招');
+    if (resolved.crit) suffix.push('暴击');
+    if (resolved.resolved) suffix.push('化解');
+    const tag = suffix.length > 0 ? `（${suffix.join(' / ')}）` : '';
+    const text = resolved.hit
+      ? `${prefix} ${monster.name}${tag}，造成 ${resolved.damage} 点伤害。`
+      : `${monster.name}身形一晃，避开了你的攻势。`;
+    return {
+      playerId: player.id,
+      text,
+      kind: 'combat',
+      floating: {
+        x: monster.x,
+        y: monster.y,
+        text: resolved.hit ? `-${resolved.damage}` : '闪',
+        color: '#ffd27a',
+      },
+    };
+  }
+
+  private buildMonsterAttackMessage(monster: RuntimeMonster, player: PlayerState, resolved: ResolvedHit): WorldMessage {
+    const suffix: string[] = [];
+    if (resolved.broken) suffix.push('破招');
+    if (resolved.crit) suffix.push('暴击');
+    if (resolved.resolved) suffix.push('化解');
+    const tag = suffix.length > 0 ? `（${suffix.join(' / ')}）` : '';
+    const text = resolved.hit
+      ? `${monster.name}扑击你${tag}，造成 ${resolved.damage} 点伤害。`
+      : `${monster.name}扑了个空，你险险避开。`;
+    return {
+      playerId: player.id,
+      text,
+      kind: 'combat',
+      floating: {
+        x: player.x,
+        y: player.y,
+        text: resolved.hit ? `-${resolved.damage}` : '闪',
+        color: '#ff8a7a',
+      },
+    };
+  }
+
+  private getPlayerCombatSnapshot(player: PlayerState): CombatSnapshot {
+    return {
+      stats: this.attrService.getPlayerNumericStats(player),
+      ratios: this.attrService.getPlayerRatioDivisors(player),
+    };
+  }
+
+  private getMonsterCombatSnapshot(monster: RuntimeMonster): CombatSnapshot {
+    const stats = createNumericStats();
+    const level = Math.max(1, monster.level ?? Math.round(monster.attack / 6));
+    stats.physAtk = monster.attack;
+    stats.spellAtk = Math.max(1, Math.round(monster.attack * 0.9));
+    stats.physDef = Math.max(0, Math.round(monster.maxHp * 0.18 + level * 2));
+    stats.spellDef = Math.max(0, Math.round(monster.maxHp * 0.14 + level * 2));
+    stats.hit = 12 + level * 8;
+    stats.dodge = level * 4;
+    stats.crit = level * 2;
+    stats.critDamage = level * 6;
+    stats.breakPower = level * 3;
+    stats.resolvePower = level * 3;
+    return {
+      stats,
+      ratios: DEFAULT_MONSTER_RATIO_DIVISORS,
+    };
+  }
+
+  private consumeQiForSkill(player: PlayerState, skill: SkillDef): number | string {
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const plannedCost = Math.max(0, skill.cost);
+    const actualCost = Math.round(calcQiCostWithOutputLimit(plannedCost, Math.max(0, numericStats.maxQiOutputPerTick)));
+    if (!Number.isFinite(actualCost) || actualCost < 0) {
+      return '当前灵力输出速率不足，无法稳定施展该技能';
+    }
+    if (player.qi < actualCost) {
+      return `灵力不足，需要 ${actualCost} 点灵力`;
+    }
+    player.qi = Math.max(0, player.qi - actualCost);
+    return actualCost;
+  }
+
+  private getEffectiveDropChance(player: PlayerState, drop: DropConfig): number {
+    const stats = this.attrService.getPlayerNumericStats(player);
+    const commonBonus = Math.max(0, stats.lootRate) / 10000;
+    const rareBonus = drop.chance <= 0.2 ? Math.max(0, stats.rareLootRate) / 10000 : 0;
+    return Math.min(1, drop.chance * (1 + commonBonus + rareBonus));
+  }
+
+  private inferMonsterElement(monster: RuntimeMonster): ElementKey | undefined {
+    const source = `${monster.id}:${monster.name}`;
+    if (source.includes('火') || source.includes('焰') || source.includes('血羽')) return 'fire';
+    if (source.includes('寒') || source.includes('冰') || source.includes('霜') || source.includes('泽')) return 'water';
+    if (source.includes('竹') || source.includes('木') || source.includes('藤')) return 'wood';
+    if (source.includes('矿') || source.includes('金') || source.includes('刀') || source.includes('刃') || source.includes('星')) return 'metal';
+    if (source.includes('石') || source.includes('骨') || source.includes('魂') || source.includes('谷')) return 'earth';
+    return undefined;
   }
 
   drainEffects(mapId: string): CombatEffect[] {
@@ -810,11 +1055,11 @@ export class WorldService {
     let bestDistance = Number.MAX_SAFE_INTEGER;
     for (const monster of this.monstersByMap.get(player.mapId) ?? []) {
       if (!monster.alive) continue;
-      const distance = this.distance(player.x, player.y, monster.x, monster.y);
-      if (distance > maxDistance) continue;
-      if (distance < bestDistance) {
+      const distanceSq = this.distanceSquared(player.x, player.y, monster.x, monster.y);
+      if (distanceSq > maxDistance * maxDistance) continue;
+      if (distanceSq < bestDistance) {
         best = monster;
-        bestDistance = distance;
+        bestDistance = distanceSq;
       }
     }
     return best;
@@ -825,11 +1070,11 @@ export class WorldService {
     let bestDistance = Number.MAX_SAFE_INTEGER;
     for (const player of players) {
       if (player.dead || player.mapId !== monster.mapId) continue;
-      const distance = this.distance(player.x, player.y, monster.x, monster.y);
-      if (distance > monster.aggroRange) continue;
-      if (distance < bestDistance) {
+      const distanceSq = this.distanceSquared(player.x, player.y, monster.x, monster.y);
+      if (distanceSq > monster.aggroRange * monster.aggroRange) continue;
+      if (distanceSq < bestDistance) {
         best = player;
-        bestDistance = distance;
+        bestDistance = distanceSq;
       }
     }
     return best;
@@ -844,6 +1089,7 @@ export class WorldService {
     player.y = pos.y;
     player.facing = Direction.South;
     player.hp = player.maxHp;
+    player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
     player.dead = false;
     player.autoBattle = false;
     player.combatTargetId = undefined;
@@ -883,7 +1129,7 @@ export class WorldService {
 
   private getAdjacentNpcs(player: PlayerState): NpcConfig[] {
     return this.mapService.getNpcs(player.mapId)
-      .filter((npc) => this.distance(player.x, player.y, npc.x, npc.y) <= 1);
+      .filter((npc) => this.isWithinRange(player.x, player.y, npc.x, npc.y, 1));
   }
 
   private findSpawnPosition(mapId: string, monster: RuntimeMonster): { x: number; y: number } | null {
@@ -921,8 +1167,14 @@ export class WorldService {
     return null;
   }
 
-  private distance(ax: number, ay: number, bx: number, by: number): number {
-    return Math.abs(ax - bx) + Math.abs(ay - by);
+  private isWithinRange(ax: number, ay: number, bx: number, by: number, range: number): boolean {
+    return this.distanceSquared(ax, ay, bx, by) <= range * range;
+  }
+
+  private distanceSquared(ax: number, ay: number, bx: number, by: number): number {
+    const dx = ax - bx;
+    const dy = ay - by;
+    return dx * dx + dy * dy;
   }
 
   private resolveCombatTarget(player: PlayerState): RuntimeMonster | undefined {

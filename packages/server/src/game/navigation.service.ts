@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Direction, PlayerState } from '@mud/shared';
+import { AttrService } from './attr.service';
 import { MapService } from './map.service';
 
 interface PathStep {
@@ -84,7 +85,10 @@ class MinHeap {
 export class NavigationService {
   private readonly moveTargets = new Map<string, MoveTargetState>();
 
-  constructor(private readonly mapService: MapService) {}
+  constructor(
+    private readonly mapService: MapService,
+    private readonly attrService: AttrService,
+  ) {}
 
   clearMoveTarget(playerId: string) {
     this.moveTargets.delete(playerId);
@@ -148,9 +152,7 @@ export class NavigationService {
       return { moved: false, reached: true, blocked: false };
     }
 
-    if (this.tryMovePlayer(player, next.x, next.y)) {
-      state.path.shift();
-      state.blockedTicks = 0;
+    if (this.tryMoveAlongPath(player, state)) {
       const reached = player.x === state.targetX && player.y === state.targetY;
       if (reached) {
         this.clearMoveTarget(player.id);
@@ -161,9 +163,7 @@ export class NavigationService {
     state.blockedTicks += 1;
     if (this.rebuildPath(player, state)) {
       const alternate = state.path[0];
-      if (alternate && this.tryMovePlayer(player, alternate.x, alternate.y)) {
-        state.path.shift();
-        state.blockedTicks = 0;
+      if (alternate && this.tryMoveAlongPath(player, state)) {
         const reached = player.x === state.targetX && player.y === state.targetY;
         if (reached) {
           this.clearMoveTarget(player.id);
@@ -178,7 +178,16 @@ export class NavigationService {
   stepPlayerByDirection(player: PlayerState, direction: Direction): boolean {
     const [dx, dy] = this.deltaFor(direction);
     player.facing = direction;
-    return this.tryMovePlayer(player, player.x + dx, player.y + dy);
+    let moved = this.tryMovePlayer(player, player.x + dx, player.y + dy);
+    if (!moved) return false;
+    const extraSteps = this.computeExtraMoveSteps(player);
+    for (let index = 0; index < extraSteps; index++) {
+      if (!this.tryMovePlayer(player, player.x + dx, player.y + dy)) {
+        break;
+      }
+      moved = true;
+    }
+    return moved;
   }
 
   private syncPath(player: PlayerState, state: MoveTargetState): boolean {
@@ -207,6 +216,36 @@ export class NavigationService {
     player.y = y;
     this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
     return true;
+  }
+
+  private tryMoveAlongPath(player: PlayerState, state: MoveTargetState): boolean {
+    let moved = false;
+    const maxSteps = 1 + this.computeExtraMoveSteps(player);
+    for (let index = 0; index < maxSteps; index++) {
+      const next = state.path[0];
+      if (!next) break;
+      if (!this.tryMovePlayer(player, next.x, next.y)) {
+        break;
+      }
+      state.path.shift();
+      state.blockedTicks = 0;
+      moved = true;
+      if (player.x === state.targetX && player.y === state.targetY) {
+        break;
+      }
+    }
+    return moved;
+  }
+
+  private computeExtraMoveSteps(player: PlayerState): number {
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const moveSpeed = Math.max(0, numericStats.moveSpeed);
+    const guaranteed = Math.floor(moveSpeed / 100);
+    const remainder = moveSpeed - guaranteed * 100;
+    if (remainder <= 0) {
+      return guaranteed;
+    }
+    return guaranteed + (Math.random() * 100 < remainder ? 1 : 0);
   }
 
   private directionFromTo(fromX: number, fromY: number, toX: number, toY: number): Direction {

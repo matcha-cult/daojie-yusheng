@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import {
-  BASE_MAX_HP,
   DEFAULT_BASE_ATTRS,
   DEFAULT_INVENTORY_CAPACITY,
   Direction,
-  HP_PER_CONSTITUTION,
   PlayerState,
   VIEW_RADIUS,
 } from '@mud/shared';
+import { AttrService } from './attr.service';
 import { MapService } from './map.service';
 import { NavigationService } from './navigation.service';
 import { PlayerService } from './player.service';
@@ -18,6 +17,7 @@ export class BotService {
   private nextBotSeq = 1;
 
   constructor(
+    private readonly attrService: AttrService,
     private readonly playerService: PlayerService,
     private readonly mapService: MapService,
     private readonly navigationService: NavigationService,
@@ -32,7 +32,6 @@ export class BotService {
       if (!pos) break;
 
       const botId = `bot_${Date.now()}_${this.nextBotSeq++}`;
-      const maxHp = BASE_MAX_HP + DEFAULT_BASE_ATTRS.constitution * HP_PER_CONSTITUTION;
       const bot: PlayerState = {
         id: botId,
         name: `傀儡${String(this.nextBotSeq - 1).padStart(2, '0')}`,
@@ -42,8 +41,9 @@ export class BotService {
         y: pos.y,
         facing: Direction.South,
         viewRange: VIEW_RADIUS,
-        hp: maxHp,
-        maxHp,
+        hp: 1,
+        maxHp: 1,
+        qi: 0,
         dead: false,
         baseAttrs: { ...DEFAULT_BASE_ATTRS },
         bonuses: [],
@@ -55,6 +55,9 @@ export class BotService {
         autoBattle: false,
         autoRetaliate: false,
       };
+      this.attrService.recalcPlayer(bot);
+      bot.hp = bot.maxHp;
+      bot.qi = Math.round(bot.numericStats?.maxQi ?? 0);
 
       this.playerService.addRuntimePlayer(bot);
       this.mapService.setOccupied(bot.mapId, bot.x, bot.y, bot.id);

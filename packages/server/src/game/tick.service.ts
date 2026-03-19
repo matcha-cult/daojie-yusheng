@@ -317,6 +317,8 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      this.applyNaturalRecovery(player);
+
       if (this.actionService.tickCooldowns(player)) {
         this.playerService.markDirty(player.id, 'actions');
       }
@@ -423,12 +425,17 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       if (!socket) continue;
 
       if (flags.has('attr')) {
-        const finalAttrs = this.attrService.computeFinal(player.baseAttrs, player.bonuses);
+        const finalAttrs = this.attrService.getPlayerFinalAttrs(player);
+        const numericStats = this.attrService.getPlayerNumericStats(player);
+        const ratioDivisors = this.attrService.getPlayerRatioDivisors(player);
         const update: S2C_AttrUpdate = {
           baseAttrs: player.baseAttrs,
           bonuses: player.bonuses,
           finalAttrs,
+          numericStats,
+          ratioDivisors,
           maxHp: player.maxHp,
+          qi: player.qi,
           realm: player.realm,
         };
         socket.emit(S2C.AttrUpdate, update);
@@ -521,6 +528,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         mapMeta: this.mapService.getMapMeta(viewer.mapId),
         path: this.navigationService.getPathPoints(viewer.id),
         hp: viewer.hp,
+        qi: viewer.qi,
         f: viewer.facing,
       };
 
@@ -539,6 +547,19 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       }
       return visibleKeys.has(`${effect.x},${effect.y}`);
     });
+  }
+
+  private applyNaturalRecovery(player: PlayerState) {
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const maxQi = Math.max(0, Math.round(numericStats.maxQi));
+    if (player.hp < player.maxHp && numericStats.hpRegenRate > 0) {
+      const heal = Math.max(1, Math.round(player.maxHp * (numericStats.hpRegenRate / 10000)));
+      player.hp = Math.min(player.maxHp, player.hp + heal);
+    }
+    if (player.qi < maxQi && numericStats.qiRegenRate > 0) {
+      const recover = Math.max(1, Math.round(maxQi * (numericStats.qiRegenRate / 10000)));
+      player.qi = Math.min(maxQi, player.qi + recover);
+    }
   }
 
 }

@@ -1,3 +1,5 @@
+import type { NumericRatioDivisors, NumericStats, PartialNumericStats } from './numeric';
+
 /** 地形类型 */
 export enum TileType {
   Floor = 'floor',
@@ -86,6 +88,7 @@ export type Attributes = Record<AttrKey, number>;
 export interface AttrBonus {
   source: string;
   attrs: Partial<Attributes>;
+  stats?: PartialNumericStats;
   label?: string;
   meta?: Record<string, unknown>;
 }
@@ -105,6 +108,7 @@ export interface ItemStack {
   desc: string;
   equipSlot?: EquipSlot;
   equipAttrs?: Partial<Attributes>;
+  equipStats?: PartialNumericStats;
 }
 
 /** 背包 */
@@ -193,6 +197,7 @@ export interface ActionDef {
   type: ActionType;
   desc: string;
   cooldownLeft: number;
+  range?: number;
   requiresTarget?: boolean;
   targetMode?: 'any' | 'entity' | 'tile';
 }
@@ -257,9 +262,13 @@ export interface PlayerState {
   viewRange: number;
   hp: number;
   maxHp: number;
+  qi: number;
   dead: boolean;
   baseAttrs: Attributes;
   bonuses: AttrBonus[];
+  finalAttrs?: Attributes;
+  numericStats?: NumericStats;
+  ratioDivisors?: NumericRatioDivisors;
   inventory: Inventory;
   equipment: EquipmentSlots;
   techniques: TechniqueState[];

@@ -38,6 +38,7 @@ export class RedisService implements OnModuleDestroy {
       viewRange: String(state.viewRange),
       hp: String(state.hp),
       maxHp: String(state.maxHp),
+      qi: String(state.qi),
       dead: state.dead ? '1' : '0',
       baseAttrs: JSON.stringify(state.baseAttrs),
       bonuses: JSON.stringify(state.bonuses),

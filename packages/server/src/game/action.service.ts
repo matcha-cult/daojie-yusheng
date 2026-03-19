@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { ActionDef, PlayerState } from '@mud/shared';
+import { ActionDef, PlayerState, ratioValue } from '@mud/shared';
+import { AttrService } from './attr.service';
 import { TechniqueService } from './technique.service';
 
 @Injectable()
 export class ActionService {
-  constructor(private readonly techniqueService: TechniqueService) {}
+  constructor(
+    private readonly techniqueService: TechniqueService,
+    private readonly attrService: AttrService,
+  ) {}
 
   /** 根据功法技能重建可用行动列表 */
   rebuildActions(player: PlayerState, contextActions: ActionDef[] = []): void {
@@ -30,7 +34,10 @@ export class ActionService {
     for (const tech of player.techniques) {
       const skill = tech.skills.find(s => s.id === actionId);
       if (skill) {
-        action.cooldownLeft = skill.cooldown;
+        const ratioDivisors = this.attrService.getPlayerRatioDivisors(player);
+        const numericStats = this.attrService.getPlayerNumericStats(player);
+        const cooldownRate = Math.max(0, ratioValue(numericStats.cooldownSpeed, ratioDivisors.cooldownSpeed));
+        action.cooldownLeft = Math.max(1, Math.ceil(skill.cooldown * (1 - cooldownRate)));
         break;
       }
     }

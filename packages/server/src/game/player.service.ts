@@ -84,6 +84,7 @@ export class PlayerService {
       viewRange: entity.viewRange ?? VIEW_RADIUS,
       hp: entity.hp,
       maxHp: entity.maxHp,
+      qi: entity.qi ?? 0,
       dead: entity.dead,
       baseAttrs: (entity.baseAttrs ?? { ...DEFAULT_BASE_ATTRS }) as Attributes,
       bonuses: (entity.bonuses ?? []) as AttrBonus[],
@@ -120,6 +121,9 @@ export class PlayerService {
     if (state.hp <= 0) {
       state.hp = state.maxHp;
     }
+    if (!Number.isFinite(state.qi) || state.qi < 0) {
+      state.qi = 0;
+    }
 
     const entity = this.playerRepo.create({
       id: state.id,
@@ -132,6 +136,7 @@ export class PlayerService {
       viewRange: state.viewRange,
       hp: state.hp,
       maxHp: state.maxHp,
+      qi: state.qi,
       dead: state.dead,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
@@ -161,6 +166,7 @@ export class PlayerService {
       viewRange: state.viewRange,
       hp: state.hp,
       maxHp: state.maxHp,
+      qi: state.qi,
       dead: state.dead,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
@@ -191,6 +197,7 @@ export class PlayerService {
       viewRange: s.viewRange,
       hp: s.hp,
       maxHp: s.maxHp,
+      qi: s.qi,
       dead: s.dead,
       baseAttrs: s.baseAttrs as any,
       bonuses: s.bonuses as any,

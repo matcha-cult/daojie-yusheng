@@ -102,6 +102,9 @@ export class TechniqueService {
   cultivateTick(player: PlayerState): CultivationResult {
     this.initializePlayerProgression(player);
     if (!player.cultivatingTechId) return EMPTY_CULTIVATION;
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
+    const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
 
     const technique = player.techniques.find((entry) => entry.techId === player.cultivatingTechId);
     if (!technique) {
@@ -117,7 +120,7 @@ export class TechniqueService {
     const messages: TechniqueMessage[] = [];
 
     if (technique.realm !== TechniqueRealm.Perfection && technique.expToNext > 0) {
-      technique.exp += CULTIVATE_EXP_PER_TICK;
+      technique.exp += Math.max(1, Math.round(CULTIVATE_EXP_PER_TICK * (1 + techniqueExpBonus)));
       while (technique.expToNext > 0 && technique.exp >= technique.expToNext && technique.realm !== TechniqueRealm.Perfection) {
         technique.exp -= technique.expToNext;
         technique.level += 1;
@@ -131,7 +134,7 @@ export class TechniqueService {
       }
     }
 
-    const realmProgress = this.advanceRealmProgress(player, technique);
+    const realmProgress = this.advanceRealmProgress(player, technique, realmExpBonus);
     if (realmProgress.changed) {
       dirty.add('attr');
       dirty.add('actions');
@@ -162,6 +165,7 @@ export class TechniqueService {
           type: 'skill',
           desc: skill.desc,
           cooldownLeft: 0,
+          range: skill.range,
           requiresTarget: skill.requiresTarget ?? true,
           targetMode: skill.targetMode ?? 'any',
         });
@@ -233,6 +237,7 @@ export class TechniqueService {
     this.applyRealmBonus(player, nextState);
     this.attrService.recalcPlayer(player);
     player.hp = player.maxHp;
+    player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
 
     return {
       dirty: ['inv', 'attr', 'actions', 'tech'],
@@ -243,13 +248,14 @@ export class TechniqueService {
     };
   }
 
-  private advanceRealmProgress(player: PlayerState, technique: TechniqueState): { changed: boolean; messages: TechniqueMessage[] } {
+  private advanceRealmProgress(player: PlayerState, technique: TechniqueState, expBonus = 0): { changed: boolean; messages: TechniqueMessage[] } {
     const realm = player.realm;
     if (!realm || realm.breakthroughReady || realm.progressToNext <= 0) {
       return { changed: false, messages: [] };
     }
 
-    const gain = 1 + technique.realm + Math.floor(technique.level / 3);
+    const baseGain = 1 + technique.realm + Math.floor(technique.level / 3);
+    const gain = Math.max(1, Math.round(baseGain * (1 + expBonus)));
     const previousProgress = realm.progress;
     realm.progress = Math.min(realm.progressToNext, realm.progress + gain);
     realm.breakthroughReady = realm.progress >= realm.progressToNext;

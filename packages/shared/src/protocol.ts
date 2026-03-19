@@ -1,4 +1,5 @@
 import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, PlayerRealmState, QuestState, CombatEffect } from './types';
+import { NumericRatioDivisors, NumericStats } from './numeric';
 
 // ===== 事件名 =====
 
@@ -109,6 +110,7 @@ export interface S2C_Tick {
   mapMeta?: MapMeta;                              // 当前地图元数据
   path?: [number, number][];                      // 当前剩余路径点
   hp?: number;                                    // 当前玩家 HP
+  qi?: number;                                    // 当前玩家灵力
   f?: Direction;                                  // 当前玩家朝向
 }
 
@@ -193,7 +195,10 @@ export interface S2C_AttrUpdate {
   baseAttrs: Attributes;
   bonuses: AttrBonus[];
   finalAttrs: Attributes;
+  numericStats: NumericStats;
+  ratioDivisors: NumericRatioDivisors;
   maxHp: number;
+  qi: number;
   realm?: PlayerRealmState;
 }
 

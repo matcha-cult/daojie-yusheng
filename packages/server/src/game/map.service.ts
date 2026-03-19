@@ -434,6 +434,10 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return this.revisions.get(mapId) ?? 0;
   }
 
+  private bumpMapRevision(mapId: string) {
+    this.revisions.set(mapId, (this.revisions.get(mapId) ?? 0) + 1);
+  }
+
   getSpawnPoint(mapId: string): { x: number; y: number } | undefined {
     return this.maps.get(mapId)?.spawnPoint;
   }
@@ -442,6 +446,12 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     const map = this.maps.get(mapId);
     if (!map) return undefined;
     return map.portals.find(p => p.x === x && p.y === y);
+  }
+
+  getPortalNear(mapId: string, x: number, y: number, maxDistance = 1): Portal | undefined {
+    const map = this.maps.get(mapId);
+    if (!map) return undefined;
+    return map.portals.find((portal) => Math.abs(portal.x - x) + Math.abs(portal.y - y) <= maxDistance);
   }
 
   getNpcs(mapId: string): NpcConfig[] {
@@ -521,6 +531,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       tile.hp = undefined;
       tile.maxHp = undefined;
       tile.hpVisible = false;
+      this.bumpMapRevision(mapId);
       return { destroyed: true, hp: 0, maxHp: 0 };
     }
 
