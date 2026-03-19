@@ -39,7 +39,7 @@
 - 多地图传送：地图之间通过 portal 连接，支持跨图推进
 - 断线恢复与顶号：支持会话恢复，同账号新连接会接管旧连接角色状态
 
-更多完整设计与技术细节见 [docs/design.md](./docs/design.md) 和 [docs/architecture.md](./docs/architecture.md)。
+更多完整设计与技术细节见 [docs/design.md](./docs/design.md)、[docs/architecture.md](./docs/architecture.md) 和 [docs/numeric-design.md](./docs/numeric-design.md)。
 
 ## 技术栈
 
@@ -119,6 +119,7 @@ pnpm dev:server
 - 生产环境使用 `start-first + healthcheck + rollback` 做近零停机滚动更新
 - 服务端启用健康检查与优雅停机，更新时会先拉起新实例，再摘除旧实例
 - 默认发布端口为前端 `11921`、后端 `11922`，适合由现有 Caddy 统一反向代理到域名
+- 本地提交不会触发线上更新；只有 push 到 `main` 才会自动部署，且一次 push 只触发一次部署
 
 关键文件：
 
