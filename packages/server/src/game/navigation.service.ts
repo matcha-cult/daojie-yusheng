@@ -1,5 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { CARDINAL_DIRECTION_STEPS, directionFromTo, directionToDelta, Direction, manhattanDistance, PlayerState } from '@mud/shared';
+import {
+  CARDINAL_DIRECTION_STEPS,
+  directionFromTo,
+  directionToDelta,
+  Direction,
+  getMovePointsPerTick,
+  manhattanDistance,
+  MAX_STORED_MOVE_POINTS,
+  MOVE_POINT_UNIT,
+  PlayerState,
+} from '@mud/shared';
 import { AttrService } from './attr.service';
 import { MapService } from './map.service';
 
@@ -15,6 +25,11 @@ interface MoveTargetState {
   blockedTicks: number;
 }
 
+interface MoveChargeState {
+  intentKey: string;
+  points: number;
+}
+
 interface HeapNode {
   index: number;
   score: number;
@@ -25,6 +40,12 @@ export interface NavigationStepResult {
   reached: boolean;
   blocked: boolean;
   error?: string;
+}
+
+interface PathMoveAttemptResult {
+  moved: boolean;
+  blocked: boolean;
+  points: number;
 }
 
 const MIN_STEP_COST = 1;
@@ -84,6 +105,7 @@ class MinHeap {
 @Injectable()
 export class NavigationService {
   private readonly moveTargets = new Map<string, MoveTargetState>();
+  private readonly moveCharges = new Map<string, MoveChargeState>();
 
   constructor(
     private readonly mapService: MapService,
@@ -92,6 +114,10 @@ export class NavigationService {
 
   clearMoveTarget(playerId: string) {
     this.moveTargets.delete(playerId);
+    const charge = this.moveCharges.get(playerId);
+    if (charge?.intentKey.startsWith('target:')) {
+      this.moveCharges.delete(playerId);
+    }
   }
 
   hasMoveTarget(playerId: string): boolean {
@@ -152,7 +178,11 @@ export class NavigationService {
       return { moved: false, reached: true, blocked: false };
     }
 
-    if (this.tryMoveAlongPath(player, state)) {
+    const intentKey = `target:${player.mapId}:${state.targetX},${state.targetY}`;
+    const availablePoints = this.rechargeMovePoints(player, intentKey);
+    const attempt = this.tryMoveAlongPath(player, state, availablePoints);
+    this.commitMovePoints(player.id, intentKey, attempt.points);
+    if (attempt.moved) {
       const reached = player.x === state.targetX && player.y === state.targetY;
       if (reached) {
         this.clearMoveTarget(player.id);
@@ -160,33 +190,55 @@ export class NavigationService {
       return { moved: true, reached, blocked: false };
     }
 
-    state.blockedTicks += 1;
-    if (this.rebuildPath(player, state)) {
-      const alternate = state.path[0];
-      if (alternate && this.tryMoveAlongPath(player, state)) {
-        const reached = player.x === state.targetX && player.y === state.targetY;
-        if (reached) {
-          this.clearMoveTarget(player.id);
+    if (attempt.blocked) {
+      state.blockedTicks += 1;
+      if (this.rebuildPath(player, state)) {
+        const alternate = state.path[0];
+        const retry = alternate ? this.tryMoveAlongPath(player, state, attempt.points) : null;
+        if (retry) {
+          this.commitMovePoints(player.id, intentKey, retry.points);
         }
-        return { moved: true, reached, blocked: false };
+        if (retry?.moved) {
+          const reached = player.x === state.targetX && player.y === state.targetY;
+          if (reached) {
+            this.clearMoveTarget(player.id);
+          }
+          return { moved: true, reached, blocked: false };
+        }
+      } else {
+        this.clearMoveTarget(player.id);
+        return { moved: false, reached: false, blocked: false, error: '无法到达该位置' };
       }
     }
 
-    return { moved: false, reached: false, blocked: true };
+    return { moved: false, reached: false, blocked: attempt.blocked };
   }
 
   stepPlayerByDirection(player: PlayerState, direction: Direction): boolean {
     const [dx, dy] = directionToDelta(direction);
     player.facing = direction;
-    let moved = this.tryMovePlayer(player, player.x + dx, player.y + dy);
-    if (!moved) return false;
-    const extraSteps = this.computeExtraMoveSteps(player);
-    for (let index = 0; index < extraSteps; index++) {
-      if (!this.tryMovePlayer(player, player.x + dx, player.y + dy)) {
+    const intentKey = `dir:${player.mapId}:${direction}`;
+    let points = this.rechargeMovePoints(player, intentKey);
+    let moved = false;
+    while (true) {
+      const nextX = player.x + dx;
+      const nextY = player.y + dy;
+      const stepCost = this.getStepMovePointCost(player.mapId, nextX, nextY);
+      if (!Number.isFinite(stepCost)) {
+        this.moveCharges.delete(player.id);
+        return moved;
+      }
+      if (points < stepCost) {
         break;
       }
+      if (!this.tryMovePlayer(player, nextX, nextY)) {
+        this.moveCharges.delete(player.id);
+        return moved;
+      }
+      points -= stepCost;
       moved = true;
     }
+    this.commitMovePoints(player.id, intentKey, points);
     return moved;
   }
 
@@ -218,15 +270,28 @@ export class NavigationService {
     return true;
   }
 
-  private tryMoveAlongPath(player: PlayerState, state: MoveTargetState): boolean {
+  private tryMoveAlongPath(player: PlayerState, state: MoveTargetState, initialPoints: number): PathMoveAttemptResult {
+    let points = initialPoints;
     let moved = false;
-    const maxSteps = 1 + this.computeExtraMoveSteps(player);
-    for (let index = 0; index < maxSteps; index++) {
+    let blocked = false;
+    while (true) {
       const next = state.path[0];
       if (!next) break;
-      if (!this.tryMovePlayer(player, next.x, next.y)) {
+      const stepCost = this.getStepMovePointCost(player.mapId, next.x, next.y);
+      if (!Number.isFinite(stepCost)) {
+        this.moveCharges.delete(player.id);
+        blocked = true;
         break;
       }
+      if (points < stepCost) {
+        break;
+      }
+      if (!this.tryMovePlayer(player, next.x, next.y)) {
+        this.moveCharges.delete(player.id);
+        blocked = true;
+        break;
+      }
+      points -= stepCost;
       state.path.shift();
       state.blockedTicks = 0;
       moved = true;
@@ -234,18 +299,33 @@ export class NavigationService {
         break;
       }
     }
-    return moved;
+    return { moved, blocked, points };
   }
 
-  private computeExtraMoveSteps(player: PlayerState): number {
+  private rechargeMovePoints(player: PlayerState, intentKey: string): number {
+    const existing = this.moveCharges.get(player.id);
+    const current = existing?.intentKey === intentKey ? existing.points : 0;
     const numericStats = this.attrService.getPlayerNumericStats(player);
-    const moveSpeed = Math.max(0, numericStats.moveSpeed);
-    const guaranteed = Math.floor(moveSpeed / 100);
-    const remainder = moveSpeed - guaranteed * 100;
-    if (remainder <= 0) {
-      return guaranteed;
+    return Math.min(MAX_STORED_MOVE_POINTS, current + getMovePointsPerTick(numericStats.moveSpeed));
+  }
+
+  private commitMovePoints(playerId: string, intentKey: string, points: number): void {
+    if (points <= 0) {
+      this.moveCharges.delete(playerId);
+      return;
     }
-    return guaranteed + (Math.random() * 100 < remainder ? 1 : 0);
+    this.moveCharges.set(playerId, {
+      intentKey,
+      points: Math.min(MAX_STORED_MOVE_POINTS, points),
+    });
+  }
+
+  private getStepMovePointCost(mapId: string, x: number, y: number): number {
+    const traversalCost = this.mapService.getTraversalCost(mapId, x, y);
+    if (!Number.isFinite(traversalCost)) {
+      return Number.POSITIVE_INFINITY;
+    }
+    return traversalCost * MOVE_POINT_UNIT;
   }
 
   private findPath(

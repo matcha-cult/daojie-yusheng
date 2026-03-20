@@ -1,13 +1,62 @@
-import { CARDINAL_DIRECTION_STEPS, deltaToDirection, Direction, manhattanDistance, Tile } from '@mud/shared';
+import { CARDINAL_DIRECTION_STEPS, deltaToDirection, Direction, getTileTraversalCost, manhattanDistance, Tile } from '@mud/shared';
 
-interface Node {
-  x: number;
-  y: number;
-  g: number;
-  h: number;
-  f: number;
-  parent: Node | null;
+interface HeapNode {
+  index: number;
+  score: number;
 }
+
+class MinHeap {
+  private items: HeapNode[] = [];
+
+  push(node: HeapNode) {
+    this.items.push(node);
+    this.bubbleUp(this.items.length - 1);
+  }
+
+  pop(): HeapNode | undefined {
+    if (this.items.length === 0) return undefined;
+    const head = this.items[0];
+    const tail = this.items.pop()!;
+    if (this.items.length > 0) {
+      this.items[0] = tail;
+      this.bubbleDown(0);
+    }
+    return head;
+  }
+
+  get size(): number {
+    return this.items.length;
+  }
+
+  private bubbleUp(index: number) {
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (this.items[parent].score <= this.items[index].score) break;
+      [this.items[parent], this.items[index]] = [this.items[index], this.items[parent]];
+      index = parent;
+    }
+  }
+
+  private bubbleDown(index: number) {
+    const last = this.items.length - 1;
+    while (true) {
+      const left = index * 2 + 1;
+      const right = left + 1;
+      let smallest = index;
+      if (left <= last && this.items[left].score < this.items[smallest].score) {
+        smallest = left;
+      }
+      if (right <= last && this.items[right].score < this.items[smallest].score) {
+        smallest = right;
+      }
+      if (smallest === index) break;
+      [this.items[smallest], this.items[index]] = [this.items[index], this.items[smallest]];
+      index = smallest;
+    }
+  }
+}
+
+const MIN_STEP_COST = 1;
 
 /** A* 寻路，返回 Direction[] 路径；不可达返回 null */
 export function findPath(
@@ -19,61 +68,67 @@ export function findPath(
   if (rows === 0) return null;
   const cols = tiles[0].length;
 
-  // 边界/不可达检查
   if (sx === ex && sy === ey) return [];
   if (ey < 0 || ey >= rows || ex < 0 || ex >= cols) return null;
   if (!tiles[ey]?.[ex]?.walkable) return null;
 
-  const key = (x: number, y: number) => `${x},${y}`;
-  const heuristic = (x: number, y: number) => manhattanDistance({ x, y }, { x: ex, y: ey });
+  const heuristic = (x: number, y: number) => manhattanDistance({ x, y }, { x: ex, y: ey }) * MIN_STEP_COST;
+  const total = rows * cols;
+  const startIndex = sy * cols + sx;
+  const goalIndex = ey * cols + ex;
+  const gScore = new Float64Array(total);
+  gScore.fill(Number.POSITIVE_INFINITY);
+  const parent = new Int32Array(total);
+  parent.fill(-1);
+  const closed = new Uint8Array(total);
+  const heap = new MinHeap();
 
-  const start: Node = { x: sx, y: sy, g: 0, h: heuristic(sx, sy), f: heuristic(sx, sy), parent: null };
-  const open: Node[] = [start];
-  const closed = new Set<string>();
+  gScore[startIndex] = 0;
+  heap.push({ index: startIndex, score: heuristic(sx, sy) });
 
-  while (open.length > 0) {
-    // 取 f 最小的节点
-    open.sort((a, b) => a.f - b.f);
-    const current = open.shift()!;
-    const ck = key(current.x, current.y);
+  while (heap.size > 0) {
+    const current = heap.pop();
+    if (!current) break;
+    if (closed[current.index]) continue;
+    closed[current.index] = 1;
 
-    if (current.x === ex && current.y === ey) {
-      // 回溯路径
+    if (current.index === goalIndex) {
       const path: Direction[] = [];
-      let node: Node | null = current;
-      while (node?.parent) {
-        const dx = node.x - node.parent.x;
-        const dy = node.y - node.parent.y;
+      let node = goalIndex;
+      while (node !== startIndex && node !== -1) {
+        const prev = parent[node];
+        if (prev === -1) return null;
+        const dx = (node % cols) - (prev % cols);
+        const dy = Math.floor(node / cols) - Math.floor(prev / cols);
         const dir = deltaToDirection(dx, dy);
-        if (dir !== null) path.unshift(dir);
-        node = node.parent;
+        if (dir === null) return null;
+        path.push(dir);
+        node = prev;
       }
+      path.reverse();
       return path;
     }
 
-    closed.add(ck);
-
+    const x = current.index % cols;
+    const y = Math.floor(current.index / cols);
     for (const { dx, dy } of CARDINAL_DIRECTION_STEPS) {
-      const nx = current.x + dx;
-      const ny = current.y + dy;
-      const nk = key(nx, ny);
-
+      const nx = x + dx;
+      const ny = y + dy;
       if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
-      if (closed.has(nk)) continue;
       if (!tiles[ny]?.[nx]?.walkable) continue;
 
-      const g = current.g + 1;
-      const existing = open.find(n => n.x === nx && n.y === ny);
-      if (existing) {
-        if (g < existing.g) {
-          existing.g = g;
-          existing.f = g + existing.h;
-          existing.parent = current;
-        }
-      } else {
-        const h = heuristic(nx, ny);
-        open.push({ x: nx, y: ny, g, h, f: g + h, parent: current });
-      }
+      const nextIndex = ny * cols + nx;
+      if (closed[nextIndex]) continue;
+
+      const nextScore = gScore[current.index] + getTileTraversalCost(tiles[ny][nx].type);
+      if (nextScore >= gScore[nextIndex]) continue;
+
+      gScore[nextIndex] = nextScore;
+      parent[nextIndex] = current.index;
+      heap.push({
+        index: nextIndex,
+        score: nextScore + heuristic(nx, ny),
+      });
     }
   }
 

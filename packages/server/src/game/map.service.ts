@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { manhattanDistance, Tile, TileType, MapMeta, Portal, VIEW_RADIUS, ItemType, VisibleTile } from '@mud/shared';
+import { manhattanDistance, Tile, TileType, MapMeta, Portal, VIEW_RADIUS, ItemType, VisibleTile, getTileTraversalCost } from '@mud/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -507,7 +507,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   getTraversalCost(mapId: string, x: number, y: number): number {
     const tile = this.getTile(mapId, x, y);
     if (!tile || !tile.walkable) return Number.POSITIVE_INFINITY;
-    return this.tileMoveCost(tile.type);
+    return getTileTraversalCost(tile.type);
   }
 
   setOccupied(mapId: string, x: number, y: number, playerId: string | null) {
@@ -618,16 +618,4 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private tileMoveCost(type: TileType): number {
-    switch (type) {
-      case TileType.Floor:
-      case TileType.Door:
-      case TileType.Portal:
-        return 1;
-      case TileType.Grass:
-        return 2;
-      default:
-        return 4;
-    }
-  }
 }

@@ -4,9 +4,11 @@ import {
   AttrBonus,
   AttrKey,
   Attributes,
+  BASE_MOVE_POINTS_PER_TICK,
   DEFAULT_RATIO_DIVISOR,
   ELEMENT_KEYS,
   ElementKey,
+  MOVE_POINT_UNIT,
   NumericRatioDivisors,
   NumericStats,
   PlayerState,
@@ -108,7 +110,7 @@ const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
   techniqueExpRate: '提高功法经验获取效率。',
   lootRate: '提高常规掉落收益。',
   rareLootRate: '提高稀有掉落收益。',
-  moveSpeed: '每 100 点移动速度会在每 tick 额外获得 1 次稳定移动，剩余数值按百分比作为再额外移动 1 格的概率。',
+  moveSpeed: '决定每 tick 获得的移动预算。平地消耗较低，草地等复杂地形会消耗更多预算，因此会自然变慢。',
   viewRange: '决定地图上的可见范围。',
 };
 
@@ -198,12 +200,10 @@ function formatDefenseReduction(value: number): string {
 
 function formatMoveSpeedEffect(value: number): string {
   const safeValue = Math.max(0, value);
-  const guaranteed = Math.floor(safeValue / 100);
-  const chance = safeValue - guaranteed * 100;
-  if (chance <= 0) {
-    return `每 tick 额外稳定移动 ${guaranteed} 格`;
-  }
-  return `每 tick 额外稳定移动 ${guaranteed} 格，另有 ${chance.toFixed(chance % 1 === 0 ? 0 : 2)}% 概率再移动 1 格`;
+  const movePoints = BASE_MOVE_POINTS_PER_TICK + safeValue;
+  const flatTiles = movePoints / MOVE_POINT_UNIT;
+  const grassTiles = movePoints / (MOVE_POINT_UNIT * 2);
+  return `每 tick 获得 ${movePoints.toFixed(movePoints % 1 === 0 ? 0 : 2)} 点移动预算，约等于 ${flatTiles.toFixed(flatTiles % 1 === 0 ? 0 : 2)} 格平地 / ${grassTiles.toFixed(grassTiles % 1 === 0 ? 0 : 2)} 格草地`;
 }
 
 function buildNumericTooltip(label: string, key: NumericCardKey, numericValue: number, ratioValueText?: string): string {

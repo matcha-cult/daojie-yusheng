@@ -7,3 +7,4 @@ export * from './geometry';
 export * from './direction';
 export * from './targeting';
 export * from './target-ref';
+export * from './terrain';
