@@ -7,7 +7,6 @@ import {
   getMovePointsPerTick,
   manhattanDistance,
   MAX_STORED_MOVE_POINTS,
-  MOVE_POINT_UNIT,
   PlayerState,
 } from '@mud/shared';
 import { AttrService } from './attr.service';
@@ -346,7 +345,7 @@ export class NavigationService {
     if (!Number.isFinite(traversalCost)) {
       return Number.POSITIVE_INFINITY;
     }
-    return traversalCost * MOVE_POINT_UNIT;
+    return traversalCost;
   }
 
   private findPath(

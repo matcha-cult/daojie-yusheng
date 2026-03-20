@@ -153,9 +153,14 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     const legend: Record<string, TileType> = {
       '#': TileType.Wall,
       '.': TileType.Floor,
+      '=': TileType.Road,
+      ':': TileType.Trail,
       'P': TileType.Portal,
       '+': TileType.Door,
       ',': TileType.Grass,
+      '^': TileType.Hill,
+      ';': TileType.Mud,
+      '%': TileType.Swamp,
       '~': TileType.Water,
       'T': TileType.Tree,
       'o': TileType.Stone,
@@ -164,7 +169,16 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     const tiles: Tile[][] = tileRows.map(row =>
       [...row].map(ch => {
         const type = legend[ch] ?? TileType.Floor;
-        const walkable = type === TileType.Floor || type === TileType.Grass || type === TileType.Door || type === TileType.Portal;
+        const walkable =
+          type === TileType.Floor ||
+          type === TileType.Road ||
+          type === TileType.Trail ||
+          type === TileType.Door ||
+          type === TileType.Portal ||
+          type === TileType.Grass ||
+          type === TileType.Hill ||
+          type === TileType.Mud ||
+          type === TileType.Swamp;
         const durability = this.tileDurability(type);
         return {
           type,
@@ -613,7 +627,16 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     if (tile.hp <= 0) {
       const replacement = this.destroyedTileType(tile.type);
       tile.type = replacement;
-      tile.walkable = replacement === TileType.Floor || replacement === TileType.Grass || replacement === TileType.Door || replacement === TileType.Portal;
+      tile.walkable =
+        replacement === TileType.Floor ||
+        replacement === TileType.Road ||
+        replacement === TileType.Trail ||
+        replacement === TileType.Door ||
+        replacement === TileType.Portal ||
+        replacement === TileType.Grass ||
+        replacement === TileType.Hill ||
+        replacement === TileType.Mud ||
+        replacement === TileType.Swamp;
       tile.blocksSight = this.tileBlocksSight(replacement);
       tile.hp = undefined;
       tile.maxHp = undefined;

@@ -4,10 +4,15 @@ import type { TargetingShape } from './targeting';
 /** 地形类型 */
 export enum TileType {
   Floor = 'floor',
+  Road = 'road',
+  Trail = 'trail',
   Wall = 'wall',
   Door = 'door',
   Portal = 'portal',
   Grass = 'grass',
+  Hill = 'hill',
+  Mud = 'mud',
+  Swamp = 'swamp',
   Water = 'water',
   Tree = 'tree',
   Stone = 'stone',
