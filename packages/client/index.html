@@ -380,7 +380,7 @@
     .hud-panel {
       display: grid;
       grid-template-columns: var(--title-rail-size) minmax(0, 1fr);
-      grid-template-rows: auto auto auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
       column-gap: 12px;
       row-gap: 12px;
       height: 100%;
@@ -391,12 +391,11 @@
       grid-column: 2;
       display: flex;
       align-items: stretch;
-      justify-content: space-between;
       gap: 12px;
     }
     .hud-identity {
       grid-column: 1;
-      grid-row: 1 / 5;
+      grid-row: 1 / 4;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -408,29 +407,60 @@
     .hud-realm-block {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 3px;
-      padding: 8px 12px;
+      justify-content: flex-end;
+      padding: 8px 14px 10px;
       border: 1px solid var(--wash-ink);
       background: rgba(255,255,255,0.45);
-      min-width: 144px;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 110px;
+      position: relative;
     }
     .hud-realm-label {
+      position: absolute;
+      top: 8px;
+      left: 14px;
       font-size: 11px;
       color: var(--ink-grey);
+      line-height: 1;
+      pointer-events: none;
+    }
+    .hud-realm-main {
+      position: absolute;
+      top: 50%;
+      left: 14px;
+      right: 14px;
+      transform: translateY(-58%);
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 14px;
     }
     .hud-realm-value {
-      font-size: 18px;
+      font-size: 40px;
       font-family: var(--font-heading-sub);
       color: var(--ink-black);
+      line-height: 1;
+      grid-column: 2;
+      justify-self: center;
     }
     .hud-realm-sub {
-      font-size: 12px;
+      font-size: 18px;
+      font-family: var(--font-heading-sub);
       color: var(--stamp-red);
+      line-height: 1.1;
+      font-style: italic;
+      opacity: 0.9;
+      grid-column: 3;
+      justify-self: end;
+      min-width: 0;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .hud-top-spacer {
-      flex: 1 1 auto;
+      display: none;
     }
     .hud-resource-bars {
       grid-column: 2;
@@ -472,14 +502,11 @@
       color: var(--ink-black);
     }
     .hud-progress-shell {
-      grid-column: 2;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .hud-progress-label {
-      font-size: 11px;
-      color: var(--ink-grey);
+      position: relative;
+      width: 100%;
+      margin-top: auto;
+      padding-top: 4px;
+      border-top: 1px solid rgba(17, 17, 17, 0.08);
     }
     .hud-progress-track {
       position: relative;
@@ -487,6 +514,7 @@
       border-radius: 999px;
       border: 1px solid rgba(17, 17, 17, 0.12);
       background: rgba(17, 17, 17, 0.08);
+      margin-top: 6px;
     }
     .hud-progress-fill {
       position: absolute;
@@ -495,9 +523,18 @@
       background: linear-gradient(90deg, rgba(124,37,31,0.9), rgba(207,90,64,0.7));
     }
     .hud-progress-value {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 0;
+      font-family: var(--font-heading-main);
       font-size: 11px;
       color: var(--ink-black);
-      text-align: right;
+      text-align: center;
+      line-height: 1;
+      white-space: nowrap;
+      z-index: 1;
     }
     .hud-name {
       font-family: var(--font-heading-main);
@@ -2721,8 +2758,16 @@
             <div class="hud-top-row">
               <div class="hud-realm-block">
                 <div class="hud-realm-label">境界</div>
-                <div class="hud-realm-value" id="hud-realm">-</div>
-                <div class="hud-realm-sub" id="hud-realm-sub">-</div>
+                <div class="hud-realm-main">
+                  <div class="hud-realm-value" id="hud-realm">-</div>
+                  <div class="hud-realm-sub" id="hud-realm-sub">-</div>
+                </div>
+                <div class="hud-progress-shell">
+                  <div class="hud-progress-value" id="hud-cultivate">修为 (0/0)</div>
+                  <div class="hud-progress-track">
+                    <div class="hud-progress-fill" id="hud-cultivate-bar"></div>
+                  </div>
+                </div>
               </div>
               <div class="hud-top-spacer"></div>
             </div>
@@ -2744,15 +2789,6 @@
                 <div class="hud-resource-meter hud-resource-meter--qi">
                   <div class="hud-resource-fill" id="hud-qi-bar"></div>
                 </div>
-              </div>
-            </div>
-            <div class="hud-progress-shell">
-              <div class="hud-resource-head">
-                <div class="hud-progress-label">修为进度</div>
-                <div class="hud-progress-value" id="hud-cultivate">-</div>
-              </div>
-              <div class="hud-progress-track">
-                <div class="hud-progress-fill" id="hud-cultivate-bar"></div>
               </div>
             </div>
             <div class="hud-grid">

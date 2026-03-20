@@ -688,6 +688,7 @@ socket.onAttrUpdate((data) => {
     myPlayer.realm = data.realm;
     myPlayer.realmName = data.realm?.name;
     myPlayer.realmStage = data.realm?.shortName;
+    myPlayer.realmReview = data.realm?.review;
     myPlayer.breakthroughReady = data.realm?.breakthroughReady;
   }
   attrPanel.update(data);
@@ -964,7 +965,8 @@ function refreshHudChrome() {
   hud.update(myPlayer, {
     mapName: currentMapMeta?.name ?? myPlayer.mapId,
     mapDanger: resolveMapDanger(),
-    realmLabel: resolveRealmLabel(myPlayer),
+    realmLabel: myPlayer.realm?.displayName ?? resolveRealmLabel(myPlayer),
+    realmReviewLabel: myPlayer.realm?.review ?? myPlayer.realmReview,
     objectiveLabel: resolveObjectiveLabel(myPlayer),
     threatLabel: resolveThreatLabel(myPlayer),
     titleLabel: resolveTitleLabel(myPlayer),

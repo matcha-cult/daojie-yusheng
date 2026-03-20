@@ -4,6 +4,7 @@ interface HUDMeta {
   mapName?: string;
   mapDanger?: string;
   realmLabel?: string;
+  realmReviewLabel?: string;
   realmProgressLabel?: string;
   objectiveLabel?: string;
   threatLabel?: string;
@@ -23,8 +24,8 @@ export class HUD {
   private hpBar = document.getElementById('hud-hp-bar')!;
   private qiText = document.getElementById('hud-qi-text')!;
   private qiBar = document.getElementById('hud-qi-bar')!;
-  private cultivateBar = document.getElementById('hud-cultivate-bar')!;
   private cultivateText = document.getElementById('hud-cultivate')!;
+  private cultivateBar = document.getElementById('hud-cultivate-bar')!;
 
   update(player: PlayerState, meta?: HUDMeta) {
     this.nameDiv.textContent = player.name;
@@ -34,14 +35,10 @@ export class HUD {
     this.objectiveDiv.textContent = meta?.objectiveLabel ?? '暂无';
     this.threatDiv.textContent = meta?.threatLabel ?? '平稳';
 
-    const realmLabel = meta?.realmLabel ?? player.realmName ?? player.realmStage ?? '-';
+    const realmLabel = meta?.realmLabel ?? player.realm?.displayName ?? player.realmName ?? player.realmStage ?? '-';
     this.realmValue.textContent = realmLabel;
-    const progressLabel = player.realm
-      ? player.realm.breakthroughReady
-        ? '突破已就绪'
-        : `修为 ${player.realm.progress}/${player.realm.progressToNext}`
-      : meta?.realmProgressLabel ?? '-';
-    this.realmSub.textContent = progressLabel;
+    const realmReviewLabel = meta?.realmReviewLabel ?? player.realm?.review ?? player.realmReview ?? '-';
+    this.realmSub.textContent = realmReviewLabel;
 
     this.setResource(this.hpBar, this.hpText, player.hp, player.maxHp);
     const qiMax = Math.max(0, Math.round(player.numericStats?.maxQi ?? 0));
@@ -51,10 +48,10 @@ export class HUD {
     if (player.realm && player.realm.progressToNext > 0) {
       const ratio = Math.min(1, player.realm.progress / player.realm.progressToNext);
       this.cultivateBar.style.width = `${Math.round(ratio * 100)}%`;
-      this.cultivateText.textContent = `修为 ${player.realm.progress}/${player.realm.progressToNext}`;
+      this.cultivateText.textContent = `修为 (${player.realm.progress}/${player.realm.progressToNext})`;
     } else {
       this.cultivateBar.style.width = '0%';
-      this.cultivateText.textContent = '-';
+      this.cultivateText.textContent = '修为 (0/0)';
     }
   }
 
