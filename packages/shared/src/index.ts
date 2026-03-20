@@ -3,3 +3,7 @@ export * from './constants';
 export * from './protocol';
 export * from './numeric';
 export * from './technique';
+export * from './geometry';
+export * from './direction';
+export * from './targeting';
+export * from './target-ref';

@@ -1,4 +1,4 @@
-import { ActionDef, MapMeta, PlayerState, QuestState, TechniqueRealm } from '@mud/shared';
+import { ActionDef, manhattanDistance, MapMeta, PlayerState, QuestState, TechniqueRealm } from '@mud/shared';
 
 interface VisibleEntity {
   id: string;
@@ -168,7 +168,7 @@ export class WorldPanel {
       .filter((entity) => entity.kind === 'monster')
       .map((entity) => ({
         ...entity,
-        distance: Math.abs(entity.wx - input.player.x) + Math.abs(entity.wy - input.player.y),
+        distance: manhattanDistance({ x: entity.wx, y: entity.wy }, input.player),
       }))
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 5);

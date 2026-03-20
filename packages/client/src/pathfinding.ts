@@ -1,4 +1,4 @@
-import { Tile, Direction } from '@mud/shared';
+import { CARDINAL_DIRECTION_STEPS, deltaToDirection, Direction, manhattanDistance, Tile } from '@mud/shared';
 
 interface Node {
   x: number;
@@ -8,13 +8,6 @@ interface Node {
   f: number;
   parent: Node | null;
 }
-
-const DIRS: { d: Direction; dx: number; dy: number }[] = [
-  { d: Direction.North, dx: 0, dy: -1 },
-  { d: Direction.South, dx: 0, dy: 1 },
-  { d: Direction.East, dx: 1, dy: 0 },
-  { d: Direction.West, dx: -1, dy: 0 },
-];
 
 /** A* 寻路，返回 Direction[] 路径；不可达返回 null */
 export function findPath(
@@ -32,7 +25,7 @@ export function findPath(
   if (!tiles[ey]?.[ex]?.walkable) return null;
 
   const key = (x: number, y: number) => `${x},${y}`;
-  const heuristic = (x: number, y: number) => Math.abs(x - ex) + Math.abs(y - ey);
+  const heuristic = (x: number, y: number) => manhattanDistance({ x, y }, { x: ex, y: ey });
 
   const start: Node = { x: sx, y: sy, g: 0, h: heuristic(sx, sy), f: heuristic(sx, sy), parent: null };
   const open: Node[] = [start];
@@ -51,8 +44,8 @@ export function findPath(
       while (node?.parent) {
         const dx = node.x - node.parent.x;
         const dy = node.y - node.parent.y;
-        const dir = DIRS.find(d => d.dx === dx && d.dy === dy);
-        if (dir) path.unshift(dir.d);
+        const dir = deltaToDirection(dx, dy);
+        if (dir !== null) path.unshift(dir);
         node = node.parent;
       }
       return path;
@@ -60,7 +53,7 @@ export function findPath(
 
     closed.add(ck);
 
-    for (const { d, dx, dy } of DIRS) {
+    for (const { dx, dy } of CARDINAL_DIRECTION_STEPS) {
       const nx = current.x + dx;
       const ny = current.y + dy;
       const nk = key(nx, ny);

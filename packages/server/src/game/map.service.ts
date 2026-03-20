@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { Tile, TileType, MapMeta, Portal, VIEW_RADIUS, ItemType, VisibleTile } from '@mud/shared';
+import { manhattanDistance, Tile, TileType, MapMeta, Portal, VIEW_RADIUS, ItemType, VisibleTile } from '@mud/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -451,7 +451,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   getPortalNear(mapId: string, x: number, y: number, maxDistance = 1): Portal | undefined {
     const map = this.maps.get(mapId);
     if (!map) return undefined;
-    return map.portals.find((portal) => Math.abs(portal.x - x) + Math.abs(portal.y - y) <= maxDistance);
+    return map.portals.find((portal) => manhattanDistance(portal, { x, y }) <= maxDistance);
   }
 
   getNpcs(mapId: string): NpcConfig[] {

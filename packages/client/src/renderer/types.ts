@@ -1,13 +1,13 @@
-import { Tile } from '@mud/shared';
+import { GridPoint, TargetingShape, Tile } from '@mud/shared';
 import { Camera } from './camera';
 
 export interface TargetingOverlayState {
   originX: number;
   originY: number;
   range: number;
-  shape?: 'single' | 'line' | 'area';
+  shape?: TargetingShape;
   radius?: number;
-  affectedCells?: Array<{ x: number; y: number }>;
+  affectedCells?: GridPoint[];
   hoverX?: number;
   hoverY?: number;
 }

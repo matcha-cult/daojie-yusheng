@@ -1,4 +1,5 @@
 import type { NumericRatioDivisors, NumericScalarStatKey, NumericStats, PartialNumericStats } from './numeric';
+import type { TargetingShape } from './targeting';
 
 /** 地形类型 */
 export enum TileType {
@@ -216,7 +217,7 @@ export type SkillFormula =
     };
 
 export interface SkillTargetingDef {
-  shape?: 'single' | 'line' | 'area';
+  shape?: TargetingShape;
   range?: number;
   radius?: number;
   maxTargets?: number;

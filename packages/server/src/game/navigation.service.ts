@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Direction, PlayerState } from '@mud/shared';
+import { CARDINAL_DIRECTION_STEPS, directionFromTo, directionToDelta, Direction, manhattanDistance, PlayerState } from '@mud/shared';
 import { AttrService } from './attr.service';
 import { MapService } from './map.service';
 
@@ -176,7 +176,7 @@ export class NavigationService {
   }
 
   stepPlayerByDirection(player: PlayerState, direction: Direction): boolean {
-    const [dx, dy] = this.deltaFor(direction);
+    const [dx, dy] = directionToDelta(direction);
     player.facing = direction;
     let moved = this.tryMovePlayer(player, player.x + dx, player.y + dy);
     if (!moved) return false;
@@ -195,7 +195,7 @@ export class NavigationService {
     if (!next) {
       return this.rebuildPath(player, state);
     }
-    if (Math.abs(next.x - player.x) + Math.abs(next.y - player.y) !== 1) {
+    if (manhattanDistance(next, player) !== 1) {
       return this.rebuildPath(player, state);
     }
     return true;
@@ -211,7 +211,7 @@ export class NavigationService {
   private tryMovePlayer(player: PlayerState, x: number, y: number): boolean {
     if (!this.mapService.canOccupy(player.mapId, x, y, player.id)) return false;
     this.mapService.setOccupied(player.mapId, player.x, player.y, null);
-    player.facing = this.directionFromTo(player.x, player.y, x, y);
+    player.facing = directionFromTo(player.x, player.y, x, y);
     player.x = x;
     player.y = y;
     this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
@@ -246,26 +246,6 @@ export class NavigationService {
       return guaranteed;
     }
     return guaranteed + (Math.random() * 100 < remainder ? 1 : 0);
-  }
-
-  private directionFromTo(fromX: number, fromY: number, toX: number, toY: number): Direction {
-    if (toX > fromX) return Direction.East;
-    if (toX < fromX) return Direction.West;
-    if (toY > fromY) return Direction.South;
-    return Direction.North;
-  }
-
-  private deltaFor(direction: Direction): [number, number] {
-    switch (direction) {
-      case Direction.North:
-        return [0, -1];
-      case Direction.South:
-        return [0, 1];
-      case Direction.East:
-        return [1, 0];
-      case Direction.West:
-        return [-1, 0];
-    }
   }
 
   private findPath(
@@ -308,14 +288,9 @@ export class NavigationService {
 
       const x = current.index % width;
       const y = Math.floor(current.index / width);
-      const neighbors: Array<[number, number]> = [
-        [x, y - 1],
-        [x, y + 1],
-        [x + 1, y],
-        [x - 1, y],
-      ];
-
-      for (const [nx, ny] of neighbors) {
+      for (const { dx, dy } of CARDINAL_DIRECTION_STEPS) {
+        const nx = x + dx;
+        const ny = y + dy;
         if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
         if (!this.mapService.isTerrainWalkable(mapId, nx, ny)) continue;
 
@@ -340,7 +315,7 @@ export class NavigationService {
   }
 
   private heuristic(x: number, y: number, targetX: number, targetY: number): number {
-    return (Math.abs(targetX - x) + Math.abs(targetY - y)) * MIN_STEP_COST;
+    return manhattanDistance({ x, y }, { x: targetX, y: targetY }) * MIN_STEP_COST;
   }
 
   private occupancyPenalty(

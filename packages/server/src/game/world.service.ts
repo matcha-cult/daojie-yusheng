@@ -3,13 +3,17 @@ import {
   ActionDef,
   calcQiCostWithOutputLimit,
   CombatEffect,
+  computeAffectedCellsFromAnchor,
   createNumericStats,
   DEFAULT_RATIO_DIVISOR,
+  distanceSquared,
   Direction,
   ElementKey,
+  isPointInRange,
   ItemStack,
   NumericRatioDivisors,
   NumericStats,
+  parseTileTargetRef,
   PlayerState,
   QuestState,
   RenderEntity,
@@ -323,17 +327,17 @@ export class WorldService {
       .map((action) => this.contentService.getSkill(action.id))
       .find((skill): skill is SkillDef => Boolean(skill));
 
-    if (availableSkill && this.isWithinRange(player.x, player.y, target.x, target.y, availableSkill.range)) {
+    if (availableSkill && isPointInRange(player, target, availableSkill.range)) {
       const update = this.performTargetedSkill(player, availableSkill.id, target.runtimeId);
       if (!update.error) {
         return { ...update, usedActionId: availableSkill.id };
       }
-      if (this.isWithinRange(player.x, player.y, target.x, target.y, 1)) {
+      if (isPointInRange(player, target, 1)) {
         return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
       }
     }
 
-    if (this.isWithinRange(player.x, player.y, target.x, target.y, 1)) {
+    if (isPointInRange(player, target, 1)) {
       this.faceToward(player, target.x, target.y);
       return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
     }
@@ -369,7 +373,7 @@ export class WorldService {
     if (!target) {
       return { ...EMPTY_UPDATE, error: '目标不存在或不可选中' };
     }
-    if (!this.isWithinRange(player.x, player.y, target.x, target.y, skill.range)) {
+    if (!isPointInRange(player, target, skill.range)) {
       return { ...EMPTY_UPDATE, error: '目标超出技能范围' };
     }
 
@@ -471,20 +475,59 @@ export class WorldService {
     const monsters = this.monstersByMap.get(player.mapId) ?? [];
     const maxTargets = Math.max(1, targeting?.maxTargets ?? 99);
     if (shape === 'line') {
-      const cells = this.getLineCells(player.x, player.y, primaryTarget.x, primaryTarget.y).slice(1);
-      return monsters
-        .filter((monster) => monster.alive && cells.some((cell) => cell.x === monster.x && cell.y === monster.y))
-        .sort((left, right) => this.distanceSquared(player.x, player.y, left.x, left.y) - this.distanceSquared(player.x, player.y, right.x, right.y))
-        .slice(0, maxTargets)
-        .map((monster) => ({ kind: 'monster', x: monster.x, y: monster.y, monster }));
+      const cells = computeAffectedCellsFromAnchor(player, primaryTarget, {
+        range: skill.range,
+        shape: 'line',
+      });
+      return this.collectTargetsFromCells(player, monsters, cells, maxTargets);
     }
 
-    const radius = Math.max(0, targeting?.radius ?? 1);
-    return monsters
-      .filter((monster) => monster.alive && this.isWithinRange(primaryTarget.x, primaryTarget.y, monster.x, monster.y, radius))
-      .sort((left, right) => this.distanceSquared(player.x, player.y, left.x, left.y) - this.distanceSquared(player.x, player.y, right.x, right.y))
-      .slice(0, maxTargets)
-      .map((monster) => ({ kind: 'monster', x: monster.x, y: monster.y, monster }));
+    const cells = computeAffectedCellsFromAnchor(player, primaryTarget, {
+      range: skill.range,
+      shape: 'area',
+      radius: targeting?.radius,
+    });
+    return this.collectTargetsFromCells(player, monsters, cells, maxTargets);
+  }
+
+  private collectTargetsFromCells(
+    player: PlayerState,
+    monsters: RuntimeMonster[],
+    cells: Array<{ x: number; y: number }>,
+    maxTargets: number,
+  ): ResolvedTarget[] {
+    const resolved: ResolvedTarget[] = [];
+    const seen = new Set<string>();
+
+    for (const cell of cells) {
+      const monster = monsters.find((entry) => entry.alive && entry.x === cell.x && entry.y === cell.y);
+      if (monster) {
+        const key = `monster:${monster.runtimeId}`;
+        if (!seen.has(key)) {
+          resolved.push({ kind: 'monster', x: monster.x, y: monster.y, monster });
+          seen.add(key);
+          if (resolved.length >= maxTargets) {
+            return resolved;
+          }
+        }
+      }
+
+      const tile = this.mapService.getTile(player.mapId, cell.x, cell.y);
+      if (!tile || !tile.hp || !tile.maxHp) {
+        continue;
+      }
+      const key = `tile:${cell.x}:${cell.y}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      resolved.push({ kind: 'tile', x: cell.x, y: cell.y, tileType: tile.type });
+      seen.add(key);
+      if (resolved.length >= maxTargets) {
+        return resolved;
+      }
+    }
+
+    return resolved;
   }
 
   private pickDamageTargets(selectedTargets: ResolvedTarget[], primaryTarget?: ResolvedTarget): ResolvedTarget[] {
@@ -612,34 +655,6 @@ export class WorldService {
     }
   }
 
-  private getLineCells(startX: number, startY: number, endX: number, endY: number): Array<{ x: number; y: number }> {
-    const cells: Array<{ x: number; y: number }> = [];
-    let x = startX;
-    let y = startY;
-    const dx = Math.abs(endX - startX);
-    const dy = Math.abs(endY - startY);
-    const sx = startX < endX ? 1 : -1;
-    const sy = startY < endY ? 1 : -1;
-    let err = dx - dy;
-
-    while (true) {
-      cells.push({ x, y });
-      if (x === endX && y === endY) {
-        break;
-      }
-      const e2 = err * 2;
-      if (e2 > -dy) {
-        err -= dy;
-        x += sx;
-      }
-      if (e2 < dx) {
-        err += dx;
-        y += sy;
-      }
-    }
-    return cells;
-  }
-
   resetPlayerToSpawn(player: PlayerState): WorldUpdate {
     this.logger.log(`重置玩家到出生点: ${player.id} (${player.mapId}:${player.x},${player.y})`);
     const spawn = this.mapService.getSpawnPoint('spawn') ?? { x: player.x, y: player.y };
@@ -694,7 +709,7 @@ export class WorldService {
       const target = this.findNearestPlayer(monster, players);
       if (!target) continue;
 
-      if (this.isWithinRange(monster.x, monster.y, target.x, target.y, 1)) {
+      if (isPointInRange(monster, target, 1)) {
         const resolved = this.resolveMonsterAttack(monster, target);
         if (target.hp > 0 && target.autoRetaliate !== false && !target.autoBattle) {
           target.autoBattle = true;
@@ -1305,7 +1320,7 @@ export class WorldService {
     let bestDistance = Number.MAX_SAFE_INTEGER;
     for (const monster of this.monstersByMap.get(player.mapId) ?? []) {
       if (!monster.alive) continue;
-      const distanceSq = this.distanceSquared(player.x, player.y, monster.x, monster.y);
+      const distanceSq = distanceSquared(player, monster);
       if (distanceSq > maxDistance * maxDistance) continue;
       if (distanceSq < bestDistance) {
         best = monster;
@@ -1320,7 +1335,7 @@ export class WorldService {
     let bestDistance = Number.MAX_SAFE_INTEGER;
     for (const player of players) {
       if (player.dead || player.mapId !== monster.mapId) continue;
-      const distanceSq = this.distanceSquared(player.x, player.y, monster.x, monster.y);
+      const distanceSq = distanceSquared(player, monster);
       if (distanceSq > monster.aggroRange * monster.aggroRange) continue;
       if (distanceSq < bestDistance) {
         best = player;
@@ -1379,7 +1394,7 @@ export class WorldService {
 
   private getAdjacentNpcs(player: PlayerState): NpcConfig[] {
     return this.mapService.getNpcs(player.mapId)
-      .filter((npc) => this.isWithinRange(player.x, player.y, npc.x, npc.y, 1));
+      .filter((npc) => isPointInRange(player, npc, 1));
   }
 
   private findSpawnPosition(mapId: string, monster: RuntimeMonster): { x: number; y: number } | null {
@@ -1417,16 +1432,6 @@ export class WorldService {
     return null;
   }
 
-  private isWithinRange(ax: number, ay: number, bx: number, by: number, range: number): boolean {
-    return this.distanceSquared(ax, ay, bx, by) <= range * range;
-  }
-
-  private distanceSquared(ax: number, ay: number, bx: number, by: number): number {
-    const dx = ax - bx;
-    const dy = ay - by;
-    return dx * dx + dy * dy;
-  }
-
   private resolveCombatTarget(player: PlayerState): RuntimeMonster | undefined {
     if (!player.combatTargetId) return undefined;
     const target = (this.monstersByMap.get(player.mapId) ?? []).find((monster) => monster.runtimeId === player.combatTargetId && monster.alive);
@@ -1447,11 +1452,9 @@ export class WorldService {
       return { kind: 'monster', x: monster.x, y: monster.y, monster };
     }
 
-    if (targetRef.startsWith('tile:')) {
-      const [, sx, sy] = targetRef.split(':');
-      const x = Number(sx);
-      const y = Number(sy);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const tileTarget = parseTileTargetRef(targetRef);
+    if (tileTarget) {
+      const { x, y } = tileTarget;
       const tile = this.mapService.getTile(player.mapId, x, y);
       if (!tile) return null;
       return { kind: 'tile', x, y, tileType: tile.type };

@@ -17,7 +17,26 @@ import { ActionPanel } from './ui/panels/action-panel';
 import { GmPanel } from './ui/panels/gm-panel';
 import { WorldPanel } from './ui/panels/world-panel';
 import { adjustZoom, cycleZoom, getZoom } from './display';
-import { Direction, MapMeta, PlayerState, SkillDef, Tile, TileType, VisibleTile, S2C_Init, S2C_Tick, VIEW_RADIUS, TechniqueRealm } from '@mud/shared';
+import {
+  computeAffectedCellsFromAnchor,
+  Direction,
+  encodeTileTargetRef,
+  GridPoint,
+  isPointInRange,
+  MapMeta,
+  manhattanDistance,
+  PlayerState,
+  SkillDef,
+  Tile,
+  TileType,
+  VisibleTile,
+  S2C_Init,
+  S2C_Tick,
+  TargetingGeometrySpec,
+  TargetingShape,
+  VIEW_RADIUS,
+  TechniqueRealm,
+} from '@mud/shared';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const canvasHost = document.getElementById('game-stage') as HTMLElement;
@@ -68,7 +87,7 @@ let pendingTargetedAction: {
   actionName: string;
   targetMode?: string;
   range: number;
-  shape?: 'single' | 'line' | 'area';
+  shape?: TargetingShape;
   radius?: number;
   maxTargets?: number;
   hoverX?: number;
@@ -177,70 +196,22 @@ function computeAffectedCells(action: NonNullable<typeof pendingTargetedAction>)
   if (action.hoverX === undefined || action.hoverY === undefined) {
     return [];
   }
-  return computeAffectedCellsFromAnchor(action, action.hoverX, action.hoverY);
+  return computeAffectedCellsForAction(action, { x: action.hoverX, y: action.hoverY });
 }
 
-function computeAffectedCellsFromAnchor(
+function computeAffectedCellsForAction(
   action: Pick<NonNullable<typeof pendingTargetedAction>, 'range' | 'shape' | 'radius'>,
-  anchorX: number,
-  anchorY: number,
-): Array<{ x: number; y: number }> {
+  anchor: GridPoint,
+): GridPoint[] {
   if (!myPlayer) {
     return [];
   }
-  if (!isTargetInRange(anchorX, anchorY, action.range)) {
-    return [];
-  }
-  if (action.shape === 'line') {
-    return getLineCells(myPlayer.x, myPlayer.y, anchorX, anchorY).slice(1);
-  }
-  if (action.shape === 'area') {
-    const cells: Array<{ x: number; y: number }> = [];
-    const radius = Math.max(0, action.radius ?? 1);
-    for (let dy = -radius; dy <= radius; dy += 1) {
-      for (let dx = -radius; dx <= radius; dx += 1) {
-        if (dx * dx + dy * dy > radius * radius) continue;
-        cells.push({ x: anchorX + dx, y: anchorY + dy });
-      }
-    }
-    return cells;
-  }
-  return [{ x: anchorX, y: anchorY }];
-}
-
-function getLineCells(startX: number, startY: number, endX: number, endY: number): Array<{ x: number; y: number }> {
-  const cells: Array<{ x: number; y: number }> = [];
-  let x = startX;
-  let y = startY;
-  const dx = Math.abs(endX - startX);
-  const dy = Math.abs(endY - startY);
-  const sx = startX < endX ? 1 : -1;
-  const sy = startY < endY ? 1 : -1;
-  let err = dx - dy;
-
-  while (true) {
-    cells.push({ x, y });
-    if (x === endX && y === endY) {
-      break;
-    }
-    const e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      x += sx;
-    }
-    if (e2 < dx) {
-      err += dx;
-      y += sy;
-    }
-  }
-  return cells;
-}
-
-function isTargetInRange(targetX: number, targetY: number, range: number): boolean {
-  if (!myPlayer) return false;
-  const dx = targetX - myPlayer.x;
-  const dy = targetY - myPlayer.y;
-  return dx * dx + dy * dy <= range * range;
+  const spec: TargetingGeometrySpec = {
+    range: action.range,
+    shape: action.shape,
+    radius: action.radius,
+  };
+  return computeAffectedCellsFromAnchor({ x: myPlayer.x, y: myPlayer.y }, anchor, spec);
 }
 
 function resolveTargetRefForAction(
@@ -248,18 +219,18 @@ function resolveTargetRefForAction(
   target: { x: number; y: number; entityId?: string; entityKind?: string },
 ): string | null {
   if (action.shape && action.shape !== 'single') {
-    return `tile:${target.x}:${target.y}`;
+    return encodeTileTargetRef({ x: target.x, y: target.y });
   }
   if (action.targetMode === 'entity') {
     return target.entityKind === 'monster' && target.entityId ? target.entityId : null;
   }
   if (action.targetMode === 'tile') {
-    return `tile:${target.x}:${target.y}`;
+    return encodeTileTargetRef({ x: target.x, y: target.y });
   }
   if (target.entityKind === 'monster' && target.entityId) {
     return target.entityId;
   }
-  return `tile:${target.x}:${target.y}`;
+  return encodeTileTargetRef({ x: target.x, y: target.y });
 }
 
 function hasAffectableTargetInArea(
@@ -270,7 +241,7 @@ function hasAffectableTargetInArea(
   if (!action.shape || action.shape === 'single') {
     return true;
   }
-  const affectedCells = computeAffectedCellsFromAnchor(action, anchorX, anchorY);
+  const affectedCells = computeAffectedCellsForAction(action, { x: anchorX, y: anchorY });
   if (affectedCells.length === 0) {
     return false;
   }
@@ -665,7 +636,7 @@ function resolveObjectiveLabel(player: PlayerState): string {
 function resolveThreatLabel(player: PlayerState): string {
   const monsters = latestEntities
     .filter((entity) => entity.kind === 'monster')
-    .map((entity) => Math.abs(entity.wx - player.x) + Math.abs(entity.wy - player.y));
+    .map((entity) => manhattanDistance({ x: entity.wx, y: entity.wy }, player));
   if (monsters.length === 0) return '平稳';
   const nearest = Math.min(...monsters);
   if (nearest <= 2) return '近身威胁';
@@ -855,7 +826,7 @@ mouseInput.init(
         cancelTargeting();
         return;
       }
-      if (!isTargetInRange(target.x, target.y, pendingTargetedAction.range)) {
+      if (!myPlayer || !isPointInRange({ x: myPlayer.x, y: myPlayer.y }, { x: target.x, y: target.y }, pendingTargetedAction.range)) {
         showToast(`超出施法范围，最多 ${pendingTargetedAction.range} 格`);
         return;
       }
