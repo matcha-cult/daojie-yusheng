@@ -26,6 +26,7 @@ import {
   MapMeta,
   manhattanDistance,
   PlayerState,
+  RenderEntity,
   SkillDef,
   Tile,
   TileType,
@@ -36,6 +37,7 @@ import {
   TargetingShape,
   VIEW_RADIUS,
   TechniqueRealm,
+  getTileTraversalCost,
 } from '@mud/shared';
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -109,6 +111,21 @@ const ENTITY_KIND_NAMES: Record<string, string> = {
   player: '修士',
   monster: '妖兽',
   npc: '人物',
+};
+
+type ObservedEntity = {
+  id: string;
+  wx: number;
+  wy: number;
+  char: string;
+  color: string;
+  name?: string;
+  kind?: string;
+  hp?: number;
+  maxHp?: number;
+  qi?: number;
+  maxQi?: number;
+  observation?: RenderEntity['observation'];
 };
 
 function escapeHtml(input: string): string {
@@ -276,27 +293,67 @@ function buildObservationRows(rows: Array<{ label: string; value: string }>): st
     .join('');
 }
 
-function buildObservedEntitiesHtml(entities: typeof latestEntities): string {
-  if (entities.length === 0) {
-    return '<div class="observe-modal-row"><span class="observe-modal-label">实体</span><span class="observe-modal-value">该格暂无实体</span></div>';
+function formatCurrentMax(current?: number, max?: number): string {
+  if (typeof current !== 'number' || typeof max !== 'number') {
+    return '未明';
   }
-  return `<div class="observe-entity-list">${entities.map((entity) => {
-    const lines = [
-      `类型：${ENTITY_KIND_NAMES[entity.kind ?? ''] ?? '未知'}`,
-      `标识：${entity.id}`,
-      typeof entity.hp === 'number' && typeof entity.maxHp === 'number'
-        ? `生命：${Math.max(0, Math.round(entity.hp))} / ${Math.max(0, Math.round(entity.maxHp))}`
-        : '生命：未知',
-      `坐标：(${entity.wx}, ${entity.wy})`,
-    ];
-    return `<div class="observe-entity-card">
-      <div class="observe-entity-head">
-        <span class="observe-entity-name">${escapeHtml(entity.name ?? entity.id)}</span>
-        <span class="observe-entity-kind">${escapeHtml(ENTITY_KIND_NAMES[entity.kind ?? ''] ?? '未知')}</span>
-      </div>
-      ${lines.map((line) => `<div class="observe-entity-line">${escapeHtml(line)}</div>`).join('')}
-    </div>`;
-  }).join('')}</div>`;
+  return `${Math.max(0, Math.round(current))} / ${Math.max(0, Math.round(max))}`;
+}
+
+function toObservedEntity(entity: RenderEntity): ObservedEntity {
+  return {
+    id: entity.id,
+    wx: entity.x,
+    wy: entity.y,
+    char: entity.char,
+    color: entity.color,
+    name: entity.name,
+    kind: entity.kind,
+    hp: entity.hp,
+    maxHp: entity.maxHp,
+    qi: entity.qi,
+    maxQi: entity.maxQi,
+    observation: entity.observation,
+  };
+}
+
+function formatTraversalCost(tile: Tile): string {
+  if (!tile.walkable) {
+    return '无法通行';
+  }
+  const cost = getTileTraversalCost(tile.type);
+  return `${cost}`;
+}
+
+function buildObservedEntityCardHtml(entity: ObservedEntity): string {
+  const shouldAlwaysShowVitals = entity.kind === 'monster' || entity.kind === 'npc';
+  const vitalRows = shouldAlwaysShowVitals
+    ? [
+        { label: '生命', value: formatCurrentMax(entity.hp, entity.maxHp) },
+        { label: '灵力', value: formatCurrentMax(entity.qi, entity.maxQi) },
+      ]
+    : [];
+  const detailRows = entity.observation?.lines ?? [];
+  const detailGrid = [...vitalRows, ...detailRows];
+  return `<div class="observe-entity-card">
+    <div class="observe-entity-head">
+      <span class="observe-entity-name">${escapeHtml(entity.name ?? entity.id)}</span>
+      <span class="observe-entity-kind">${escapeHtml(ENTITY_KIND_NAMES[entity.kind ?? ''] ?? '未知')}</span>
+    </div>
+    <div class="observe-entity-verdict">${escapeHtml(entity.observation?.verdict ?? '神识轻拂而过，未得更多回响。')}</div>
+    ${detailGrid.length > 0
+      ? `<div class="observe-entity-grid">${buildObservationRows(detailGrid)}</div>`
+      : '<div class="observe-entity-empty">此身气机尽藏，暂未看出更多端倪。</div>'}
+  </div>`;
+}
+
+function buildObservedEntitySectionHtml(entities: ObservedEntity[]): string {
+  return `<section class="observe-modal-section">
+    <div class="observe-modal-section-title">角色信息</div>
+    ${entities.length > 0
+      ? `<div class="observe-entity-list">${entities.map((entity) => buildObservedEntityCardHtml(entity)).join('')}</div>`
+      : '<div class="observe-entity-empty">该地块当前没有角色、怪物或 NPC。</div>'}
+  </section>`;
 }
 
 function showObserveModal(targetX: number, targetY: number): void {
@@ -307,22 +364,29 @@ function showObserveModal(targetX: number, targetY: number): void {
   }
 
   const entities = latestEntities.filter((entity) => entity.wx === targetX && entity.wy === targetY);
+  const sortedEntities = [...entities].sort((left, right) => {
+    const order = (kind?: string): number => (kind === 'player' ? 0 : kind === 'npc' ? 1 : kind === 'monster' ? 2 : 3);
+    return order(left.kind) - order(right.kind);
+  });
   const terrainRows = [
-    { label: '地面类型', value: TILE_TYPE_NAMES[tile.type] ?? tile.type },
+    { label: '地貌', value: TILE_TYPE_NAMES[tile.type] ?? tile.type },
     { label: '是否可通行', value: tile.walkable ? '可通行' : '不可通行' },
+    { label: '行走消耗', value: formatTraversalCost(tile) },
     { label: '是否阻挡视线', value: tile.blocksSight ? '会阻挡' : '不会阻挡' },
   ];
   if (typeof tile.hp === 'number' && typeof tile.maxHp === 'number') {
     terrainRows.push({
-      label: tile.type === TileType.Wall ? '墙体耐久' : '结构耐久',
-      value: `${Math.max(0, Math.round(tile.hp))} / ${Math.max(0, Math.round(tile.maxHp))}${tile.hpVisible ? '' : '（未显式显示）'}`,
+      label: tile.type === TileType.Wall ? '壁垒稳固' : '地物稳固',
+      value: formatCurrentMax(tile.hp, tile.maxHp),
     });
   }
-  if (tile.occupiedBy) {
-    terrainRows.push({ label: '占用标识', value: tile.occupiedBy });
+  if (entities.length > 0) {
+    terrainRows.push({ label: '驻足气息', value: entities.map((entity) => entity.name ?? ENTITY_KIND_NAMES[entity.kind ?? ''] ?? entity.id).join('、') });
+  } else if (tile.occupiedBy) {
+    terrainRows.push({ label: '驻足气息', value: '此地留有生灵立身之痕' });
   }
   if (tile.modifiedAt) {
-    terrainRows.push({ label: '最近变动', value: `第 ${tile.modifiedAt} tick` });
+    terrainRows.push({ label: '最近变动', value: '此地近期发生过变化' });
   }
 
   if (observeModalSubtitleEl) {
@@ -330,14 +394,17 @@ function showObserveModal(targetX: number, targetY: number): void {
   }
   if (observeModalBodyEl) {
     observeModalBodyEl.innerHTML = `
-      <section class="observe-modal-section">
-        <div class="observe-modal-section-title">地块信息</div>
-        <div class="observe-modal-grid">${buildObservationRows(terrainRows)}</div>
-      </section>
-      <section class="observe-modal-section">
-        <div class="observe-modal-section-title">实体信息</div>
-        ${buildObservedEntitiesHtml(entities)}
-      </section>
+      <div class="observe-modal-top">
+        <section class="observe-modal-section">
+          <div class="observe-modal-section-title">地块信息</div>
+          <div class="observe-modal-grid">${buildObservationRows(terrainRows)}</div>
+        </section>
+        <section class="observe-modal-section">
+          <div class="observe-modal-section-title">地面物品</div>
+          <div class="observe-entity-empty">暂未接入地面掉落显示，当前没有可展示物品。</div>
+        </section>
+      </div>
+      ${buildObservedEntitySectionHtml(sortedEntities)}
     `;
   }
   observeModalEl?.classList.remove('hidden');
@@ -530,7 +597,7 @@ let lastGmSyncAt = 0;
 
 let myPlayer: PlayerState | null = null;
 let currentMapMeta: MapMeta | null = null;
-let latestEntities: { id: string; wx: number; wy: number; char: string; color: string; name?: string; kind?: string; hp?: number; maxHp?: number }[] = [];
+let latestEntities: ObservedEntity[] = [];
 
 // 视野中心平滑值（浮点格子坐标），无延迟快速 lerp
 let viewCenterX = 0;
@@ -879,10 +946,7 @@ socket.onInit((data: S2C_Init) => {
   viewCenterX = myPlayer.x;
   viewCenterY = myPlayer.y;
 
-  const entities = data.players.map(([id, x, y, char, color, name, hp, maxHp]) => ({
-    id, wx: x, wy: y, char, color, name, hp, maxHp, kind: 'player',
-  }));
-  entities.push({ id: myPlayer.id, wx: myPlayer.x, wy: myPlayer.y, char: [...myPlayer.name][0] ?? '@', color: '#ff0', name: myPlayer.name, hp: myPlayer.hp, maxHp: myPlayer.maxHp, kind: 'player' });
+  const entities = data.players.map(toObservedEntity);
   latestEntities = entities;
   renderer.updateEntities(entities);
 
@@ -957,10 +1021,10 @@ socket.onTick((data: S2C_Tick) => {
   const oldX = myPlayer.x;
   const oldY = myPlayer.y;
 
-  for (const [id, x, y] of data.p) {
-    if (id === myPlayer.id) {
-      myPlayer.x = x;
-      myPlayer.y = y;
+  for (const entity of data.p) {
+    if (entity.id === myPlayer.id) {
+      myPlayer.x = entity.x;
+      myPlayer.y = entity.y;
       break;
     }
   }
@@ -975,12 +1039,8 @@ socket.onTick((data: S2C_Tick) => {
 
   const moved = myPlayer.x !== oldX || myPlayer.y !== oldY;
 
-  const entities = data.p.map(([id, wx, wy, char, color, name, hp, maxHp]) => ({
-    id, wx, wy, char, color, name, hp, maxHp, kind: 'player',
-  }));
-  const mapEntities = data.e.map(([id, wx, wy, char, color, name, kind, hp, maxHp]) => ({
-    id, wx, wy, char, color, name, kind, hp, maxHp,
-  }));
+  const entities = data.p.map(toObservedEntity);
+  const mapEntities = data.e.map(toObservedEntity);
   entities.push(...mapEntities);
   latestEntities = entities;
   syncTargetingOverlay();

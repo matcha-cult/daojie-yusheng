@@ -1,4 +1,4 @@
-import { Inventory, PlayerState } from '@mud/shared';
+import { Inventory, ItemType, PlayerState } from '@mud/shared';
 import { FloatingTooltip } from '../floating-tooltip';
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -51,6 +51,17 @@ const STAT_LABELS: Record<string, string> = {
   moveSpeed: '移动速度',
 };
 
+type InventoryFilter = 'all' | ItemType;
+
+const FILTER_TABS: Array<{ id: InventoryFilter; label: string }> = [
+  { id: 'all', label: '全部' },
+  { id: 'equipment', label: '装备' },
+  { id: 'material', label: '材料' },
+  { id: 'skill_book', label: '功法书' },
+  { id: 'consumable', label: '消耗品' },
+  { id: 'quest_item', label: '任务物' },
+];
+
 function formatBonusValue(key: string, value: number): string {
   if (key === 'critDamage') {
     return `${value / 10}%`;
@@ -67,13 +78,19 @@ export class InventoryPanel {
   private onUseItem: ((slotIndex: number) => void) | null = null;
   private onDropItem: ((slotIndex: number, count: number) => void) | null = null;
   private onEquipItem: ((slotIndex: number) => void) | null = null;
+  private onSortInventory: (() => void) | null = null;
   private tooltip = new FloatingTooltip('floating-tooltip inventory-tooltip');
+  private activeFilter: InventoryFilter = 'all';
+  private lastInventory: Inventory | null = null;
 
   constructor() {
     this.ensureTooltipStyle();
   }
 
   clear(): void {
+    this.activeFilter = 'all';
+    this.lastInventory = null;
+    this.tooltip.hide();
     this.pane.innerHTML = '<div class="empty-hint">背包空空如也</div>';
   }
 
@@ -81,31 +98,54 @@ export class InventoryPanel {
     onUse: (slotIndex: number) => void,
     onDrop: (slotIndex: number, count: number) => void,
     onEquip: (slotIndex: number) => void,
+    onSort: () => void,
   ): void {
     this.onUseItem = onUse;
     this.onDropItem = onDrop;
     this.onEquipItem = onEquip;
+    this.onSortInventory = onSort;
   }
 
   update(inventory: Inventory): void {
+    this.lastInventory = inventory;
     this.render(inventory);
   }
 
   initFromPlayer(player: PlayerState): void {
+    this.lastInventory = player.inventory;
     this.render(player.inventory);
   }
 
   private render(inventory: Inventory): void {
-    if (inventory.items.length === 0) {
-      this.clear();
+    this.lastInventory = inventory;
+    const visibleItems = inventory.items
+      .map((item, slotIndex) => ({ item, slotIndex }))
+      .filter(({ item }) => this.activeFilter === 'all' || item.type === this.activeFilter);
+
+    let html = `<div class="panel-section">
+      <div class="inventory-panel-head">
+        <div class="panel-section-title">背包 (${inventory.items.length}/${inventory.capacity})</div>
+        <button class="small-btn" data-sort-inventory type="button">一键整理</button>
+      </div>
+      <div class="inventory-filter-tabs">`;
+
+    for (const tab of FILTER_TABS) {
+      html += `<button class="inventory-filter-tab ${this.activeFilter === tab.id ? 'active' : ''}" data-filter="${tab.id}" type="button">${tab.label}</button>`;
+    }
+
+    html += '</div>';
+
+    if (visibleItems.length === 0) {
+      html += `<div class="empty-hint">${inventory.items.length === 0 ? '背包空空如也' : '当前分类暂无物品'}</div>`;
+      html += '</div>';
+      this.pane.innerHTML = html;
+      this.bindActions();
       return;
     }
 
-    let html = `<div class="panel-section">
-      <div class="panel-section-title">背包 (${inventory.items.length}/${inventory.capacity})</div>
-      <div class="inventory-grid">`;
+    html += '<div class="inventory-grid">';
 
-    inventory.items.forEach((item, i) => {
+    visibleItems.forEach(({ item, slotIndex }) => {
       const attrLines = item.equipAttrs
         ? Object.entries(item.equipAttrs).map(([key, value]) => `${ATTR_LABELS[key] ?? key} +${value}`)
         : [];
@@ -129,8 +169,8 @@ export class InventoryPanel {
         </div>
         <div class="inventory-cell-name">${this.escapeHtml(shortName)}</div>
         <div class="inventory-cell-actions">
-          ${item.type === 'equipment' ? `<button class="small-btn" data-equip="${i}" type="button">装备</button>` : `<button class="small-btn" data-use="${i}" type="button">使用</button>`}
-          <button class="small-btn danger" data-drop="${i}" type="button">丢弃</button>
+          ${item.type === 'equipment' ? `<button class="small-btn" data-equip="${slotIndex}" type="button">装备</button>` : `<button class="small-btn" data-use="${slotIndex}" type="button">使用</button>`}
+          <button class="small-btn danger" data-drop="${slotIndex}" type="button">丢弃</button>
         </div>
       </div>`;
     });
@@ -138,8 +178,25 @@ export class InventoryPanel {
     html += '</div></div>';
     this.pane.innerHTML = html;
     this.bindTooltips();
+    this.bindActions();
+  }
 
-    // 绑定按钮事件
+  private bindActions(): void {
+    this.pane.querySelectorAll<HTMLElement>('[data-filter]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const filter = btn.dataset.filter as InventoryFilter | undefined;
+        if (!filter || filter === this.activeFilter) {
+          return;
+        }
+        this.activeFilter = filter;
+        if (this.lastInventory) {
+          this.render(this.lastInventory);
+        }
+      });
+    });
+    this.pane.querySelector<HTMLElement>('[data-sort-inventory]')?.addEventListener('click', () => {
+      this.onSortInventory?.();
+    });
     this.pane.querySelectorAll('[data-use]').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt((btn as HTMLElement).dataset.use!);

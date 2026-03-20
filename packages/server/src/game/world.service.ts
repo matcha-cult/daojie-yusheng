@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ActionDef,
+  Attributes,
   calcQiCostWithOutputLimit,
   CombatEffect,
   computeAffectedCellsFromAnchor,
@@ -13,6 +14,7 @@ import {
   ItemStack,
   NumericRatioDivisors,
   NumericStats,
+  ObservationInsight,
   parseTileTargetRef,
   PlayerState,
   QuestState,
@@ -48,6 +50,31 @@ interface RuntimeMonster extends MonsterSpawnConfig {
 interface NpcInteractionState {
   quest?: QuestConfig;
   questState?: QuestState;
+}
+
+interface ObservationTargetSnapshot {
+  hp: number;
+  maxHp: number;
+  qi: number;
+  maxQi: number;
+  spirit: number;
+  stats: NumericStats;
+  ratios: NumericRatioDivisors;
+  attrs?: Attributes;
+  realmLabel?: string;
+}
+
+interface ObservationLineSpec {
+  threshold: number;
+  label: string;
+  value: string;
+}
+
+interface NpcPresenceProfile {
+  title: string;
+  spirit: number;
+  hp: number;
+  qi: number;
 }
 
 export interface WorldMessage {
@@ -103,6 +130,17 @@ const SKILL_ELEMENTS: Partial<Record<string, ElementKey>> = {
   'skill.starfall_thrust': 'metal',
   'skill.meteor_break': 'fire',
 };
+const OBSERVATION_FULL_RATIO = 1.2;
+const OBSERVATION_BLIND_RATIO = 0.2;
+const NPC_ROLE_PROFILES: Record<string, { title: string; spirit: number; hp: number; qi: number }> = {
+  quest_giver: { title: '引路前辈', spirit: 30, hp: 96, qi: 132 },
+  support: { title: '养脉修者', spirit: 26, hp: 82, qi: 120 },
+  craft: { title: '炉火匠人', spirit: 18, hp: 108, qi: 74 },
+  lore: { title: '守卷旧识', spirit: 28, hp: 72, qi: 118 },
+  quest_hint: { title: '路引修者', spirit: 14, hp: 64, qi: 52 },
+  warning: { title: '示警修士', spirit: 16, hp: 70, qi: 58 },
+  scene: { title: '器物残痕', spirit: 2, hp: 44, qi: 0 },
+};
 
 interface CombatSnapshot {
   stats: NumericStats;
@@ -153,33 +191,36 @@ export class WorldService {
 
     const npcs = this.mapService.getNpcs(player.mapId)
       .filter((npc) => visibleKeys.has(`${npc.x},${npc.y}`))
-      .map<RenderEntity>((npc) => ({
-        id: `npc:${npc.id}`,
-        x: npc.x,
-        y: npc.y,
-        char: npc.char,
-        color: npc.color,
-        name: npc.name,
-        kind: 'npc',
-        hp: 1,
-        maxHp: 1,
-      }));
+      .map<RenderEntity>((npc) => this.buildNpcRenderEntity(player, npc, player.mapId));
 
     const monsters = (this.monstersByMap.get(player.mapId) ?? [])
       .filter((monster) => monster.alive && visibleKeys.has(`${monster.x},${monster.y}`))
-      .map<RenderEntity>((monster) => ({
-        id: monster.runtimeId,
-        x: monster.x,
-        y: monster.y,
-        char: monster.char,
-        color: monster.color,
-        name: monster.name,
-        kind: 'monster',
-        hp: monster.hp,
-        maxHp: monster.maxHp,
-      }));
+      .map<RenderEntity>((monster) => this.buildMonsterRenderEntity(player, monster));
 
     return [...npcs, ...monsters];
+  }
+
+  buildPlayerRenderEntity(viewer: PlayerState, target: PlayerState, color: string): RenderEntity {
+    const snapshot = this.createPlayerObservationSnapshot(target);
+    return {
+      id: target.id,
+      x: target.x,
+      y: target.y,
+      char: [...target.name][0] ?? '@',
+      color,
+      name: target.name,
+      kind: 'player',
+      hp: target.hp,
+      maxHp: target.maxHp,
+      qi: target.qi,
+      maxQi: snapshot.maxQi,
+      observation: this.buildObservationInsight(
+        viewer,
+        snapshot,
+        this.buildObservationLineSpecs(snapshot, true),
+        viewer.id === target.id,
+      ),
+    };
   }
 
   getContextActions(player: PlayerState): ActionDef[] {
@@ -571,7 +612,7 @@ export class WorldService {
     return {
       messages: [{
         playerId: player.id,
-        text: `你获得了 ${effect.name}${stackText}，持续 ${effect.duration} 回合。`,
+        text: `你获得了 ${effect.name}${stackText}，持续 ${effect.duration} 息。`,
         kind: 'combat',
       }],
       dirty: ['attr'],
@@ -1102,6 +1143,288 @@ export class WorldService {
       stats,
       ratios: DEFAULT_MONSTER_RATIO_DIVISORS,
     };
+  }
+
+  private buildMonsterRenderEntity(viewer: PlayerState, monster: RuntimeMonster): RenderEntity {
+    const snapshot = this.createMonsterObservationSnapshot(monster);
+    return {
+      id: monster.runtimeId,
+      x: monster.x,
+      y: monster.y,
+      char: monster.char,
+      color: monster.color,
+      name: monster.name,
+      kind: 'monster',
+      hp: monster.hp,
+      maxHp: monster.maxHp,
+      qi: snapshot.qi,
+      maxQi: snapshot.maxQi,
+      observation: this.buildObservationInsight(
+        viewer,
+        snapshot,
+        this.buildObservationLineSpecs(snapshot, false),
+      ),
+    };
+  }
+
+  private buildNpcRenderEntity(viewer: PlayerState, npc: NpcConfig, mapId: string): RenderEntity {
+    const profile = this.buildNpcPresenceProfile(npc, mapId);
+    const snapshot = this.createNpcObservationSnapshot(profile);
+    const lineSpecs = [
+      { threshold: 0.3, label: '身份', value: profile.title },
+      ...this.buildObservationLineSpecs(snapshot, false),
+    ];
+    return {
+      id: `npc:${npc.id}`,
+      x: npc.x,
+      y: npc.y,
+      char: npc.char,
+      color: npc.color,
+      name: npc.name,
+      kind: 'npc',
+      hp: snapshot.hp,
+      maxHp: snapshot.maxHp,
+      qi: snapshot.qi,
+      maxQi: snapshot.maxQi,
+      observation: this.buildObservationInsight(
+        viewer,
+        snapshot,
+        lineSpecs,
+      ),
+    };
+  }
+
+  private createPlayerObservationSnapshot(player: PlayerState): ObservationTargetSnapshot {
+    const stats = this.attrService.getPlayerNumericStats(player);
+    const ratios = this.attrService.getPlayerRatioDivisors(player);
+    const attrs = this.attrService.getPlayerFinalAttrs(player);
+    const maxQi = Math.max(0, Math.round(stats.maxQi));
+    return {
+      hp: player.hp,
+      maxHp: player.maxHp,
+      qi: player.qi,
+      maxQi,
+      spirit: Math.max(1, attrs.spirit),
+      stats,
+      ratios,
+      attrs: { ...attrs },
+      realmLabel: this.describePlayerRealm(player),
+    };
+  }
+
+  private createMonsterObservationSnapshot(monster: RuntimeMonster): ObservationTargetSnapshot {
+    const combat = this.getMonsterCombatSnapshot(monster);
+    const spirit = this.estimateMonsterSpirit(monster);
+    const maxQi = Math.max(24, Math.round(spirit * 2 + (monster.level ?? 1) * 8));
+    const hpRatio = monster.maxHp > 0 ? monster.hp / monster.maxHp : 0;
+    return {
+      hp: monster.hp,
+      maxHp: monster.maxHp,
+      qi: Math.max(0, Math.round(maxQi * hpRatio)),
+      maxQi,
+      spirit,
+      stats: combat.stats,
+      ratios: combat.ratios,
+      attrs: this.deriveAttrsFromStats(combat.stats, spirit),
+      realmLabel: this.describeMonsterRealm(monster),
+    };
+  }
+
+  private createNpcObservationSnapshot(profile: NpcPresenceProfile): ObservationTargetSnapshot {
+    const stats = createNumericStats();
+    stats.maxHp = profile.hp;
+    stats.maxQi = profile.qi;
+    stats.physAtk = Math.max(4, Math.round(profile.hp * 0.18 + profile.spirit * 0.6));
+    stats.spellAtk = Math.max(4, Math.round(profile.qi * 0.2 + profile.spirit * 0.7));
+    stats.physDef = Math.max(3, Math.round(profile.hp * 0.12 + profile.spirit * 0.4));
+    stats.spellDef = Math.max(3, Math.round(profile.qi * 0.14 + profile.spirit * 0.45));
+    stats.hit = Math.max(8, Math.round(profile.spirit * 0.9));
+    stats.dodge = Math.max(0, Math.round(profile.spirit * 0.45));
+    stats.crit = Math.max(0, Math.round(profile.spirit * 0.28));
+    stats.critDamage = Math.max(0, Math.round(profile.spirit * 5));
+    stats.breakPower = Math.max(0, Math.round(profile.spirit * 0.35));
+    stats.resolvePower = Math.max(0, Math.round(profile.spirit * 0.42));
+    stats.maxQiOutputPerTick = Math.max(0, Math.round(profile.qi * 0.22));
+    stats.qiRegenRate = Math.max(0, Math.round(profile.spirit * 18));
+    stats.hpRegenRate = Math.max(0, Math.round(profile.spirit * 12));
+    stats.viewRange = 8 + Math.round(profile.spirit * 0.08);
+    stats.moveSpeed = Math.max(0, Math.round(profile.spirit * 0.2));
+    return {
+      hp: profile.hp,
+      maxHp: profile.hp,
+      qi: profile.qi,
+      maxQi: profile.qi,
+      spirit: Math.max(1, profile.spirit),
+      stats,
+      ratios: DEFAULT_MONSTER_RATIO_DIVISORS,
+      attrs: this.deriveAttrsFromStats(stats, profile.spirit),
+    };
+  }
+
+  private buildObservationLineSpecs(
+    snapshot: ObservationTargetSnapshot,
+    includeResources: boolean,
+  ): ObservationLineSpec[] {
+    const lines: ObservationLineSpec[] = [];
+    if (includeResources) {
+      lines.push(
+        { threshold: 0.18, label: '生命', value: this.formatCurrentMax(snapshot.hp, snapshot.maxHp) },
+        { threshold: 0.24, label: '灵力', value: this.formatCurrentMax(snapshot.qi, snapshot.maxQi) },
+      );
+    }
+
+    lines.push(
+      { threshold: 0.32, label: '物理攻击', value: this.formatWhole(snapshot.stats.physAtk) },
+      { threshold: 0.36, label: '物理防御', value: this.formatWhole(snapshot.stats.physDef) },
+      { threshold: 0.4, label: '法术攻击', value: this.formatWhole(snapshot.stats.spellAtk) },
+      { threshold: 0.44, label: '法术防御', value: this.formatWhole(snapshot.stats.spellDef) },
+      { threshold: 0.52, label: '命中', value: this.formatWhole(snapshot.stats.hit) },
+      { threshold: 0.56, label: '闪避', value: this.formatRatio(snapshot.stats.dodge, snapshot.ratios.dodge) },
+      { threshold: 0.64, label: '暴击', value: this.formatRatio(snapshot.stats.crit, snapshot.ratios.crit) },
+      { threshold: 0.68, label: '暴击伤害', value: this.formatCritDamage(snapshot.stats.critDamage) },
+      { threshold: 0.74, label: '破招', value: this.formatRatio(snapshot.stats.breakPower, snapshot.ratios.breakPower) },
+      { threshold: 0.78, label: '化解', value: this.formatRatio(snapshot.stats.resolvePower, snapshot.ratios.resolvePower) },
+      { threshold: 0.84, label: '最大灵力输出速率', value: `${this.formatWhole(snapshot.stats.maxQiOutputPerTick)} / 息` },
+      { threshold: 0.87, label: '灵力回复', value: `${this.formatRate(snapshot.stats.qiRegenRate)} / 息` },
+      { threshold: 0.89, label: '生命回复', value: `${this.formatRate(snapshot.stats.hpRegenRate)} / 息` },
+    );
+
+    if (snapshot.realmLabel) {
+      lines.push({ threshold: 0.9, label: '境界', value: snapshot.realmLabel });
+    }
+
+    if (snapshot.attrs) {
+      lines.push(
+        { threshold: 0.92, label: '体魄', value: this.formatWhole(snapshot.attrs.constitution) },
+        { threshold: 0.94, label: '神识', value: this.formatWhole(snapshot.attrs.spirit) },
+        { threshold: 0.96, label: '身法', value: this.formatWhole(snapshot.attrs.perception) },
+        { threshold: 0.98, label: '根骨', value: this.formatWhole(snapshot.attrs.talent) },
+        { threshold: 0.99, label: '悟性', value: this.formatWhole(snapshot.attrs.comprehension) },
+        { threshold: 1, label: '气运', value: this.formatWhole(snapshot.attrs.luck) },
+      );
+    }
+
+    return lines;
+  }
+
+  private buildObservationInsight(
+    viewer: PlayerState,
+    snapshot: ObservationTargetSnapshot,
+    lineSpecs: ObservationLineSpec[],
+    selfView = false,
+  ): ObservationInsight {
+    const viewerSpirit = Math.max(1, this.attrService.getPlayerFinalAttrs(viewer).spirit);
+    const progress = selfView ? 1 : this.computeObservationProgress(viewerSpirit, snapshot.spirit);
+    return {
+      clarity: this.resolveObservationClarity(progress),
+      verdict: this.buildObservationVerdict(progress, selfView),
+      lines: lineSpecs.map((line) => ({
+        label: line.label,
+        value: progress >= line.threshold ? line.value : '???',
+      })),
+    };
+  }
+
+  private computeObservationProgress(viewerSpirit: number, targetSpirit: number): number {
+    if (targetSpirit <= 0) return 1;
+    const ratio = viewerSpirit / targetSpirit;
+    if (ratio <= OBSERVATION_BLIND_RATIO) return 0;
+    if (ratio >= OBSERVATION_FULL_RATIO) return 1;
+    return Math.max(0, Math.min(1, (ratio - OBSERVATION_BLIND_RATIO) / (OBSERVATION_FULL_RATIO - OBSERVATION_BLIND_RATIO)));
+  }
+
+  private resolveObservationClarity(progress: number): ObservationInsight['clarity'] {
+    if (progress <= 0) return 'veiled';
+    if (progress < 0.34) return 'blurred';
+    if (progress < 0.68) return 'partial';
+    if (progress < 1) return 'clear';
+    return 'complete';
+  }
+
+  private buildObservationVerdict(progress: number, selfView: boolean): string {
+    if (selfView) {
+      return '神识内照，经络与底蕴尽现。';
+    }
+    if (progress <= 0) {
+      return '对方气机晦涩，神识难以穿透。';
+    }
+    if (progress < 0.34) {
+      return '仅能捕捉几缕外泄气机，难辨真底。';
+    }
+    if (progress < 0.68) {
+      return '攻守轮廓渐明，深层底蕴仍藏于雾中。';
+    }
+    if (progress < 1) {
+      return '神识已触及其根底，大半虚实可辨。';
+    }
+    return '神识压过其身，诸般底细尽入眼底。';
+  }
+
+  private buildNpcPresenceProfile(npc: NpcConfig, mapId: string): NpcPresenceProfile {
+    const preset = NPC_ROLE_PROFILES[npc.role ?? ''] ?? { title: '过路修者', spirit: 12, hp: 60, qi: 56 };
+    const actualDanger = this.mapService.getMapMeta(mapId)?.dangerLevel ?? 1;
+    return {
+      title: preset.title,
+      spirit: Math.max(1, preset.spirit + actualDanger * 18),
+      hp: Math.max(1, preset.hp + actualDanger * 24),
+      qi: Math.max(0, preset.qi + actualDanger * 20),
+    };
+  }
+
+  private estimateMonsterSpirit(monster: RuntimeMonster): number {
+    const level = Math.max(1, monster.level ?? Math.round(monster.attack / 6));
+    return Math.max(6, Math.round(level * 12 + monster.attack * 0.8 + monster.maxHp * 0.18));
+  }
+
+  private deriveAttrsFromStats(stats: NumericStats, spirit: number): Attributes {
+    return {
+      constitution: Math.max(1, Math.round(stats.maxHp / 18)),
+      spirit: Math.max(1, Math.round(spirit)),
+      perception: Math.max(1, Math.round((stats.hit + stats.dodge) / 14)),
+      talent: Math.max(1, Math.round((stats.physAtk + stats.physDef) / 18)),
+      comprehension: Math.max(1, Math.round((stats.spellAtk + stats.spellDef) / 18)),
+      luck: Math.max(1, Math.round((stats.crit + stats.breakPower) / 12)),
+    };
+  }
+
+  private describePlayerRealm(player: PlayerState): string {
+    if (player.realm?.name) {
+      return player.realm.shortName ? `${player.realm.name} · ${player.realm.shortName}` : player.realm.name;
+    }
+    if (player.realmName) {
+      return player.realmStage ? `${player.realmName} · ${player.realmStage}` : player.realmName;
+    }
+    return '行功未明';
+  }
+
+  private describeMonsterRealm(monster: RuntimeMonster): string {
+    const level = Math.max(1, monster.level ?? Math.round(monster.attack / 6));
+    if (level >= 8) return '凶阶妖躯';
+    if (level >= 5) return '悍阶妖躯';
+    if (level >= 3) return '成形妖躯';
+    return '初成妖躯';
+  }
+
+  private formatCurrentMax(current: number, max: number): string {
+    return `${this.formatWhole(current)} / ${this.formatWhole(max)}`;
+  }
+
+  private formatWhole(value: number): string {
+    return `${Math.max(0, Math.round(value))}`;
+  }
+
+  private formatRate(value: number): string {
+    const percent = Math.max(0, value) / 100;
+    return `${percent.toFixed(percent % 1 === 0 ? 0 : percent % 0.1 === 0 ? 1 : 2)}%`;
+  }
+
+  private formatCritDamage(value: number): string {
+    const total = 200 + Math.max(0, value) / 10;
+    return `${total.toFixed(total % 1 === 0 ? 0 : total % 0.1 === 0 ? 1 : 2)}%`;
+  }
+
+  private formatRatio(value: number, divisor: number): string {
+    return `${(Math.max(0, ratioValue(value, divisor)) * 100).toFixed(2)}%`;
   }
 
   private consumeQiForSkill(player: PlayerState, skill: SkillDef): number | string {

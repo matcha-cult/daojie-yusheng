@@ -24,7 +24,7 @@ import { TechniqueService } from './technique.service';
 
 export interface PlayerCommand {
   playerId: string;
-  type: 'move' | 'moveTo' | 'action' | 'useItem' | 'dropItem' | 'equip' | 'unequip' | 'cultivate' | 'debugResetSpawn';
+  type: 'move' | 'moveTo' | 'action' | 'useItem' | 'dropItem' | 'sortInventory' | 'equip' | 'unequip' | 'cultivate' | 'debugResetSpawn';
   data: unknown;
   timestamp: number;
 }

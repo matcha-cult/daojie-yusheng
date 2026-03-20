@@ -100,9 +100,9 @@ const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
   critDamage: '决定暴击命中后的伤害倍率。',
   breakPower: '压低目标化解概率；超出目标化解的部分会按概率触发破招，使本次命中与暴击判定翻倍。',
   resolvePower: '提高化解来招的概率；化解触发时会按双倍防御重新结算本次减伤。',
-  maxQiOutputPerTick: '限制每 tick 可稳定输出的灵力上限。',
-  qiRegenRate: '决定每 tick 自动回复的灵力比例。',
-  hpRegenRate: '决定每 tick 自动回复的生命比例。',
+  maxQiOutputPerTick: '限制每息可稳定输出的灵力上限。',
+  qiRegenRate: '决定每息自动回复的灵力比例。',
+  hpRegenRate: '决定每息自动回复的生命比例。',
   cooldownSpeed: '提高技能与效果的冷却流转速度。',
   auraCostReduce: '降低光环或阵法持续消耗。',
   auraPowerRate: '提高光环或阵法提供的效果。',
@@ -110,7 +110,7 @@ const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
   techniqueExpRate: '提高功法经验获取效率。',
   lootRate: '提高常规掉落收益。',
   rareLootRate: '提高稀有掉落收益。',
-  moveSpeed: '决定每 tick 获得的移动预算。平地消耗较低，草地等复杂地形会消耗更多预算，因此会自然变慢。',
+  moveSpeed: '决定每息获得的移动预算。平地消耗较低，草地等复杂地形会消耗更多预算，因此会自然变慢。',
   viewRange: '决定地图上的可见范围。',
 };
 
@@ -203,7 +203,7 @@ function formatMoveSpeedEffect(value: number): string {
   const movePoints = BASE_MOVE_POINTS_PER_TICK + safeValue;
   const flatTiles = movePoints / MOVE_POINT_UNIT;
   const grassTiles = movePoints / (MOVE_POINT_UNIT * 2);
-  return `每 tick 获得 ${movePoints.toFixed(movePoints % 1 === 0 ? 0 : 2)} 点移动预算，约等于 ${flatTiles.toFixed(flatTiles % 1 === 0 ? 0 : 2)} 格平地 / ${grassTiles.toFixed(grassTiles % 1 === 0 ? 0 : 2)} 格草地`;
+  return `每息获得 ${movePoints.toFixed(movePoints % 1 === 0 ? 0 : 2)} 点移动预算，约等于 ${flatTiles.toFixed(flatTiles % 1 === 0 ? 0 : 2)} 格平地 / ${grassTiles.toFixed(grassTiles % 1 === 0 ? 0 : 2)} 格草地`;
 }
 
 function buildNumericTooltip(label: string, key: NumericCardKey, numericValue: number, ratioValueText?: string): string {

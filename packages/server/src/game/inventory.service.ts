@@ -1,5 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { PlayerState, ItemStack } from '@mud/shared';
+import { PlayerState, ItemStack, ItemType, EquipSlot } from '@mud/shared';
+
+const ITEM_TYPE_ORDER: Record<ItemType, number> = {
+  equipment: 0,
+  consumable: 1,
+  material: 2,
+  skill_book: 3,
+  quest_item: 4,
+};
+
+const EQUIP_SLOT_ORDER: Record<EquipSlot, number> = {
+  weapon: 0,
+  head: 1,
+  body: 2,
+  legs: 3,
+  accessory: 4,
+};
 
 @Injectable()
 export class InventoryService {
@@ -61,5 +77,55 @@ export class InventoryService {
   /** 查找物品在背包中的槽位索引，-1 表示未找到 */
   findItem(player: PlayerState, itemId: string): number {
     return player.inventory.items.findIndex(i => i.itemId === itemId);
+  }
+
+  /** 整理背包：合并可堆叠物品，并按类型与名称稳定排序 */
+  sortInventory(player: PlayerState): void {
+    const stackableItems = new Map<string, ItemStack>();
+    const equipmentItems: ItemStack[] = [];
+
+    for (const item of player.inventory.items) {
+      if (item.count <= 0) {
+        continue;
+      }
+      if (item.type === 'equipment') {
+        equipmentItems.push({ ...item });
+        continue;
+      }
+
+      const existing = stackableItems.get(item.itemId);
+      if (existing) {
+        existing.count += item.count;
+        continue;
+      }
+      stackableItems.set(item.itemId, { ...item });
+    }
+
+    player.inventory.items = [...equipmentItems, ...stackableItems.values()].sort((left, right) => {
+      const typeDiff = ITEM_TYPE_ORDER[left.type] - ITEM_TYPE_ORDER[right.type];
+      if (typeDiff !== 0) {
+        return typeDiff;
+      }
+
+      if (left.type === 'equipment' && right.type === 'equipment') {
+        const leftSlot = left.equipSlot ? EQUIP_SLOT_ORDER[left.equipSlot] : Number.MAX_SAFE_INTEGER;
+        const rightSlot = right.equipSlot ? EQUIP_SLOT_ORDER[right.equipSlot] : Number.MAX_SAFE_INTEGER;
+        if (leftSlot !== rightSlot) {
+          return leftSlot - rightSlot;
+        }
+      }
+
+      const nameDiff = left.name.localeCompare(right.name, 'zh-Hans-CN');
+      if (nameDiff !== 0) {
+        return nameDiff;
+      }
+
+      const itemIdDiff = left.itemId.localeCompare(right.itemId);
+      if (itemIdDiff !== 0) {
+        return itemIdDiff;
+      }
+
+      return right.count - left.count;
+    });
   }
 }

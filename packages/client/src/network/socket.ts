@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import {
   C2S, S2C, C2S_Move, C2S_MoveTo, C2S_GmGetState, C2S_GmSpawnBots, C2S_GmRemoveBots, C2S_GmUpdatePlayer, C2S_GmResetPlayer, C2S_Action, C2S_DebugResetSpawn, C2S_UseItem, C2S_DropItem,
-  C2S_Equip, C2S_Unequip, C2S_Cultivate, C2S_Chat,
+  C2S_SortInventory, C2S_Equip, C2S_Unequip, C2S_Cultivate, C2S_Chat,
   S2C_Tick, S2C_Init, S2C_AttrUpdate, S2C_InventoryUpdate,
   S2C_EquipmentUpdate, S2C_TechniqueUpdate, S2C_ActionsUpdate, S2C_QuestUpdate, S2C_SystemMsg, S2C_GmState,
   S2C_Error,
@@ -131,6 +131,10 @@ export class SocketManager {
 
   sendDropItem(slotIndex: number, count: number) {
     this.socket?.emit(C2S.DropItem, { slotIndex, count } satisfies C2S_DropItem);
+  }
+
+  sendSortInventory() {
+    this.socket?.emit(C2S.SortInventory, {} satisfies C2S_SortInventory);
   }
 
   sendEquip(slotIndex: number) {

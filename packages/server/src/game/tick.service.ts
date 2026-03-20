@@ -208,6 +208,12 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           }
           break;
         }
+        case 'sortInventory': {
+          this.inventoryService.sortInventory(player);
+          this.playerService.markDirty(player.id, 'inv');
+          messages.push({ playerId: player.id, text: '背包已整理', kind: 'system' });
+          break;
+        }
         case 'equip': {
           const { slotIndex } = cmd.data as { slotIndex: number };
           const err = this.equipmentService.equip(player, slotIndex);
@@ -259,7 +265,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
             break;
           }
           if (action.cooldownLeft > 0) {
-            messages.push({ playerId: player.id, text: '技能冷却中', kind: 'system' });
+            messages.push({ playerId: player.id, text: `技能仍在冷却中，还需 ${action.cooldownLeft} 息`, kind: 'system' });
             break;
           }
 
@@ -500,28 +506,12 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
       const visiblePlayers = players
         .filter((player) => visibility.visibleKeys.has(`${player.x},${player.y}`))
-        .map((player) => [
-          player.id,
-          player.x,
-          player.y,
-          this.playerGlyph(player.name),
+        .map((player) => this.worldService.buildPlayerRenderEntity(
+          viewer,
+          player,
           player.id === viewer.id ? '#ff0' : player.isBot ? '#6bb8ff' : '#0f0',
-          player.name,
-          player.hp,
-          player.maxHp,
-        ] as [string, number, number, string, string, string, number, number]);
-      const visibleEntities = this.worldService.getVisibleEntities(viewer, visibility.visibleKeys)
-        .map((entity) => [
-          entity.id,
-          entity.x,
-          entity.y,
-          entity.char,
-          entity.color,
-          entity.name ?? '',
-          entity.kind ?? 'npc',
-          entity.hp ?? 0,
-          entity.maxHp ?? 0,
-        ] as [string, number, number, string, string, string, 'npc' | 'monster', number, number]);
+        ));
+      const visibleEntities = this.worldService.getVisibleEntities(viewer, visibility.visibleKeys);
 
       const tickData: S2C_Tick = {
         p: visiblePlayers,
@@ -540,10 +530,6 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
       socket.emit(S2C.Tick, tickData);
     }
-  }
-
-  private playerGlyph(name: string): string {
-    return [...name][0] ?? '@';
   }
 
   private filterEffectsForViewer(effects: CombatEffect[], visibleKeys: Set<string>): CombatEffect[] {

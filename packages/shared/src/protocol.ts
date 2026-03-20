@@ -17,6 +17,7 @@ export const C2S = {
   Chat: 'c:chat',
   UseItem: 'c:useItem',
   DropItem: 'c:dropItem',
+  SortInventory: 'c:sortInventory',
   Equip: 'c:equip',
   Unequip: 'c:unequip',
   Cultivate: 'c:cultivate',
@@ -100,9 +101,9 @@ export interface C2S_Chat {
 
 /** Tick 更新（紧凑格式） */
 export interface S2C_Tick {
-  p: [string, number, number, string, string, string, number, number][]; // [id, x, y, char, color, name, hp, maxHp]
+  p: RenderEntity[];                              // 玩家可见实体（含自身）
   t: [number, number, string][];                  // [x, y, tileType]
-  e: [string, number, number, string, string, string, EntityKind, number, number][]; // [id, x, y, char, color, name, kind, hp, maxHp]
+  e: RenderEntity[];                              // 怪物 / NPC 可见实体
   fx?: CombatEffect[];                            // 当前 tick 触发的战斗特效
   v?: VisibleTile[][];                            // 视野 tiles（null 表示当前不可见）
   dt?: number;                                    // 实际 tick 间隔（毫秒）
@@ -129,7 +130,7 @@ export interface S2C_Init {
   self: PlayerState;
   mapMeta: MapMeta;
   tiles: VisibleTile[][];
-  players: [string, number, number, string, string, string, number, number][]; // [id, x, y, char, color, name, hp, maxHp]
+  players: RenderEntity[]; // 初始可见玩家实体（含自身）
 }
 
 export interface GmPlayerSummary {
@@ -174,6 +175,9 @@ export interface C2S_DropItem {
   slotIndex: number;
   count: number;
 }
+
+/** 整理背包 */
+export interface C2S_SortInventory {}
 
 /** 装备物品 */
 export interface C2S_Equip {

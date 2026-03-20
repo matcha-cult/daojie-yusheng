@@ -200,7 +200,7 @@ export class ActionPanel {
               <div class="action-cta">
                 <button class="small-btn ghost" data-bind-action="${action.id}" type="button">${this.getBindButtonLabel(action.id)}</button>
                 ${onCd
-                  ? `<span class="action-cd">冷却 ${action.cooldownLeft}s</span>`
+                  ? `<span class="action-cd">冷却 ${action.cooldownLeft} 息</span>`
                   : `<button class="small-btn" data-action="${action.id}" data-action-name="${escapeHtml(action.name)}" data-action-range="${action.range ?? ''}" data-action-target="${action.requiresTarget ? '1' : '0'}" data-action-target-mode="${action.targetMode ?? ''}">执行</button>`
                 }
               </div>

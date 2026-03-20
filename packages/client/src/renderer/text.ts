@@ -36,6 +36,13 @@ const CHAR_COLOR: Record<TileType, string> = {
   [TileType.Stone]: 'rgba(40,35,30,0.35)',
 };
 
+const PATH_FILL_COLOR = 'rgba(88, 180, 214, 0.24)';
+const PATH_STROKE_COLOR = 'rgba(151, 236, 255, 0.78)';
+const PATH_ARROW_COLOR = 'rgba(179, 244, 255, 0.95)';
+const PATH_TARGET_FILL_COLOR = 'rgba(244, 144, 64, 0.34)';
+const PATH_TARGET_STROKE_COLOR = 'rgba(255, 216, 138, 0.96)';
+const PATH_TARGET_CORE_COLOR = 'rgba(255, 244, 219, 0.98)';
+
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -80,6 +87,8 @@ export class TextRenderer implements IRenderer {
   private entities: Map<string, AnimEntity> = new Map();
   private pathCells: { x: number; y: number }[] = [];
   private pathKeys = new Set<string>();
+  private pathIndexByKey = new Map<string, number>();
+  private pathTargetKey: string | null = null;
   private targetingOverlay: TargetingOverlayState | null = null;
   private targetingAffectedKeys = new Set<string>();
   private floatingTexts: FloatingText[] = [];
@@ -101,6 +110,8 @@ export class TextRenderer implements IRenderer {
   setPathHighlight(cells: { x: number; y: number }[]) {
     this.pathCells = cells;
     this.pathKeys = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
+    this.pathIndexByKey = new Map(cells.map((cell, index) => [`${cell.x},${cell.y}`, index]));
+    this.pathTargetKey = cells.length > 0 ? `${cells[cells.length - 1].x},${cells[cells.length - 1].y}` : null;
   }
 
   setTargetingOverlay(state: TargetingOverlayState | null) {
@@ -141,8 +152,18 @@ export class TextRenderer implements IRenderer {
 
           // 路径高亮
           if (this.pathKeys.has(key)) {
-            ctx.fillStyle = 'rgba(255, 200, 50, 0.3)';
-            ctx.fillRect(sx, sy, cellSize, cellSize);
+            const isTargetCell = key === this.pathTargetKey;
+            ctx.fillStyle = isTargetCell ? PATH_TARGET_FILL_COLOR : PATH_FILL_COLOR;
+            ctx.fillRect(sx + 1, sy + 1, cellSize - 2, cellSize - 2);
+            ctx.strokeStyle = isTargetCell ? PATH_TARGET_STROKE_COLOR : PATH_STROKE_COLOR;
+            ctx.lineWidth = isTargetCell ? 2 : 1.5;
+            ctx.strokeRect(sx + 1.5, sy + 1.5, cellSize - 3, cellSize - 3);
+            if (isTargetCell) {
+              ctx.fillStyle = PATH_TARGET_CORE_COLOR;
+              ctx.beginPath();
+              ctx.arc(sx + cellSize / 2, sy + cellSize / 2, Math.max(3, cellSize * 0.12), 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
 
           ctx.strokeStyle = 'rgba(0,0,0,0.1)';
@@ -201,6 +222,8 @@ export class TextRenderer implements IRenderer {
         }
       }
     }
+
+    this.renderPathArrows(camera, visibleTiles, playerX, playerY);
   }
 
   updateEntities(
@@ -409,8 +432,92 @@ export class TextRenderer implements IRenderer {
     this.ctx = null;
     this.entities.clear();
     this.pathKeys.clear();
+    this.pathIndexByKey.clear();
+    this.pathTargetKey = null;
     this.floatingTexts = [];
     this.attackTrails = [];
+  }
+
+  private renderPathArrows(camera: Camera, visibleTiles: Set<string>, playerX: number, playerY: number) {
+    if (!this.ctx || this.pathCells.length === 0) return;
+    const ctx = this.ctx;
+    const sw = ctx.canvas.width;
+    const sh = ctx.canvas.height;
+    const cellSize = getCellSize();
+    const route = [{ x: playerX, y: playerY }, ...this.pathCells];
+
+    ctx.save();
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    for (let index = 0; index < route.length - 1; index++) {
+      const from = route[index];
+      const to = route[index + 1];
+      const toKey = `${to.x},${to.y}`;
+      if (!this.pathIndexByKey.has(toKey)) {
+        continue;
+      }
+      if (!this.isPathCellRenderable(from.x, from.y, visibleTiles, playerX, playerY) && !this.isPathCellRenderable(to.x, to.y, visibleTiles, playerX, playerY)) {
+        continue;
+      }
+
+      const fromPos = camera.worldToScreen(from.x * cellSize + cellSize / 2, from.y * cellSize + cellSize / 2, sw, sh);
+      const toPos = camera.worldToScreen(to.x * cellSize + cellSize / 2, to.y * cellSize + cellSize / 2, sw, sh);
+      const dx = toPos.sx - fromPos.sx;
+      const dy = toPos.sy - fromPos.sy;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 1) {
+        continue;
+      }
+
+      const ux = dx / distance;
+      const uy = dy / distance;
+      const startPadding = index === 0 ? cellSize * 0.2 : cellSize * 0.1;
+      const endPadding = cellSize * 0.14;
+      const startX = fromPos.sx + ux * startPadding;
+      const startY = fromPos.sy + uy * startPadding;
+      const tipX = toPos.sx - ux * endPadding;
+      const tipY = toPos.sy - uy * endPadding;
+      const isFinalSegment = toKey === this.pathTargetKey;
+      const arrowColor = isFinalSegment ? PATH_TARGET_STROKE_COLOR : PATH_ARROW_COLOR;
+      const headLength = Math.max(8, cellSize * 0.2);
+      const headWidth = Math.max(5, cellSize * 0.12);
+      const shaftEndX = tipX - ux * headLength;
+      const shaftEndY = tipY - uy * headLength;
+
+      if (
+        Math.max(startX, tipX) < -cellSize ||
+        Math.min(startX, tipX) > sw + cellSize ||
+        Math.max(startY, tipY) < -cellSize ||
+        Math.min(startY, tipY) > sh + cellSize
+      ) {
+        continue;
+      }
+
+      ctx.strokeStyle = arrowColor;
+      ctx.fillStyle = arrowColor;
+      ctx.lineWidth = Math.max(1.25, cellSize * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(shaftEndX, shaftEndY);
+      ctx.stroke();
+
+      const normalX = -uy;
+      const normalY = ux;
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY);
+      ctx.lineTo(shaftEndX + normalX * headWidth, shaftEndY + normalY * headWidth);
+      ctx.lineTo(shaftEndX - normalX * headWidth, shaftEndY - normalY * headWidth);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  private isPathCellRenderable(x: number, y: number, visibleTiles: Set<string>, playerX: number, playerY: number): boolean {
+    const key = `${x},${y}`;
+    return visibleTiles.has(key) || (Math.abs(x - playerX) <= 10 && Math.abs(y - playerY) <= 10);
   }
 
   private drawOutlinedText(text: string, x: number, y: number, fill: string, stroke: string) {

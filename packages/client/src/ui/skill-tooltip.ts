@@ -310,10 +310,10 @@ export function buildSkillTooltipLines(skill: SkillDef, context: SkillTooltipPre
       continue;
     }
     const stackText = effect.maxStacks && effect.maxStacks > 1 ? `，最多 ${effect.maxStacks} 层` : '';
-    lines.push(renderPlainLine('增益', `${effect.name}，持续 ${effect.duration} 回合${stackText}`));
+    lines.push(renderPlainLine('增益', `${effect.name}，持续 ${effect.duration} 息${stackText}`));
   }
   lines.push(renderPlainLine('灵力消耗', String(skill.cost)));
-  lines.push(renderPlainLine('冷却', `${skill.cooldown} 秒`));
+  lines.push(renderPlainLine('冷却', `${skill.cooldown} 息`));
   lines.push('<span class="skill-tooltip-note">实际结算仍会受命中、闪避、破招、化解、暴击与目标防御影响。</span>');
   return lines;
 }

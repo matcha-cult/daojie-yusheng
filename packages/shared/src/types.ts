@@ -64,9 +64,25 @@ export interface RenderEntity {
   char: string;
   color: string;
   name?: string;
-  kind?: EntityKind;
+  kind?: EntityKind | 'player';
   hp?: number;
   maxHp?: number;
+  qi?: number;
+  maxQi?: number;
+  observation?: ObservationInsight;
+}
+
+export interface ObservationLine {
+  label: string;
+  value: string;
+}
+
+export type ObservationClarity = 'veiled' | 'blurred' | 'partial' | 'clear' | 'complete';
+
+export interface ObservationInsight {
+  clarity: ObservationClarity;
+  verdict: string;
+  lines: ObservationLine[];
 }
 
 /** 视口 */

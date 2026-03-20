@@ -19,6 +19,7 @@ import {
   C2S_GmResetPlayer,
   C2S_UseItem,
   C2S_DropItem,
+  C2S_SortInventory,
   C2S_Equip,
   C2S_Unequip,
   C2S_Cultivate,
@@ -322,6 +323,20 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage(C2S.SortInventory)
+  handleSortInventory(client: Socket, data: C2S_SortInventory) {
+    const playerId = client.data?.playerId as string;
+    const player = this.playerService.getPlayer(playerId);
+    if (!player) return;
+
+    this.playerService.enqueueCommand(player.mapId, {
+      playerId,
+      type: 'sortInventory',
+      data,
+      timestamp: Date.now(),
+    });
+  }
+
   @SubscribeMessage(C2S.Equip)
   handleEquip(client: Socket, data: C2S_Equip) {
     const playerId = client.data?.playerId as string;
@@ -394,17 +409,12 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const visibility = this.aoiService.getVisibility(player);
     const nearbyPlayers = this.playerService.getPlayersByMap(player.mapId)
-      .filter(p => p.id !== player.id && visibility.visibleKeys.has(`${p.x},${p.y}`))
-      .map(p => [
-        p.id,
-        p.x,
-        p.y,
-        [...p.name][0] ?? '@',
-        p.isBot ? '#6bb8ff' : '#0f0',
-        p.name,
-        p.hp,
-        p.maxHp,
-      ] as [string, number, number, string, string, string, number, number]);
+      .filter((target) => visibility.visibleKeys.has(`${target.x},${target.y}`))
+      .map((target) => this.worldService.buildPlayerRenderEntity(
+        player,
+        target,
+        target.id === player.id ? '#ff0' : target.isBot ? '#6bb8ff' : '#0f0',
+      ));
 
     const initData: S2C_Init = { self: player, mapMeta, tiles: visibility.tiles, players: nearbyPlayers };
     client.emit(S2C.Init, initData);
