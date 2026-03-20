@@ -7,6 +7,7 @@ export interface SkillTooltipPreviewContext {
   techLevel?: number;
   unlockLevel?: number;
   player?: SkillTooltipPreviewPlayer | null;
+  target?: SkillTooltipPreviewPlayer | null;
 }
 
 type PreviewPlayer = NonNullable<SkillTooltipPreviewContext['player']>;
@@ -148,8 +149,13 @@ function resolveCasterStat(player: PreviewPlayer | null | undefined, key: Numeri
   return player.numericStats[key];
 }
 
+function resolveTargetPreview(context: SkillTooltipPreviewContext): PreviewPlayer | null | undefined {
+  return context.target ?? context.player;
+}
+
 function resolvePreviewVar(varName: SkillFormulaVar, context: SkillTooltipPreviewContext): number | null {
   const player = context.player;
+  const target = resolveTargetPreview(context);
   switch (varName) {
     case 'techLevel':
       return context.techLevel ?? null;
@@ -161,9 +167,20 @@ function resolvePreviewVar(varName: SkillFormulaVar, context: SkillTooltipPrevie
       return player?.qi ?? null;
     case 'caster.maxQi':
       return player?.numericStats?.maxQi ?? null;
+    case 'target.hp':
+      return target?.hp ?? null;
+    case 'target.maxHp':
+      return target?.maxHp ?? null;
+    case 'target.qi':
+      return target?.qi ?? null;
+    case 'target.maxQi':
+      return target?.numericStats?.maxQi ?? null;
     default:
       if (varName.startsWith('caster.stat.')) {
         return resolveCasterStat(player, varName.slice('caster.stat.'.length) as NumericScalarStatKey);
+      }
+      if (varName.startsWith('target.stat.')) {
+        return resolveCasterStat(target, varName.slice('target.stat.'.length) as NumericScalarStatKey);
       }
       return null;
   }
