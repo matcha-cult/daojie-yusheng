@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import {
   ActionDef,
   AttrBonus,
+  BreakthroughPreviewState,
+  BreakthroughRequirementView,
   calcTechniqueFinalAttrBonus,
   CULTIVATE_EXP_PER_TICK,
   DEFAULT_PLAYER_REALM_STAGE,
@@ -13,6 +15,8 @@ import {
   PlayerRealmStage,
   PlayerRealmState,
   PlayerState,
+  TECHNIQUE_GRADE_LABELS,
+  TECHNIQUE_GRADE_ORDER,
   TechniqueGrade,
   TechniqueLayerDef,
   TechniqueRealm,
@@ -21,7 +25,7 @@ import {
   SkillDef,
 } from '@mud/shared';
 import { AttrService } from './attr.service';
-import { ContentService } from './content.service';
+import { BreakthroughConfigEntry, BreakthroughRequirementDef, ContentService } from './content.service';
 import { InventoryService } from './inventory.service';
 
 type TechniqueDirtyFlag = 'inv' | 'tech' | 'attr' | 'actions';
@@ -61,21 +65,12 @@ export class TechniqueService {
     const previousHp = player.hp;
     const previousMaxHp = player.maxHp;
     const persisted = this.readPersistedRealmState(player);
-    const stage = persisted.stage ?? player.realm?.stage ?? DEFAULT_PLAYER_REALM_STAGE;
-    const progress = persisted.progress ?? player.realm?.progress ?? 0;
-    const normalized = this.createRealmState(stage, progress);
-    player.realm = normalized;
-    player.realmLv = normalized.realmLv;
-    player.realmName = normalized.name;
-    player.realmStage = normalized.shortName || undefined;
-    player.realmReview = normalized.review;
-    player.breakthroughReady = normalized.breakthroughReady;
-
+    const normalized = this.resolveInitialRealmState(player, persisted);
     this.syncTechniqueMetadata(player);
     this.applyRealmBonus(player, normalized);
     this.applyTechniqueBonuses(player);
-    this.applyRealmStateMirror(player, normalized);
     this.attrService.recalcPlayer(player);
+    this.syncRealmPresentation(player, normalized);
 
     if (previousMaxHp <= 0) {
       player.hp = player.maxHp;
@@ -211,18 +206,12 @@ export class TechniqueService {
   getBreakthroughAction(player: PlayerState): ActionDef | null {
     this.initializePlayerProgression(player);
     const realm = player.realm;
-    if (!realm?.breakthroughReady || realm.nextStage === undefined) return null;
-
-    const nextEntry = this.contentService.getRealmStageStartEntry(realm.nextStage);
-    const requirementText = this.describeBreakthroughRequirements(player, realm);
-
+    if (!realm?.breakthroughReady || !realm.breakthrough) return null;
     return {
       id: 'realm:breakthrough',
-      name: `突破至 ${nextEntry?.displayName ?? PLAYER_REALM_CONFIG[realm.nextStage].shortName}`,
+      name: `突破至 ${realm.breakthrough.targetDisplayName}`,
       type: 'breakthrough',
-      desc: requirementText
-        ? `修为已满，冲境前仍需确认：${requirementText}。`
-        : '满足修行条件，可直接冲击下一境。',
+      desc: `当前境界已圆满，点击查看 ${realm.breakthrough.targetDisplayName} 的突破要求。`,
       cooldownLeft: 0,
     };
   }
@@ -233,38 +222,27 @@ export class TechniqueService {
     if (!realm) {
       return { error: '当前境界状态异常', dirty: [], messages: [] };
     }
-    if (!realm.breakthroughReady || realm.nextStage === undefined) {
+    if (!realm.breakthroughReady || !realm.breakthrough) {
       return { error: '你的境界火候未到，尚不能突破', dirty: [], messages: [] };
     }
 
-    const techniqueGateError = this.validateTechniqueGate(player, realm);
-    if (techniqueGateError) {
-      return { error: techniqueGateError, dirty: [], messages: [] };
+    const requirements = this.getResolvedBreakthroughRequirements(player, realm.realmLv);
+    const unmet = requirements.filter((entry) => !entry.completed);
+    if (unmet.length > 0) {
+      return { error: '突破条件尚未满足', dirty: [], messages: [] };
     }
 
-    const missing = realm.breakthroughItems
-      .filter((entry) => this.getInventoryCount(player, entry.itemId) < entry.count)
-      .map((entry) => `${this.contentService.getItem(entry.itemId)?.name ?? entry.itemId} x${entry.count}`);
-    if (missing.length > 0) {
-      return {
-        error: `突破所需材料不足：${missing.join('、')}`,
-        dirty: [],
-        messages: [],
-      };
+    for (const requirement of requirements) {
+      if (requirement.def.type !== 'item') continue;
+      this.consumeItem(player, requirement.def.itemId, requirement.def.count);
     }
 
-    for (const requirement of realm.breakthroughItems) {
-      this.consumeItem(player, requirement.itemId, requirement.count);
+    const nextState = this.createRealmStateFromLevel(realm.breakthrough.targetRealmLv, 0);
+    const crossedStage = nextState.stage !== realm.stage;
+    this.syncRealmPresentation(player, nextState);
+    if (crossedStage) {
+      this.applyRealmBonus(player, nextState);
     }
-
-    const nextState = this.createRealmState(realm.nextStage, 0);
-    player.realm = nextState;
-    player.realmLv = nextState.realmLv;
-    player.realmName = nextState.name;
-    player.realmStage = nextState.shortName || undefined;
-    player.realmReview = nextState.review;
-    player.breakthroughReady = nextState.breakthroughReady;
-    this.applyRealmBonus(player, nextState);
     this.attrService.recalcPlayer(player);
     player.hp = player.maxHp;
     player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
@@ -272,7 +250,7 @@ export class TechniqueService {
     return {
       dirty: ['inv', 'attr', 'actions', 'tech'],
       messages: [{
-        text: this.buildBreakthroughMessage(realm.stage, nextState.stage, nextState.name),
+        text: this.buildBreakthroughMessage(realm.stage, nextState.stage, nextState.displayName),
         kind: 'quest',
       }],
     };
@@ -280,32 +258,25 @@ export class TechniqueService {
 
   private advanceRealmProgress(player: PlayerState, technique: TechniqueState, expBonus = 0): { changed: boolean; messages: TechniqueMessage[] } {
     const realm = player.realm;
-    if (!realm || realm.breakthroughReady || realm.progressToNext <= 0) {
+    if (!realm || realm.progressToNext <= 0) {
       return { changed: false, messages: [] };
     }
 
     const baseGain = 1 + Math.floor(technique.level / 2);
     const gain = this.applyRateBonus(baseGain, expBonus);
     const previousProgress = realm.progress;
-    realm.progress = Math.min(realm.progressToNext, realm.progress + gain);
-    realm.breakthroughReady = realm.progress >= realm.progressToNext;
-    player.breakthroughReady = realm.breakthroughReady;
+    const nextState = this.normalizeRealmState(realm.realmLv, realm.progress + gain);
 
-    if (realm.progress === previousProgress) {
+    if (nextState.progress === previousProgress && nextState.breakthroughReady === realm.breakthroughReady) {
       return { changed: false, messages: [] };
     }
 
+    this.syncRealmPresentation(player, nextState);
+
     const messages: TechniqueMessage[] = [];
-    if (realm.breakthroughReady) {
-      const nextName = realm.nextStage !== undefined
-        ? this.contentService.getRealmStageStartEntry(realm.nextStage)?.displayName
-          ?? PLAYER_REALM_CONFIG[realm.nextStage].name
-        : '更高境界';
-      const requirementText = this.describeBreakthroughRequirements(player, realm);
+    if (nextState.breakthroughReady && !realm.breakthroughReady && nextState.breakthrough) {
       messages.push({
-        text: requirementText
-          ? `你的${realm.name}已圆满，可冲击 ${nextName}。当前仍需备齐：${requirementText}。`
-          : `你的${realm.name}已圆满，可尝试突破至 ${nextName}。`,
+        text: `你的${nextState.displayName}已圆满，可尝试突破至 ${nextState.breakthrough.targetDisplayName}。`,
         kind: 'quest',
       });
     }
@@ -323,76 +294,66 @@ export class TechniqueService {
     return guaranteed + (Math.random() < remainder ? 1 : 0);
   }
 
-  private validateTechniqueGate(player: PlayerState, realm: PlayerRealmState): string | null {
-    const highest = this.getHighestTechnique(player);
-    if (!highest) {
-      return '至少需要掌握一门功法才能冲境';
-    }
-    if (highest.level < realm.minTechniqueLevel) {
-      return `至少需要一门功法达到 ${realm.minTechniqueLevel} 级`;
-    }
-    if (realm.minTechniqueRealm !== undefined && highest.realm < realm.minTechniqueRealm) {
-      return `至少需要一门功法达到${this.techniqueRealmLabel(realm.minTechniqueRealm)}`;
-    }
-    return null;
-  }
-
-  private describeBreakthroughRequirements(player: PlayerState, realm: PlayerRealmState): string {
-    const parts: string[] = [];
-    const missingItems = realm.breakthroughItems
-      .filter((entry) => this.getInventoryCount(player, entry.itemId) < entry.count)
-      .map((entry) => `${this.contentService.getItem(entry.itemId)?.name ?? entry.itemId} x${entry.count}`);
-    if (missingItems.length > 0) {
-      parts.push(missingItems.join('、'));
-    } else if (realm.breakthroughItems.length > 0) {
-      const allItems = realm.breakthroughItems
-        .map((entry) => `${this.contentService.getItem(entry.itemId)?.name ?? entry.itemId} x${entry.count}`)
-        .join('、');
-      parts.push(`材料已齐(${allItems})`);
-    }
-
-    const techniqueGateError = this.validateTechniqueGate(player, realm);
-    if (techniqueGateError) {
-      parts.push(techniqueGateError);
-    }
-
-    return parts.join('；');
-  }
-
-  private createRealmState(stage: PlayerRealmStage, progress = 0): PlayerRealmState {
+  private createRealmStateFromLevel(realmLv: number, progress = 0): PlayerRealmState {
+    const normalizedRealmLv = this.clampRealmLv(realmLv);
+    const realmEntry = this.contentService.getRealmLevelEntry(normalizedRealmLv)
+      ?? this.contentService.getRealmLevelEntry(1);
+    const stage = this.resolveStageForRealmLevel(normalizedRealmLv);
     const config = PLAYER_REALM_CONFIG[stage];
-    const index = PLAYER_REALM_ORDER.indexOf(stage);
-    const nextStage = index >= 0 && index < PLAYER_REALM_ORDER.length - 1
-      ? PLAYER_REALM_ORDER[index + 1]
+    const expToNext = Math.max(0, realmEntry?.expToNext ?? 0);
+    const cappedProgress = expToNext > 0 ? Math.max(0, Math.min(progress, expToNext)) : 0;
+    const maxRealmLv = this.getMaxRealmLv();
+    const breakthroughReady = expToNext > 0 && cappedProgress >= expToNext && normalizedRealmLv < maxRealmLv;
+    const nextStage = normalizedRealmLv < maxRealmLv
+      ? this.resolveStageForRealmLevel(normalizedRealmLv + 1)
       : undefined;
-    const cappedProgress = config.progressToNext > 0
-      ? Math.min(progress, config.progressToNext)
-      : 0;
-    const breakthroughReady = config.progressToNext > 0 ? cappedProgress >= config.progressToNext : false;
-    const realmEntry = this.contentService.resolveRealmLevelEntry(
-      stage,
-      cappedProgress,
-      config.progressToNext,
-      breakthroughReady,
-    );
 
     return {
       stage,
-      realmLv: realmEntry.realmLv,
-      displayName: realmEntry.displayName,
-      name: realmEntry.name,
-      shortName: realmEntry.phaseName ?? '',
-      path: realmEntry.path,
+      realmLv: realmEntry?.realmLv ?? normalizedRealmLv,
+      displayName: realmEntry?.displayName ?? '未知境界',
+      name: realmEntry?.name ?? '未知境界',
+      shortName: realmEntry?.phaseName ?? '',
+      path: realmEntry?.path ?? config.path,
       narrative: config.narrative,
-      review: realmEntry.review,
+      review: realmEntry?.review,
       progress: cappedProgress,
-      progressToNext: config.progressToNext,
+      progressToNext: expToNext,
       breakthroughReady,
       nextStage,
-      breakthroughItems: config.breakthroughItems.map((entry) => ({ ...entry })),
+      breakthroughItems: breakthroughReady ? config.breakthroughItems.map((entry) => ({ ...entry })) : [],
       minTechniqueLevel: config.minTechniqueLevel,
       minTechniqueRealm: config.minTechniqueRealm,
     };
+  }
+
+  private normalizeRealmState(realmLv: number, progress = 0): PlayerRealmState {
+    return this.createRealmStateFromLevel(realmLv, Math.max(0, Math.floor(progress)));
+  }
+
+  private resolveInitialRealmState(
+    player: PlayerState,
+    persisted: { stage?: PlayerRealmStage; progress?: number; realmLv?: number },
+  ): PlayerRealmState {
+    const persistedProgress = persisted.progress ?? player.realm?.progress ?? 0;
+    const persistedRealmLv = persisted.realmLv ?? player.realm?.realmLv ?? player.realmLv;
+    if (typeof persistedRealmLv === 'number' && persistedRealmLv > 0) {
+      return this.normalizeRealmState(persistedRealmLv, persistedProgress);
+    }
+
+    const stage = persisted.stage ?? player.realm?.stage ?? DEFAULT_PLAYER_REALM_STAGE;
+    const stageProgress = Math.max(0, persistedProgress);
+    const legacyProgressToNext = Math.max(0, PLAYER_REALM_CONFIG[stage].progressToNext);
+    const legacyEntry = this.contentService.resolveRealmLevelEntry(
+      stage,
+      stageProgress,
+      legacyProgressToNext,
+      legacyProgressToNext > 0 && stageProgress >= legacyProgressToNext,
+    );
+    const mappedProgress = legacyProgressToNext > 0
+      ? Math.floor((Math.max(0, legacyEntry.expToNext ?? 0) * Math.min(stageProgress, legacyProgressToNext)) / legacyProgressToNext)
+      : 0;
+    return this.normalizeRealmState(legacyEntry.realmLv, mappedProgress);
   }
 
   private applyRealmBonus(player: PlayerState, realm: PlayerRealmState): void {
@@ -424,14 +385,188 @@ export class TechniqueService {
     });
   }
 
-  private readPersistedRealmState(player: PlayerState): { stage?: PlayerRealmStage; progress?: number } {
+  private readPersistedRealmState(player: PlayerState): { stage?: PlayerRealmStage; progress?: number; realmLv?: number } {
     const mirrored = player.bonuses.find((bonus) => bonus.source === REALM_STATE_SOURCE);
     const stage = mirrored?.meta?.stage;
+    const realmLv = mirrored?.meta?.realmLv;
     const progress = mirrored?.meta?.progress;
     return {
       stage: typeof stage === 'number' ? stage as PlayerRealmStage : undefined,
+      realmLv: typeof realmLv === 'number' ? realmLv : undefined,
       progress: typeof progress === 'number' ? progress : undefined,
     };
+  }
+
+  private syncRealmPresentation(player: PlayerState, realm: PlayerRealmState): void {
+    const nextRealm: PlayerRealmState = {
+      ...realm,
+      breakthrough: this.buildBreakthroughPreview(player, realm),
+    };
+    player.realm = nextRealm;
+    player.realmLv = nextRealm.realmLv;
+    player.realmName = nextRealm.name;
+    player.realmStage = nextRealm.shortName || undefined;
+    player.realmReview = nextRealm.review;
+    player.breakthroughReady = nextRealm.breakthroughReady;
+    this.applyRealmStateMirror(player, nextRealm);
+  }
+
+  revealBreakthroughRequirements(player: PlayerState, requirementIds: readonly string[]): boolean {
+    if (requirementIds.length === 0) return false;
+    const known = new Set(player.revealedBreakthroughRequirementIds ?? []);
+    const previousSize = known.size;
+    for (const requirementId of requirementIds) {
+      if (typeof requirementId !== 'string' || !requirementId) continue;
+      known.add(requirementId);
+    }
+    if (known.size === previousSize) {
+      return false;
+    }
+    player.revealedBreakthroughRequirementIds = [...known];
+    if (player.realm) {
+      this.syncRealmPresentation(player, this.normalizeRealmState(player.realm.realmLv, player.realm.progress));
+    }
+    return true;
+  }
+
+  private buildBreakthroughPreview(player: PlayerState, realm: PlayerRealmState): BreakthroughPreviewState | undefined {
+    if (!realm.breakthroughReady) return undefined;
+    const config = this.getBreakthroughConfig(realm.realmLv);
+    const requirements = this.getResolvedBreakthroughRequirements(player, realm.realmLv).map((entry) => entry.view);
+    const completedRequirements = requirements.filter((entry) => entry.completed).length;
+    const targetEntry = this.contentService.getRealmLevelEntry(config.toRealmLv);
+    return {
+      targetRealmLv: config.toRealmLv,
+      targetDisplayName: targetEntry?.displayName ?? `realmLv ${config.toRealmLv}`,
+      totalRequirements: requirements.length,
+      completedRequirements,
+      allCompleted: completedRequirements === requirements.length,
+      requirements,
+    };
+  }
+
+  private getResolvedBreakthroughRequirements(player: PlayerState, fromRealmLv: number): Array<{ def: BreakthroughRequirementDef; completed: boolean; view: BreakthroughRequirementView }> {
+    const config = this.getBreakthroughConfig(fromRealmLv);
+    const revealed = new Set(player.revealedBreakthroughRequirementIds ?? []);
+    return config.requirements.map((def) => {
+      const completed = this.isBreakthroughRequirementCompleted(player, def);
+      const hidden = !completed && !revealed.has(def.id);
+      const view: BreakthroughRequirementView = {
+        id: def.id,
+        type: def.type,
+        label: hidden ? '???' : this.formatBreakthroughRequirementLabel(def),
+        completed,
+        hidden,
+      };
+      return { def, completed, view };
+    });
+  }
+
+  private getBreakthroughConfig(fromRealmLv: number): BreakthroughConfigEntry {
+    const nextRealmLv = Math.min(this.getMaxRealmLv(), fromRealmLv + 1);
+    return this.contentService.getBreakthroughConfig(fromRealmLv) ?? {
+      fromRealmLv,
+      toRealmLv: nextRealmLv,
+      requirements: [],
+    };
+  }
+
+  private isBreakthroughRequirementCompleted(player: PlayerState, requirement: BreakthroughRequirementDef): boolean {
+    switch (requirement.type) {
+      case 'item':
+        return this.getInventoryCount(player, requirement.itemId) >= requirement.count;
+      case 'technique': {
+        const qualified = player.techniques.filter((technique) => {
+          if (requirement.techniqueId && technique.techId !== requirement.techniqueId) return false;
+          if (requirement.minGrade && !this.isTechniqueGradeAtLeast(technique.grade, requirement.minGrade)) return false;
+          if (requirement.minLevel && technique.level < requirement.minLevel) return false;
+          if (requirement.minRealm !== undefined && technique.realm < requirement.minRealm) return false;
+          return true;
+        });
+        return qualified.length >= (requirement.count ?? 1);
+      }
+      case 'attribute':
+        return (player.finalAttrs?.[requirement.attr] ?? player.baseAttrs[requirement.attr] ?? 0) >= requirement.minValue;
+      default:
+        return false;
+    }
+  }
+
+  private formatBreakthroughRequirementLabel(requirement: BreakthroughRequirementDef): string {
+    if (requirement.label) return requirement.label;
+    switch (requirement.type) {
+      case 'item': {
+        const itemName = this.contentService.getItem(requirement.itemId)?.name ?? requirement.itemId;
+        return `${itemName} x${requirement.count}`;
+      }
+      case 'technique': {
+        const parts: string[] = ['至少掌握'];
+        const count = requirement.count ?? 1;
+        parts.push(`${count}门`);
+        if (requirement.techniqueId) {
+          parts.push(this.contentService.getTechnique(requirement.techniqueId)?.name ?? requirement.techniqueId);
+        } else if (requirement.minGrade) {
+          parts.push(`${TECHNIQUE_GRADE_LABELS[requirement.minGrade]}功法`);
+        } else {
+          parts.push('功法');
+        }
+        if (requirement.minLevel) {
+          parts.push(`达到 ${requirement.minLevel} 级`);
+        }
+        if (requirement.minRealm !== undefined) {
+          parts.push(`境界达到${this.techniqueRealmLabel(requirement.minRealm)}`);
+        }
+        return parts.join('');
+      }
+      case 'attribute':
+        return `${this.attrLabel(requirement.attr)}达到 ${requirement.minValue}`;
+      default:
+        return '???';
+    }
+  }
+
+  private isTechniqueGradeAtLeast(current: TechniqueGrade | undefined, expected: TechniqueGrade): boolean {
+    if (!current) return false;
+    return TECHNIQUE_GRADE_ORDER.indexOf(current) >= TECHNIQUE_GRADE_ORDER.indexOf(expected);
+  }
+
+  private attrLabel(attr: keyof PlayerState['baseAttrs']): string {
+    switch (attr) {
+      case 'constitution':
+        return '体魄';
+      case 'spirit':
+        return '神识';
+      case 'perception':
+        return '感知';
+      case 'talent':
+        return '资质';
+      case 'comprehension':
+        return '悟性';
+      case 'luck':
+        return '气运';
+      default:
+        return String(attr);
+    }
+  }
+
+  private resolveStageForRealmLevel(realmLv: number): PlayerRealmStage {
+    for (const stage of [...PLAYER_REALM_ORDER].reverse()) {
+      const range = this.contentService.getRealmLevelRange(stage);
+      if (realmLv >= range.levelFrom) {
+        return stage;
+      }
+    }
+    return DEFAULT_PLAYER_REALM_STAGE;
+  }
+
+  private getMaxRealmLv(): number {
+    const levels = this.contentService.getRealmLevelsConfig()?.levels ?? [];
+    const maxRealmLv = levels[levels.length - 1]?.realmLv;
+    return typeof maxRealmLv === 'number' && maxRealmLv > 0 ? maxRealmLv : 1;
+  }
+
+  private clampRealmLv(realmLv: number): number {
+    return Math.max(1, Math.min(this.getMaxRealmLv(), Math.floor(realmLv)));
   }
 
   private applyTechniqueBonuses(player: PlayerState): void {
@@ -469,13 +604,6 @@ export class TechniqueService {
         technique.exp = Math.max(0, technique.expToNext - 1);
       }
     }
-  }
-
-  private getHighestTechnique(player: PlayerState): TechniqueState | undefined {
-    return [...player.techniques].sort((left, right) => {
-      if (right.realm !== left.realm) return right.realm - left.realm;
-      return right.level - left.level;
-    })[0];
   }
 
   private getInventoryCount(player: PlayerState, itemId: string): number {

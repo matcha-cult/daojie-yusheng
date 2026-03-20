@@ -1029,6 +1029,13 @@ export class WorldService {
       if (rewards.length > 0) {
         dirty.push('inv');
       }
+      const unlockedBreakthroughRequirements = this.techniqueService.revealBreakthroughRequirements(
+        player,
+        interaction.quest.unlockBreakthroughRequirementIds ?? [],
+      );
+      if (unlockedBreakthroughRequirements) {
+        dirty.push('attr');
+      }
       interaction.questState.status = 'completed';
       return {
         messages: [{

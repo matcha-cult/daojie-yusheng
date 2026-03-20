@@ -464,6 +464,12 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       this.techniqueService.initializePlayerProgression(player);
       const flags = this.playerService.getDirtyFlags(player.id);
       if (!flags || flags.size === 0) continue;
+      if (
+        player.realm?.breakthroughReady
+        && (flags.has('inv') || flags.has('equip') || flags.has('tech'))
+      ) {
+        flags.add('attr');
+      }
       const socket = this.playerService.getSocket(player.id);
       if (!socket) continue;
 

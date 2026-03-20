@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "transitions": [
+    {
+      "fromRealmLv": 5,
+      "toRealmLv": 6,
+      "title": "养气开门",
+      "requirements": [
+        { "id": "bw_5_6_rat_tail", "type": "item", "itemId": "rat_tail", "count": 3 },
+        { "id": "bw_5_6_boar_tusk", "type": "item", "itemId": "boar_tusk", "count": 1 }
+      ]
+    },
+    {
+      "fromRealmLv": 8,
+      "toRealmLv": 9,
+      "title": "开阳试锋",
+      "requirements": [
+        { "id": "bw_8_9_wolf_fang", "type": "item", "itemId": "wolf_fang", "count": 4 },
+        { "id": "bw_8_9_serpent_gall", "type": "item", "itemId": "serpent_gall", "count": 2 }
+      ]
+    },
+    {
+      "fromRealmLv": 12,
+      "toRealmLv": 13,
+      "title": "天璇试关",
+      "requirements": [
+        { "id": "bw_12_13_black_iron_chunk", "type": "item", "itemId": "black_iron_chunk", "count": 6 },
+        { "id": "bw_12_13_rune_shard", "type": "item", "itemId": "rune_shard", "count": 4 },
+        { "id": "bw_12_13_mine_signal_core", "type": "item", "itemId": "mine_signal_core", "count": 1 }
+      ]
+    },
+    {
+      "fromRealmLv": 15,
+      "toRealmLv": 16,
+      "title": "大宗师归炁",
+      "requirements": [
+        { "id": "bw_15_16_rune_shard", "type": "item", "itemId": "rune_shard", "count": 6 },
+        { "id": "bw_15_16_spirit_iron_fragment", "type": "item", "itemId": "spirit_iron_fragment", "count": 4 },
+        { "id": "bw_15_16_valley_core", "type": "item", "itemId": "valley_core", "count": 1 }
+      ]
+    },
+    {
+      "fromRealmLv": 18,
+      "toRealmLv": 19,
+      "title": "破凡入真",
+      "requirements": [
+        { "id": "bw_18_19_blood_feather", "type": "item", "itemId": "blood_feather", "count": 6 },
+        { "id": "bw_18_19_demon_wolf_bone", "type": "item", "itemId": "demon_wolf_bone", "count": 6 },
+        { "id": "bw_18_19_spirit_iron_fragment", "type": "item", "itemId": "spirit_iron_fragment", "count": 6 }
+      ]
+    },
+    {
+      "fromRealmLv": 24,
+      "toRealmLv": 25,
+      "title": "道基初誓",
+      "requirements": [
+        { "id": "bw_24_25_yellow_tech", "type": "technique", "minGrade": "yellow", "count": 1, "label": "至少掌握 1 门黄阶功法" },
+        { "id": "bw_24_25_spirit", "type": "attribute", "attr": "spirit", "minValue": 14, "label": "神识达到 14" },
+        { "id": "bw_24_25_comprehension", "type": "attribute", "attr": "comprehension", "minValue": 12, "label": "悟性达到 12" }
+      ]
+    }
+  ]
+}

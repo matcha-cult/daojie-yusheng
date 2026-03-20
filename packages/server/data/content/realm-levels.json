@@ -86,7 +86,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "尘根未醒"
+      "review": "尘根未醒",
+      "expToNext": 1000
     },
     {
       "realmLv": 2,
@@ -97,7 +98,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "皮坚肉紧"
+      "review": "皮坚肉紧",
+      "expToNext": 1200
     },
     {
       "realmLv": 3,
@@ -108,7 +110,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "骨沉如铁"
+      "review": "骨沉如铁",
+      "expToNext": 1500
     },
     {
       "realmLv": 4,
@@ -119,7 +122,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "筋开力长"
+      "review": "筋开力长",
+      "expToNext": 2000
     },
     {
       "realmLv": 5,
@@ -130,7 +134,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "洗垢生新"
+      "review": "洗垢生新",
+      "expToNext": 2500
     },
     {
       "realmLv": 6,
@@ -141,7 +146,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "一气养周天"
+      "review": "一气养周天",
+      "expToNext": 3000
     },
     {
       "realmLv": 7,
@@ -152,7 +158,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "百脉始归流"
+      "review": "百脉始归流",
+      "expToNext": 5000
     },
     {
       "realmLv": 8,
@@ -163,7 +170,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "星火照命门"
+      "review": "星火照命门",
+      "expToNext": 6000
     },
     {
       "realmLv": 9,
@@ -174,7 +182,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "开阳悬胆，锋意渐生"
+      "review": "开阳悬胆，锋意渐生",
+      "expToNext": 7000
     },
     {
       "realmLv": 10,
@@ -185,7 +194,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "玉衡定步，进退有章"
+      "review": "玉衡定步，进退有章",
+      "expToNext": 9000
     },
     {
       "realmLv": 11,
@@ -196,7 +206,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "一念权衡定去留"
+      "review": "一念权衡定去留",
+      "expToNext": 11000
     },
     {
       "realmLv": 12,
@@ -207,7 +218,8 @@
       "path": "martial",
       "grade": "mortal",
       "gradeLabel": "凡阶",
-      "review": "玄机暗转藏锋处"
+      "review": "玄机暗转藏锋处",
+      "expToNext": 13000
     },
     {
       "realmLv": 13,
@@ -218,7 +230,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "天璇照骨，气走八荒"
+      "review": "天璇照骨，气走八荒",
+      "expToNext": 16000
     },
     {
       "realmLv": 14,
@@ -229,7 +242,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "北斗归枢，我身为轴"
+      "review": "北斗归枢，我身为轴",
+      "expToNext": 25000
     },
     {
       "realmLv": 15,
@@ -240,7 +254,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "开宗立势，名动一方"
+      "review": "开宗立势，名动一方",
+      "expToNext": 30000
     },
     {
       "realmLv": 16,
@@ -251,7 +266,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "满堂风雨，不折其锋"
+      "review": "满堂风雨，不折其锋",
+      "expToNext": 40000
     },
     {
       "realmLv": 17,
@@ -262,7 +278,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "临渊羡鱼"
+      "review": "临渊羡鱼",
+      "expToNext": 50000
     },
     {
       "realmLv": 18,
@@ -273,7 +290,8 @@
       "path": "martial",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "回首人间再叩天"
+      "review": "回首人间再叩天",
+      "expToNext": 80000
     },
     {
       "realmLv": 19,
@@ -284,7 +302,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "灵息入海"
+      "review": "灵息入海",
+      "expToNext": 100000
     },
     {
       "realmLv": 20,
@@ -295,7 +314,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "气海起微澜"
+      "review": "气海起微澜",
+      "expToNext": 120000
     },
     {
       "realmLv": 21,
@@ -306,7 +326,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "一缕真炁绕周身"
+      "review": "一缕真炁绕周身",
+      "expToNext": 150000
     },
     {
       "realmLv": 22,
@@ -317,7 +338,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "气走百脉，念动成锋"
+      "review": "气走百脉，念动成锋",
+      "expToNext": 180000
     },
     {
       "realmLv": 23,
@@ -328,7 +350,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "周天无漏，灵泉自生"
+      "review": "周天无漏，灵泉自生",
+      "expToNext": 220000
     },
     {
       "realmLv": 24,
@@ -339,7 +362,8 @@
       "path": "immortal",
       "grade": "yellow",
       "gradeLabel": "黄阶",
-      "review": "道基只待一念成"
+      "review": "道基只待一念成",
+      "expToNext": 300000
     },
     {
       "realmLv": 25,
@@ -350,7 +374,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "道台初立"
+      "review": "道台初立",
+      "expToNext": 360000
     },
     {
       "realmLv": 26,
@@ -361,7 +386,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "真基稳如岳"
+      "review": "真基稳如岳",
+      "expToNext": 430000
     },
     {
       "realmLv": 27,
@@ -372,7 +398,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "灵台澄澈照尘寰"
+      "review": "灵台澄澈照尘寰",
+      "expToNext": 520000
     },
     {
       "realmLv": 28,
@@ -383,7 +410,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "基成无缺，法起无滞"
+      "review": "基成无缺，法起无滞",
+      "expToNext": 620000
     },
     {
       "realmLv": 29,
@@ -394,7 +422,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "道骨已成，百脉齐鸣"
+      "review": "道骨已成，百脉齐鸣",
+      "expToNext": 750000
     },
     {
       "realmLv": 30,
@@ -405,7 +434,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "丹光隐现候天时"
+      "review": "丹光隐现候天时",
+      "expToNext": 1000000
     },
     {
       "realmLv": 31,
@@ -416,7 +446,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "一丹在腹"
+      "review": "一丹在腹",
+      "expToNext": 1200000
     },
     {
       "realmLv": 32,
@@ -427,7 +458,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "丹华照五脏"
+      "review": "丹华照五脏",
+      "expToNext": 1450000
     },
     {
       "realmLv": 33,
@@ -438,7 +470,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "金辉流转映灵台"
+      "review": "金辉流转映灵台",
+      "expToNext": 1740000
     },
     {
       "realmLv": 34,
@@ -449,7 +482,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "丹转九息，内景如昼"
+      "review": "丹转九息，内景如昼",
+      "expToNext": 2100000
     },
     {
       "realmLv": 35,
@@ -460,7 +494,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "金性圆明，照彻形神"
+      "review": "金性圆明，照彻形神",
+      "expToNext": 2500000
     },
     {
       "realmLv": 36,
@@ -471,7 +506,8 @@
       "path": "immortal",
       "grade": "mystic",
       "gradeLabel": "玄阶",
-      "review": "紫气东来孕婴神"
+      "review": "紫气东来孕婴神",
+      "expToNext": 3500000
     },
     {
       "realmLv": 37,
@@ -482,7 +518,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "婴神初坐"
+      "review": "婴神初坐",
+      "expToNext": 4200000
     },
     {
       "realmLv": 38,
@@ -493,7 +530,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "紫府开新天"
+      "review": "紫府开新天",
+      "expToNext": 5000000
     },
     {
       "realmLv": 39,
@@ -504,7 +542,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "一念神游越千山"
+      "review": "一念神游越千山",
+      "expToNext": 6000000
     },
     {
       "realmLv": 40,
@@ -515,7 +554,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "婴照四极，念覆八荒"
+      "review": "婴照四极，念覆八荒",
+      "expToNext": 7200000
     },
     {
       "realmLv": 41,
@@ -526,7 +566,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "神婴无瑕，心映万象"
+      "review": "神婴无瑕，心映万象",
+      "expToNext": 8600000
     },
     {
       "realmLv": 42,
@@ -537,7 +578,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "神火将燃蜕旧身"
+      "review": "神火将燃蜕旧身",
+      "expToNext": 12000000
     },
     {
       "realmLv": 43,
@@ -548,7 +590,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "神意离壳"
+      "review": "神意离壳",
+      "expToNext": 14000000
     },
     {
       "realmLv": 44,
@@ -559,7 +602,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "一念化万形"
+      "review": "一念化万形",
+      "expToNext": 17000000
     },
     {
       "realmLv": 45,
@@ -570,7 +614,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "神机入微驭诸法"
+      "review": "神机入微驭诸法",
+      "expToNext": 20000000
     },
     {
       "realmLv": 46,
@@ -581,7 +626,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "元神高举，天地共鸣"
+      "review": "元神高举，天地共鸣",
+      "expToNext": 24000000
     },
     {
       "realmLv": 47,
@@ -592,7 +638,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "神明澄彻，虚妄皆明"
+      "review": "神明澄彻，虚妄皆明",
+      "expToNext": 29000000
     },
     {
       "realmLv": 48,
@@ -603,7 +650,8 @@
       "path": "immortal",
       "grade": "earth",
       "gradeLabel": "地阶",
-      "review": "身返于虚开界隙"
+      "review": "身返于虚开界隙",
+      "expToNext": 40000000
     },
     {
       "realmLv": 49,
@@ -614,7 +662,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "虚境初开"
+      "review": "虚境初开",
+      "expToNext": 48000000
     },
     {
       "realmLv": 50,
@@ -625,7 +674,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "形神两相忘"
+      "review": "形神两相忘",
+      "expToNext": 58000000
     },
     {
       "realmLv": 51,
@@ -636,7 +686,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "一念入空万相轻"
+      "review": "一念入空万相轻",
+      "expToNext": 70000000
     },
     {
       "realmLv": 52,
@@ -647,7 +698,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "虚实互映，法界徐开"
+      "review": "虚实互映，法界徐开",
+      "expToNext": 84000000
     },
     {
       "realmLv": 53,
@@ -658,7 +710,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "炼尽有形，真我独存"
+      "review": "炼尽有形，真我独存",
+      "expToNext": 100000000
     },
     {
       "realmLv": 54,
@@ -669,7 +722,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "身道将合同天心"
+      "review": "身道将合同天心",
+      "expToNext": 140000000
     },
     {
       "realmLv": 55,
@@ -680,7 +734,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "身神相契"
+      "review": "身神相契",
+      "expToNext": 170000000
     },
     {
       "realmLv": 56,
@@ -691,7 +746,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "三元归一处"
+      "review": "三元归一处",
+      "expToNext": 200000000
     },
     {
       "realmLv": 57,
@@ -702,7 +758,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "精炁神合镇山河"
+      "review": "精炁神合镇山河",
+      "expToNext": 240000000
     },
     {
       "realmLv": 58,
@@ -713,7 +770,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "内外无间，道体初圆"
+      "review": "内外无间，道体初圆",
+      "expToNext": 290000000
     },
     {
       "realmLv": 59,
@@ -724,7 +782,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "天人相抱，万象同流"
+      "review": "天人相抱，万象同流",
+      "expToNext": 350000000
     },
     {
       "realmLv": 60,
@@ -735,7 +794,8 @@
       "path": "immortal",
       "grade": "heaven",
       "gradeLabel": "天阶",
-      "review": "法舟已满待长风"
+      "review": "法舟已满待长风",
+      "expToNext": 500000000
     },
     {
       "realmLv": 61,
@@ -746,7 +806,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "大道载身"
+      "review": "大道载身",
+      "expToNext": 600000000
     },
     {
       "realmLv": 62,
@@ -757,7 +818,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "举念契天机"
+      "review": "举念契天机",
+      "expToNext": 720000000
     },
     {
       "realmLv": 63,
@@ -768,7 +830,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "身若乾坤吞山海"
+      "review": "身若乾坤吞山海",
+      "expToNext": 860000000
     },
     {
       "realmLv": 64,
@@ -779,7 +842,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "大乘法满，诸界侧目"
+      "review": "大乘法满，诸界侧目",
+      "expToNext": 1030000000
     },
     {
       "realmLv": 65,
@@ -790,7 +854,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "圆融无碍，近道而行"
+      "review": "圆融无碍，近道而行",
+      "expToNext": 1240000000
     },
     {
       "realmLv": 66,
@@ -801,7 +866,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "雷门将启照心关"
+      "review": "雷门将启照心关",
+      "expToNext": 1800000000
     },
     {
       "realmLv": 67,
@@ -812,7 +878,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "劫云初压"
+      "review": "劫云初压",
+      "expToNext": 2200000000
     },
     {
       "realmLv": 68,
@@ -823,7 +890,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "雷火洗真身"
+      "review": "雷火洗真身",
+      "expToNext": 2600000000
     },
     {
       "realmLv": 69,
@@ -834,7 +902,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "万劫加身道更坚"
+      "review": "万劫加身道更坚",
+      "expToNext": 3100000000
     },
     {
       "realmLv": 70,
@@ -845,7 +914,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "天威尽落，我意长明"
+      "review": "天威尽落，我意长明",
+      "expToNext": 3700000000
     },
     {
       "realmLv": 71,
@@ -856,7 +926,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "劫数已尽，道果将成"
+      "review": "劫数已尽，道果将成",
+      "expToNext": 4500000000
     },
     {
       "realmLv": 72,
@@ -867,7 +938,8 @@
       "path": "immortal",
       "grade": "spirit",
       "gradeLabel": "灵阶",
-      "review": "旧界难留待登天"
+      "review": "旧界难留待登天",
+      "expToNext": 6500000000
     },
     {
       "realmLv": 73,
@@ -878,7 +950,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "一朝拔界去"
+      "review": "一朝拔界去",
+      "expToNext": 8000000000
     },
     {
       "realmLv": 74,
@@ -889,7 +962,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "仙籍初留名"
+      "review": "仙籍初留名",
+      "expToNext": 9600000000
     },
     {
       "realmLv": 75,
@@ -900,7 +974,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "厚土承仙命"
+      "review": "厚土承仙命",
+      "expToNext": 11500000000
     },
     {
       "realmLv": 76,
@@ -911,7 +986,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "乘风上青冥"
+      "review": "乘风上青冥",
+      "expToNext": 13800000000
     },
     {
       "realmLv": 77,
@@ -922,7 +998,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "真性无尘，仙光自满"
+      "review": "真性无尘，仙光自满",
+      "expToNext": 16600000000
     },
     {
       "realmLv": 78,
@@ -933,7 +1010,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "玄理在握驭天机"
+      "review": "玄理在握驭天机",
+      "expToNext": 20000000000
     },
     {
       "realmLv": 79,
@@ -944,7 +1022,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "金性不朽，岁月难侵"
+      "review": "金性不朽，岁月难侵",
+      "expToNext": 24000000000
     },
     {
       "realmLv": 80,
@@ -955,7 +1034,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "太一含元镇万灵"
+      "review": "太一含元镇万灵",
+      "expToNext": 32000000000
     },
     {
       "realmLv": 81,
@@ -966,7 +1046,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "圣机初孕"
+      "review": "圣机初孕",
+      "expToNext": 40000000000
     },
     {
       "realmLv": 82,
@@ -977,7 +1058,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "一步入圣门"
+      "review": "一步入圣门",
+      "expToNext": 48000000000
     },
     {
       "realmLv": 83,
@@ -988,7 +1070,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "圣威如海镇八荒"
+      "review": "圣威如海镇八荒",
+      "expToNext": 58000000000
     },
     {
       "realmLv": 84,
@@ -999,7 +1082,8 @@
       "path": "ascended",
       "grade": "saint",
       "gradeLabel": "圣阶",
-      "review": "诸圣拱服，王座初成"
+      "review": "诸圣拱服，王座初成",
+      "expToNext": 80000000000
     },
     {
       "realmLv": 85,
@@ -1010,7 +1094,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "帝气初生"
+      "review": "帝气初生",
+      "expToNext": 100000000000
     },
     {
       "realmLv": 86,
@@ -1021,7 +1106,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "君临一域定山河"
+      "review": "君临一域定山河",
+      "expToNext": 120000000000
     },
     {
       "realmLv": 87,
@@ -1032,7 +1118,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "帝威横世，万族低首"
+      "review": "帝威横世，万族低首",
+      "expToNext": 145000000000
     },
     {
       "realmLv": 88,
@@ -1043,7 +1130,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "古意临今压诸天"
+      "review": "古意临今压诸天",
+      "expToNext": 174000000000
     },
     {
       "realmLv": 89,
@@ -1054,7 +1142,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "高坐九霄，俯瞰万界"
+      "review": "高坐九霄，俯瞰万界",
+      "expToNext": 209000000000
     },
     {
       "realmLv": 90,
@@ -1065,7 +1154,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "尊在诸帝上"
+      "review": "尊在诸帝上",
+      "expToNext": 250000000000
     },
     {
       "realmLv": 91,
@@ -1076,7 +1166,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "身横岁月贯古今"
+      "review": "身横岁月贯古今",
+      "expToNext": 300000000000
     },
     {
       "realmLv": 92,
@@ -1087,7 +1178,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "太上忘形，道意独尊"
+      "review": "太上忘形，道意独尊",
+      "expToNext": 360000000000
     },
     {
       "realmLv": 93,
@@ -1098,7 +1190,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "举世无并照寰宇"
+      "review": "举世无并照寰宇",
+      "expToNext": 430000000000
     },
     {
       "realmLv": 94,
@@ -1109,7 +1202,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "万古唯一"
+      "review": "万古唯一",
+      "expToNext": 520000000000
     },
     {
       "realmLv": 95,
@@ -1120,7 +1214,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "诸天俯首，万界同尊"
+      "review": "诸天俯首，万界同尊",
+      "expToNext": 620000000000
     },
     {
       "realmLv": 96,
@@ -1131,7 +1226,8 @@
       "path": "ascended",
       "grade": "emperor",
       "gradeLabel": "帝阶",
-      "review": "立尽长天只问道"
+      "review": "立尽长天只问道",
+      "expToNext": 0
     }
   ]
 }

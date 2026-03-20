@@ -17,6 +17,7 @@ import { ActionPanel } from './ui/panels/action-panel';
 import { GmPanel } from './ui/panels/gm-panel';
 import { WorldPanel } from './ui/panels/world-panel';
 import { FloatingTooltip } from './ui/floating-tooltip';
+import { detailModalHost } from './ui/detail-modal-host';
 import { adjustZoom, cycleZoom, getZoom } from './display';
 import { hydrateTileCacheFromMemory, rememberVisibleTiles } from './map-memory';
 import {
@@ -189,6 +190,51 @@ function escapeHtml(input: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function openBreakthroughModal() {
+  const preview = myPlayer?.realm?.breakthrough;
+  const currentRealm = myPlayer?.realm;
+  if (!preview || !currentRealm) {
+    showToast('当前境界尚未圆满，暂时不能突破');
+    return;
+  }
+
+  const requirementRows = preview.requirements.length > 0
+    ? preview.requirements.map((requirement) => `
+      <div class="action-item">
+        <div class="action-copy">
+          <div>
+            <span class="action-name">${escapeHtml(requirement.label)}</span>
+            <span class="action-type">[${requirement.completed ? '已达成' : '未达成'}]</span>
+          </div>
+          <div class="action-desc">${requirement.hidden ? '该要求尚未解锁，只能通过主线或支线任务逐步获知。' : (requirement.completed ? '当前已满足。' : '当前尚未满足。')}</div>
+        </div>
+      </div>
+    `).join('')
+    : '<div class="empty-hint">当前无额外突破要求。</div>';
+
+  detailModalHost.open({
+    ownerId: 'realm:breakthrough',
+    title: `突破至 ${preview.targetDisplayName}`,
+    subtitle: `${currentRealm.displayName} · 已完成 ${preview.completedRequirements}/${preview.totalRequirements}`,
+    hint: preview.allCompleted ? '点击空白处关闭' : '未达成的隐藏条件需通过任务逐步解锁',
+    bodyHtml: `
+      <div class="panel-section">
+        <div class="panel-section-title">突破要求</div>
+        ${requirementRows}
+      </div>
+      <div class="tech-modal-actions">
+        <button class="small-btn" type="button" data-breakthrough-confirm ${preview.allCompleted ? '' : 'disabled'}>确认突破</button>
+      </div>
+    `,
+    onAfterRender: (body) => {
+      body.querySelector<HTMLElement>('[data-breakthrough-confirm]')?.addEventListener('click', () => {
+        detailModalHost.close('realm:breakthrough');
+        socket.sendAction('realm:breakthrough');
+      });
+    },
+  });
 }
 
 function syncTargetingOverlay() {
@@ -610,6 +656,12 @@ questPanel.setCallbacks((x, y) => {
 });
 actionPanel.setCallbacks(
   (actionId, requiresTarget, targetMode, range, actionName) => {
+    if (actionId === 'realm:breakthrough') {
+      cancelTargeting();
+      hideObserveModal();
+      openBreakthroughModal();
+      return;
+    }
     if (requiresTarget) {
       beginTargeting(actionId, actionName ?? actionId, targetMode, actionId === 'client:observe' ? getViewRadius() : (range ?? 1));
       return;

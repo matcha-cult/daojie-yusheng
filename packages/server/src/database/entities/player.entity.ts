@@ -62,6 +62,9 @@ export class PlayerEntity {
   @Column({ type: 'jsonb', default: () => `'[]'` })
   quests!: unknown[];
 
+  @Column({ type: 'jsonb', default: () => `'[]'` })
+  revealedBreakthroughRequirementIds!: unknown[];
+
   @Column({ type: 'boolean', default: false })
   autoBattle!: boolean;
 

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  AttrKey,
   DEFAULT_INVENTORY_CAPACITY,
   EquipmentSlots,
   EQUIP_SLOTS,
@@ -64,6 +65,7 @@ export interface RealmLevelEntry {
   grade: TechniqueGrade;
   gradeLabel: string;
   review: string;
+  expToNext?: number;
 }
 
 interface RealmLevelBand {
@@ -91,6 +93,60 @@ interface RealmLevelsConfig {
   levels: RealmLevelEntry[];
 }
 
+type RawBreakthroughItemRequirement = {
+  id: string;
+  type: 'item';
+  itemId: string;
+  count: number;
+  label?: string;
+};
+
+type RawBreakthroughTechniqueRequirement = {
+  id: string;
+  type: 'technique';
+  techniqueId?: string;
+  minGrade?: TechniqueGrade;
+  minLevel?: number;
+  minRealm?: keyof typeof TechniqueRealm | TechniqueRealm;
+  count?: number;
+  label?: string;
+};
+
+type RawBreakthroughAttributeRequirement = {
+  id: string;
+  type: 'attribute';
+  attr: AttrKey;
+  minValue: number;
+  label?: string;
+};
+
+type RawBreakthroughRequirement =
+  | RawBreakthroughItemRequirement
+  | RawBreakthroughTechniqueRequirement
+  | RawBreakthroughAttributeRequirement;
+
+export type BreakthroughRequirementDef =
+  | RawBreakthroughItemRequirement
+  | (Omit<RawBreakthroughTechniqueRequirement, 'minRealm'> & { minRealm?: TechniqueRealm })
+  | RawBreakthroughAttributeRequirement;
+
+export interface BreakthroughConfigEntry {
+  fromRealmLv: number;
+  toRealmLv: number;
+  title?: string;
+  requirements: BreakthroughRequirementDef[];
+}
+
+interface BreakthroughConfigFile {
+  version: number;
+  transitions: Array<{
+    fromRealmLv: number;
+    toRealmLv?: number;
+    title?: string;
+    requirements?: RawBreakthroughRequirement[];
+  }>;
+}
+
 const PLAYER_REALM_STAGE_LEVEL_RANGES: Record<PlayerRealmStage, { levelFrom: number; levelTo: number }> = {
   [PlayerRealmStage.Mortal]: { levelFrom: 1, levelTo: 5 },
   [PlayerRealmStage.BodyTempering]: { levelFrom: 6, levelTo: 8 },
@@ -108,12 +164,14 @@ export class ContentService implements OnModuleInit {
   private readonly items = new Map<string, ItemTemplate>();
   private realmLevelsConfig: RealmLevelsConfig | null = null;
   private readonly realmLevels = new Map<number, RealmLevelEntry>();
+  private readonly breakthroughConfigs = new Map<number, BreakthroughConfigEntry>();
   private starterInventoryEntries: StarterInventoryEntry[] = [];
   private readonly contentDir = path.join(process.cwd(), 'data', 'content');
   private readonly techniquesDir = path.join(this.contentDir, 'techniques');
   private readonly itemsDir = path.join(this.contentDir, 'items');
   private readonly starterInventoryPath = path.join(this.contentDir, 'starter-inventory.json');
   private readonly realmLevelsPath = path.join(this.contentDir, 'realm-levels.json');
+  private readonly breakthroughConfigPath = path.join(this.contentDir, 'breakthroughs.json');
 
   onModuleInit(): void {
     this.loadContent();
@@ -123,11 +181,13 @@ export class ContentService implements OnModuleInit {
     this.techniques.clear();
     this.items.clear();
     this.realmLevels.clear();
+    this.breakthroughConfigs.clear();
     this.loadTechniques();
     this.loadItems();
     this.loadStarterInventory();
     this.loadRealmLevels();
-    this.logger.log(`内容已加载：功法 ${this.techniques.size} 条，物品 ${this.items.size} 条，境界 ${this.realmLevels.size} 条`);
+    this.loadBreakthroughConfigs();
+    this.logger.log(`内容已加载：功法 ${this.techniques.size} 条，物品 ${this.items.size} 条，境界 ${this.realmLevels.size} 条，突破配置 ${this.breakthroughConfigs.size} 条`);
   }
 
   private loadTechniques(): void {
@@ -177,6 +237,65 @@ export class ContentService implements OnModuleInit {
     for (const entry of raw.levels ?? []) {
       this.realmLevels.set(entry.realmLv, entry);
     }
+  }
+
+  private loadBreakthroughConfigs(): void {
+    const raw = JSON.parse(fs.readFileSync(this.breakthroughConfigPath, 'utf-8')) as BreakthroughConfigFile;
+    for (const transition of raw.transitions ?? []) {
+      if (!Number.isInteger(transition.fromRealmLv)) continue;
+      const fromRealmLv = Number(transition.fromRealmLv);
+      const toRealmLv = Number.isInteger(transition.toRealmLv) ? Number(transition.toRealmLv) : fromRealmLv + 1;
+      const requirements = Array.isArray(transition.requirements)
+        ? transition.requirements.flatMap((requirement) => this.normalizeBreakthroughRequirement(requirement))
+        : [];
+      this.breakthroughConfigs.set(fromRealmLv, {
+        fromRealmLv,
+        toRealmLv,
+        title: typeof transition.title === 'string' ? transition.title : undefined,
+        requirements,
+      });
+    }
+  }
+
+  private normalizeBreakthroughRequirement(input: RawBreakthroughRequirement): BreakthroughRequirementDef[] {
+    if (!input || typeof input !== 'object' || typeof input.id !== 'string') {
+      return [];
+    }
+    if (input.type === 'item') {
+      if (typeof input.itemId !== 'string' || !Number.isInteger(input.count)) return [];
+      return [{
+        id: input.id,
+        type: 'item',
+        itemId: input.itemId,
+        count: Math.max(1, Number(input.count)),
+        label: typeof input.label === 'string' ? input.label : undefined,
+      }];
+    }
+    if (input.type === 'technique') {
+      return [{
+        id: input.id,
+        type: 'technique',
+        techniqueId: typeof input.techniqueId === 'string' ? input.techniqueId : undefined,
+        minGrade: input.minGrade,
+        minLevel: Number.isInteger(input.minLevel) ? Math.max(1, Number(input.minLevel)) : undefined,
+        minRealm: input.minRealm === undefined ? undefined : this.parseTechniqueRealm(input.minRealm),
+        count: Number.isInteger(input.count) ? Math.max(1, Number(input.count)) : undefined,
+        label: typeof input.label === 'string' ? input.label : undefined,
+      }];
+    }
+    if (input.type === 'attribute') {
+      if (!['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'].includes(input.attr) || !Number.isFinite(input.minValue)) {
+        return [];
+      }
+      return [{
+        id: input.id,
+        type: 'attribute',
+        attr: input.attr,
+        minValue: Math.max(1, Math.floor(input.minValue)),
+        label: typeof input.label === 'string' ? input.label : undefined,
+      }];
+    }
+    return [];
   }
 
   private readJsonEntries<T>(dirPath: string): T[] {
@@ -270,6 +389,10 @@ export class ContentService implements OnModuleInit {
 
   getRealmLevelRange(stage: PlayerRealmStage): { levelFrom: number; levelTo: number } {
     return PLAYER_REALM_STAGE_LEVEL_RANGES[stage] ?? PLAYER_REALM_STAGE_LEVEL_RANGES[PlayerRealmStage.Mortal];
+  }
+
+  getBreakthroughConfig(fromRealmLv: number): BreakthroughConfigEntry | undefined {
+    return this.breakthroughConfigs.get(fromRealmLv);
   }
 
   getRealmStageStartEntry(stage: PlayerRealmStage): RealmLevelEntry | undefined {

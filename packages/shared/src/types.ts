@@ -179,6 +179,25 @@ export interface BreakthroughItemRequirement {
   count: number;
 }
 
+export type BreakthroughRequirementType = 'item' | 'technique' | 'attribute';
+
+export interface BreakthroughRequirementView {
+  id: string;
+  type: BreakthroughRequirementType;
+  label: string;
+  completed: boolean;
+  hidden: boolean;
+}
+
+export interface BreakthroughPreviewState {
+  targetRealmLv: number;
+  targetDisplayName: string;
+  totalRequirements: number;
+  completedRequirements: number;
+  allCompleted: boolean;
+  requirements: BreakthroughRequirementView[];
+}
+
 /** 功法境界 */
 export enum TechniqueRealm {
   Entry = 0,
@@ -235,6 +254,7 @@ export interface PlayerRealmState {
   breakthroughItems: BreakthroughItemRequirement[];
   minTechniqueLevel: number;
   minTechniqueRealm?: TechniqueRealm;
+  breakthrough?: BreakthroughPreviewState;
 }
 
 /** 技能定义 */
@@ -458,5 +478,6 @@ export interface PlayerState {
   autoBattleSkills: AutoBattleSkillConfig[];
   combatTargetId?: string;
   cultivatingTechId?: string;
+  revealedBreakthroughRequirementIds?: string[];
   realm?: PlayerRealmState;
 }

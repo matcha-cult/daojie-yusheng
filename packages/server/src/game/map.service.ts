@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import {
+  calculateTerrainDurability,
   manhattanDistance,
   Tile,
   TileType,
@@ -12,6 +13,8 @@ import {
   PlayerRealmStage,
   QuestLine,
   QuestObjectiveType,
+  TerrainDurabilityMaterial,
+  TechniqueGrade,
 } from '@mud/shared';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -38,6 +41,7 @@ export interface QuestConfig {
   nextQuestId?: string;
   requiredItemId?: string;
   requiredItemCount?: number;
+  unlockBreakthroughRequirementIds?: string[];
 }
 
 export interface NpcConfig {
@@ -86,6 +90,66 @@ interface MapData {
   monsterSpawns: MonsterSpawnConfig[];
   spawnPoint: { x: number; y: number };
 }
+
+type TerrainDurabilityProfile = {
+  grade: TechniqueGrade;
+  material: TerrainDurabilityMaterial;
+};
+
+const DEFAULT_TERRAIN_DURABILITY_BY_TILE: Partial<Record<TileType, TerrainDurabilityProfile>> = {
+  [TileType.Wall]: { grade: 'mortal', material: 'stone' },
+  [TileType.Tree]: { grade: 'mortal', material: 'wood' },
+  [TileType.Stone]: { grade: 'mortal', material: 'stone' },
+  [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
+};
+
+// 现有地图按区域主题与进度分配材质与品阶，统一走“品阶基础血量 × 材质倍率”。
+const MAP_TERRAIN_DURABILITY_OVERRIDES: Partial<Record<string, Partial<Record<TileType, TerrainDurabilityProfile>>>> = {
+  spawn: {
+    [TileType.Wall]: { grade: 'mortal', material: 'stone' },
+    [TileType.Tree]: { grade: 'mortal', material: 'wood' },
+    [TileType.Stone]: { grade: 'mortal', material: 'stone' },
+    [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
+  },
+  wildlands: {
+    [TileType.Wall]: { grade: 'yellow', material: 'stone' },
+    [TileType.Tree]: { grade: 'mortal', material: 'wood' },
+    [TileType.Stone]: { grade: 'yellow', material: 'stone' },
+  },
+  bamboo_forest: {
+    [TileType.Wall]: { grade: 'yellow', material: 'stone' },
+    [TileType.Tree]: { grade: 'yellow', material: 'bamboo' },
+    [TileType.Stone]: { grade: 'yellow', material: 'stone' },
+    [TileType.Door]: { grade: 'mortal', material: 'wood' },
+  },
+  black_iron_mine: {
+    [TileType.Wall]: { grade: 'mystic', material: 'blackIron' },
+    [TileType.Stone]: { grade: 'mystic', material: 'blackIron' },
+    [TileType.Door]: { grade: 'yellow', material: 'ironwood' },
+  },
+  ancient_ruins: {
+    [TileType.Wall]: { grade: 'mystic', material: 'runeStone' },
+    [TileType.Tree]: { grade: 'yellow', material: 'spiritWood' },
+    [TileType.Stone]: { grade: 'mystic', material: 'runeStone' },
+    [TileType.Door]: { grade: 'yellow', material: 'ironwood' },
+  },
+  spirit_ridge: {
+    [TileType.Wall]: { grade: 'earth', material: 'stone' },
+    [TileType.Tree]: { grade: 'mystic', material: 'spiritWood' },
+    [TileType.Stone]: { grade: 'earth', material: 'stone' },
+  },
+  beast_valley: {
+    [TileType.Wall]: { grade: 'earth', material: 'stone' },
+    [TileType.Tree]: { grade: 'yellow', material: 'wood' },
+    [TileType.Stone]: { grade: 'earth', material: 'stone' },
+  },
+  sky_ruins: {
+    [TileType.Wall]: { grade: 'earth', material: 'skyMetal' },
+    [TileType.Tree]: { grade: 'mystic', material: 'spiritWood' },
+    [TileType.Stone]: { grade: 'earth', material: 'skyMetal' },
+    [TileType.Door]: { grade: 'mystic', material: 'metal' },
+  },
+};
 
 export interface NpcLocation {
   mapId: string;
@@ -180,7 +244,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           type === TileType.Hill ||
           type === TileType.Mud ||
           type === TileType.Swamp;
-        const durability = this.tileDurability(type);
+        const durability = this.tileDurability(raw.id, type);
         return {
           type,
           walkable,
@@ -319,6 +383,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           nextQuestId?: string;
           requiredItemId?: string;
           requiredItemCount?: number;
+          unlockBreakthroughRequirementIds?: string[];
         };
         const objectiveType = rawQuest.objectiveType ?? 'kill';
         const required = Number.isInteger(rawQuest.required) ? rawQuest.required : rawQuest.targetCount;
@@ -406,6 +471,9 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           nextQuestId: typeof rawQuest.nextQuestId === 'string' ? rawQuest.nextQuestId : undefined,
           requiredItemId: typeof rawQuest.requiredItemId === 'string' ? rawQuest.requiredItemId : undefined,
           requiredItemCount: Number.isInteger(rawQuest.requiredItemCount) ? rawQuest.requiredItemCount : undefined,
+          unlockBreakthroughRequirementIds: Array.isArray(rawQuest.unlockBreakthroughRequirementIds)
+            ? rawQuest.unlockBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
+            : undefined,
         });
       }
 
@@ -701,19 +769,16 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return type === TileType.Wall || type === TileType.Tree || type === TileType.Stone;
   }
 
-  private tileDurability(type: TileType): number {
-    switch (type) {
-      case TileType.Wall:
-        return 48;
-      case TileType.Tree:
-        return 28;
-      case TileType.Stone:
-        return 36;
-      case TileType.Door:
-        return 20;
-      default:
-        return 0;
+  private tileDurability(mapId: string, type: TileType): number {
+    const profile = this.resolveTerrainDurabilityProfile(mapId, type);
+    if (!profile) {
+      return 0;
     }
+    return calculateTerrainDurability(profile.grade, profile.material);
+  }
+
+  private resolveTerrainDurabilityProfile(mapId: string, type: TileType): TerrainDurabilityProfile | undefined {
+    return MAP_TERRAIN_DURABILITY_OVERRIDES[mapId]?.[type] ?? DEFAULT_TERRAIN_DURABILITY_BY_TILE[type];
   }
 
   private destroyedTileType(type: TileType): TileType {

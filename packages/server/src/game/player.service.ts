@@ -99,6 +99,9 @@ export class PlayerService {
       equipment: (entity.equipment ?? { weapon: null, head: null, body: null, legs: null, accessory: null }) as EquipmentSlots,
       techniques: (entity.techniques ?? []) as TechniqueState[],
       quests: this.normalizeQuests((entity.quests ?? []) as QuestState[]),
+      revealedBreakthroughRequirementIds: Array.isArray(entity.revealedBreakthroughRequirementIds)
+        ? entity.revealedBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
+        : [],
       autoBattle: entity.autoBattle ?? false,
       autoBattleSkills: (entity.autoBattleSkills ?? []) as AutoBattleSkillConfig[],
       autoRetaliate: entity.autoRetaliate ?? true,
@@ -125,6 +128,7 @@ export class PlayerService {
     state.equipment = this.contentService.normalizeEquipment(state.equipment);
     if (!state.techniques) state.techniques = [];
     if (!state.quests) state.quests = [];
+    if (!state.revealedBreakthroughRequirementIds) state.revealedBreakthroughRequirementIds = [];
     if (state.autoBattle === undefined) state.autoBattle = false;
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
     if (state.autoRetaliate === undefined) state.autoRetaliate = true;
@@ -158,6 +162,7 @@ export class PlayerService {
       equipment: state.equipment as any,
       techniques: state.techniques as any,
       quests: state.quests as any,
+      revealedBreakthroughRequirementIds: state.revealedBreakthroughRequirementIds as any,
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
@@ -189,6 +194,7 @@ export class PlayerService {
       equipment: state.equipment as any,
       techniques: state.techniques as any,
       quests: state.quests as any,
+      revealedBreakthroughRequirementIds: state.revealedBreakthroughRequirementIds as any,
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
@@ -221,6 +227,7 @@ export class PlayerService {
       equipment: s.equipment as any,
       techniques: s.techniques as any,
       quests: s.quests as any,
+      revealedBreakthroughRequirementIds: s.revealedBreakthroughRequirementIds as any,
       autoBattle: s.autoBattle,
       autoBattleSkills: s.autoBattleSkills as any,
       autoRetaliate: s.autoRetaliate,

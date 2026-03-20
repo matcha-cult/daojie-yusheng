@@ -259,7 +259,7 @@ export class QuestPanel {
       return `切换到修炼状态，继续积累 ${quest.targetName}`;
     }
     if (quest.objectiveType === 'realm_stage') {
-      return `备齐突破条件并冲击 ${quest.targetName}`;
+      return `切换到修炼状态，继续提升至 ${quest.targetName}`;
     }
     return `前往击杀 ${quest.targetName}`;
   }

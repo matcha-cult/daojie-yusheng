@@ -48,10 +48,10 @@ export class HUD {
     if (player.realm && player.realm.progressToNext > 0) {
       const ratio = Math.min(1, player.realm.progress / player.realm.progressToNext);
       this.cultivateBar.style.width = `${Math.round(ratio * 100)}%`;
-      this.cultivateText.textContent = `修为 (${player.realm.progress}/${player.realm.progressToNext})`;
+      this.cultivateText.textContent = `境界经验 (${player.realm.progress}/${player.realm.progressToNext})`;
     } else {
       this.cultivateBar.style.width = '0%';
-      this.cultivateText.textContent = '修为 (0/0)';
+      this.cultivateText.textContent = '境界经验 (已满)';
     }
   }
 
