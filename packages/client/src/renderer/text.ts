@@ -99,6 +99,11 @@ interface AttackTrail {
   duration: number;
 }
 
+interface FloatingTextBurstOffset {
+  offsetX: number;
+  offsetY: number;
+}
+
 export class TextRenderer implements IRenderer {
   private ctx: CanvasRenderingContext2D | null = null;
   private entities: Map<string, AnimEntity> = new Map();
@@ -563,6 +568,19 @@ export class TextRenderer implements IRenderer {
     const cellSize = getCellSize();
 
     this.floatingTexts = this.floatingTexts.filter((entry) => now - entry.createdAt < entry.duration);
+    const groups = new Map<string, FloatingText[]>();
+    for (const entry of this.floatingTexts) {
+      const key = `${entry.x},${entry.y}`;
+      const group = groups.get(key);
+      if (group) {
+        group.push(entry);
+      } else {
+        groups.set(key, [entry]);
+      }
+    }
+    for (const group of groups.values()) {
+      group.sort((left, right) => left.createdAt - right.createdAt || left.id - right.id);
+    }
 
     for (const entry of this.floatingTexts) {
       const progress = Math.min(1, (now - entry.createdAt) / entry.duration);
@@ -572,13 +590,22 @@ export class TextRenderer implements IRenderer {
       const worldY = entry.y * cellSize;
       const { sx, sy } = camera.worldToScreen(worldX, worldY, sw, sh);
       if (sx + cellSize < 0 || sx > sw || sy + cellSize < 0 || sy > sh) continue;
+      const group = groups.get(`${entry.x},${entry.y}`) ?? [entry];
+      const index = group.findIndex((item) => item.id === entry.id);
+      const burst = this.getFloatingTextBurstOffset(index, group.length, cellSize);
 
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'alphabetic';
       ctx.font = `bold ${Math.max(14, cellSize * 0.45)}px "Noto Serif SC", serif`;
-      this.drawOutlinedText(entry.text, sx + cellSize / 2, sy - rise, entry.color, 'rgba(15,12,10,0.95)');
+      this.drawOutlinedText(
+        entry.text,
+        sx + cellSize / 2 + burst.offsetX,
+        sy - rise - burst.offsetY,
+        entry.color,
+        'rgba(15,12,10,0.95)',
+      );
       ctx.restore();
     }
   }
@@ -629,6 +656,19 @@ export class TextRenderer implements IRenderer {
     this.pathTargetKey = null;
     this.floatingTexts = [];
     this.attackTrails = [];
+  }
+
+  private getFloatingTextBurstOffset(index: number, count: number, cellSize: number): FloatingTextBurstOffset {
+    if (count <= 1 || index < 0) {
+      return { offsetX: 0, offsetY: 0 };
+    }
+    const horizontalStep = cellSize * 0.3;
+    const verticalStep = cellSize * 0.12;
+    const centeredIndex = index - (count - 1) / 2;
+    return {
+      offsetX: centeredIndex * horizontalStep,
+      offsetY: Math.abs(centeredIndex) * verticalStep,
+    };
   }
 
   private renderPathArrows(camera: Camera, visibleTiles: Set<string>, playerX: number, playerY: number) {
