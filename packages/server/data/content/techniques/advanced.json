@@ -21,21 +21,39 @@
       {
         "id": "skill.fire_talisman",
         "name": "离火符",
-        "desc": "引燃符火，攻击三格内的目标。",
-        "cooldown": 24,
+        "desc": "符火先灼其表、再侵其脉，灼印叠得越多，后续火行越烈。",
+        "cooldown": 22,
         "cost": 8,
         "range": 3,
         "effects": [
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "fire",
             "formula": {
               "op": "add",
               "args": [
-                26,
+                24,
                 { "var": "techLevel", "scale": 2.5 },
-                { "var": "caster.stat.spellAtk", "scale": 1.1 }
+                { "var": "caster.stat.spellAtk", "scale": 1.05 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.fire_talisman_burn",
+            "name": "灼印",
+            "desc": "火印未熄，法抗与化解被持续灼穿。",
+            "shortMark": "灼",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#ef6b3b",
+            "duration": 4,
+            "maxStacks": 3,
+            "stats": {
+              "spellDef": -10,
+              "resolvePower": -15
             }
           }
         ],
@@ -67,8 +85,8 @@
       {
         "id": "skill.thunder_palm",
         "name": "惊雷掌",
-        "desc": "掌心引雷，重创近中距离目标。",
-        "cooldown": 40,
+        "desc": "雷势先蓄于掌，再借下一掌骤然炸开，越打越容易破招暴击。",
+        "cooldown": 34,
         "cost": 10,
         "range": 2,
         "targeting": {
@@ -79,14 +97,33 @@
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "metal",
             "formula": {
               "op": "add",
               "args": [
-                24,
+                20,
                 { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.spellAtk", "scale": 1.05 },
-                { "var": "target.stat.physDef", "scale": 0.3 }
+                { "var": "caster.stat.spellAtk", "scale": 0.95 },
+                { "var": "caster.stat.breakPower", "scale": 0.6 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.thunder_palm_force",
+            "name": "雷势",
+            "desc": "掌中余雷未散，提高命中、破招与暴击。",
+            "shortMark": "雷",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#d6c34a",
+            "duration": 3,
+            "maxStacks": 2,
+            "stats": {
+              "hit": 12,
+              "crit": 35,
+              "breakPower": 18
             }
           }
         ],
@@ -116,8 +153,8 @@
       {
         "id": "skill.cloud_cut",
         "name": "流云断",
-        "desc": "刀势如云，斩击两格内目标。",
-        "cooldown": 20,
+        "desc": "先以云势起刀，再以步伐藏锋，越灵动，下一式越难防。",
+        "cooldown": 18,
         "cost": 7,
         "range": 2,
         "targeting": {
@@ -131,10 +168,29 @@
             "formula": {
               "op": "add",
               "args": [
-                20,
-                { "var": "techLevel", "scale": 2.5 },
-                { "var": "caster.stat.physAtk", "scale": 1.05 }
+                18,
+                { "var": "techLevel", "scale": 2.4 },
+                { "var": "caster.stat.physAtk", "scale": 1.0 },
+                { "var": "caster.stat.moveSpeed", "scale": 2.5 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.cloud_blade_flow",
+            "name": "流云",
+            "desc": "刀随身走，短时间提升移速、闪避与暴击。",
+            "shortMark": "云",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#b7c7da",
+            "duration": 3,
+            "maxStacks": 2,
+            "stats": {
+              "moveSpeed": 1,
+              "dodge": 15,
+              "crit": 20
             }
           }
         ],
@@ -143,8 +199,8 @@
       {
         "id": "skill.dragon_turn",
         "name": "回龙转锋",
-        "desc": "连环变招，重创三格内目标。",
-        "cooldown": 40,
+        "desc": "借流云余势转身再斩，步法越疾，回锋越狠。",
+        "cooldown": 36,
         "cost": 12,
         "range": 3,
         "targeting": {
@@ -159,10 +215,11 @@
             "formula": {
               "op": "add",
               "args": [
-                28,
-                { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.physAtk", "scale": 1.15 },
-                { "var": "target.maxHp", "scale": 0.02 }
+                24,
+                { "var": "techLevel", "scale": 3.1 },
+                { "var": "caster.stat.physAtk", "scale": 1.1 },
+                { "var": "caster.stat.moveSpeed", "scale": 5 },
+                { "var": "target.maxHp", "scale": 0.015 }
               ]
             }
           }
@@ -195,21 +252,40 @@
       {
         "id": "skill.frost_mark",
         "name": "霜痕",
-        "desc": "冰灵附刃，远距点杀目标。",
-        "cooldown": 24,
+        "desc": "先在目标体表凝出寒痕，再以后续寒诀层层压制。",
+        "cooldown": 22,
         "cost": 8,
         "range": 3,
         "effects": [
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "water",
             "formula": {
               "op": "add",
               "args": [
-                26,
-                { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.spellAtk", "scale": 1.2 }
+                20,
+                { "var": "techLevel", "scale": 2.7 },
+                { "var": "caster.stat.spellAtk", "scale": 1.0 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.frost_mark_chill",
+            "name": "寒痕",
+            "desc": "寒意黏身，法抗、闪避与命中同步走低。",
+            "shortMark": "寒",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#63b9d7",
+            "duration": 4,
+            "maxStacks": 3,
+            "stats": {
+              "spellDef": -8,
+              "dodge": -15,
+              "hit": -12
             }
           }
         ],
@@ -218,8 +294,8 @@
       {
         "id": "skill.cold_moon_seal",
         "name": "寒月印",
-        "desc": "凝寒印镇压四格内敌手。",
-        "cooldown": 50,
+        "desc": "凝寒月印覆压一片敌手，让寒痕迅速蔓延。",
+        "cooldown": 46,
         "cost": 13,
         "range": 4,
         "targeting": {
@@ -231,14 +307,32 @@
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "water",
             "formula": {
               "op": "add",
               "args": [
-                34,
-                { "var": "techLevel", "scale": 3.5 },
-                { "var": "caster.stat.spellAtk", "scale": 1.15 },
-                { "var": "target.maxHp", "scale": 0.03 }
+                28,
+                { "var": "techLevel", "scale": 3.3 },
+                { "var": "caster.stat.spellAtk", "scale": 1.05 },
+                { "var": "target.maxHp", "scale": 0.025 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.cold_moon_bind",
+            "name": "寒凝",
+            "desc": "重寒压体，进一步削弱闪避与破招。",
+            "shortMark": "凝",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#7bd6f5",
+            "duration": 3,
+            "maxStacks": 2,
+            "stats": {
+              "dodge": -20,
+              "breakPower": -16
             }
           }
         ],

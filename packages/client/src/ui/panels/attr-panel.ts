@@ -569,11 +569,6 @@ export class AttrPanel {
       .attr-tooltip {
         position: fixed;
         pointer-events: none;
-        background: rgba(255,255,255,0.96);
-        border: 1px solid rgba(34,26,19,0.15);
-        padding: 8px 12px;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
         font-size: 13px;
         color: #1a120a;
         z-index: 2000;
@@ -581,16 +576,27 @@ export class AttrPanel {
         opacity: 0;
         transform: translateY(-8px);
         font-family: var(--font-text);
-        min-width: 140px;
+        min-width: 0;
       }
       .attr-tooltip.visible {
         opacity: 1;
+      }
+      .attr-tooltip .floating-tooltip-shell {
+        display: block;
+        max-width: min(320px, calc(100vw - 24px));
       }
       .attr-tooltip .floating-tooltip-body {
         display: flex;
         flex-direction: column;
         gap: 4px;
         line-height: 1.35;
+        min-width: 140px;
+        max-width: min(320px, calc(100vw - 24px));
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(34,26,19,0.15);
+        background: rgba(255,255,255,0.96);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
       }
       .attr-tooltip .floating-tooltip-body strong {
         font-weight: 600;

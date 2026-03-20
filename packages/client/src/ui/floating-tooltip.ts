@@ -9,6 +9,12 @@ function escapeHtml(value: string): string {
 
 interface FloatingTooltipShowOptions {
   allowHtml?: boolean;
+  asideCards?: Array<{
+    mark?: string;
+    title: string;
+    lines: string[];
+    tone?: 'buff' | 'debuff';
+  }>;
 }
 
 export class FloatingTooltip {
@@ -28,7 +34,22 @@ export class FloatingTooltip {
     const renderedContent = content
       .map((line) => `<span class="floating-tooltip-line">${options?.allowHtml ? line : escapeHtml(line)}</span>`)
       .join('');
-    this.el.innerHTML = `<div class="floating-tooltip-body"><strong>${escapeHtml(title)}</strong>${content.length > 0 ? `<div class="floating-tooltip-detail">${renderedContent}</div>` : ''}</div>`;
+    const asideCards = options?.asideCards ?? [];
+    const renderedAside = asideCards.length > 0
+      ? `<div class="floating-tooltip-aside">${asideCards.map((card) => {
+        const detail = card.lines
+          .map((line) => `<span class="floating-tooltip-aside-line">${escapeHtml(line)}</span>`)
+          .join('');
+        return `<div class="floating-tooltip-aside-card ${card.tone === 'debuff' ? 'debuff' : 'buff'}">
+          <div class="floating-tooltip-aside-head">
+            ${card.mark ? `<span class="floating-tooltip-aside-mark">${escapeHtml(card.mark)}</span>` : ''}
+            <strong>${escapeHtml(card.title)}</strong>
+          </div>
+          ${detail ? `<div class="floating-tooltip-aside-detail">${detail}</div>` : ''}
+        </div>`;
+      }).join('')}</div>`
+      : '';
+    this.el.innerHTML = `<div class="floating-tooltip-shell"><div class="floating-tooltip-body"><strong>${escapeHtml(title)}</strong>${content.length > 0 ? `<div class="floating-tooltip-detail">${renderedContent}</div>` : ''}</div>${renderedAside}</div>`;
     this.el.classList.add('visible');
     this.move(clientX, clientY);
   }

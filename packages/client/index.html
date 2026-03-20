@@ -960,16 +960,16 @@
       letter-spacing: 1px;
     }
     .observe-buff-list {
-      display: grid;
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
     }
     .observe-buff-chip {
-      display: grid;
-      grid-template-columns: 28px minmax(0, 1fr) auto;
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      width: 100%;
-      padding: 8px 10px;
+      gap: 6px;
+      max-width: 100%;
+      padding: 6px 8px;
       border: 1px solid rgba(44, 47, 51, 0.14);
       background: rgba(255,255,255,0.78);
       text-align: left;
@@ -995,24 +995,20 @@
       font-size: 14px;
       line-height: 1;
     }
-    .observe-buff-main {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      gap: 2px;
-    }
     .observe-buff-name {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: bold;
       color: var(--ink-black);
+      line-height: 1.2;
+      white-space: nowrap;
     }
     .observe-buff-duration {
       font-size: 11px;
       color: var(--ink-grey);
     }
     .observe-buff-stack {
-      min-width: 20px;
-      padding: 2px 6px;
+      min-width: 16px;
+      padding: 1px 5px;
       border-radius: 999px;
       background: rgba(31, 26, 20, 0.1);
       color: var(--ink-black);
@@ -1713,27 +1709,35 @@
     .floating-tooltip {
       position: fixed;
       pointer-events: none;
-      background: rgba(255,255,255,0.96);
-      border: 1px solid rgba(34,26,19,0.15);
-      padding: 8px 12px;
-      border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
       font-size: 13px;
       color: #1a120a;
       z-index: 2000;
       opacity: 0;
       transition: opacity 120ms ease;
-      min-width: 180px;
-      max-width: min(320px, calc(100vw - 24px));
+      min-width: 0;
+      max-width: calc(100vw - 24px);
     }
     .floating-tooltip.visible {
       opacity: 1;
+    }
+    .floating-tooltip-shell {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      max-width: min(720px, calc(100vw - 24px));
     }
     .floating-tooltip-body {
       display: flex;
       flex-direction: column;
       gap: 4px;
       line-height: 1.45;
+      min-width: 180px;
+      max-width: min(360px, calc(100vw - 24px));
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(34,26,19,0.15);
+      background: rgba(255,255,255,0.96);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
     }
     .floating-tooltip-detail {
       display: flex;
@@ -1742,6 +1746,56 @@
       color: #5c5349;
     }
     .floating-tooltip-line {
+      display: block;
+    }
+    .floating-tooltip-aside {
+      display: grid;
+      gap: 8px;
+      width: min(220px, calc(100vw - 24px));
+      flex: 0 0 auto;
+    }
+    .floating-tooltip-aside-card {
+      display: grid;
+      gap: 4px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(34,26,19,0.12);
+      background: rgba(248, 245, 238, 0.98);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    }
+    .floating-tooltip-aside-card.buff {
+      box-shadow: inset 3px 0 0 rgba(69, 147, 93, 0.72), 0 8px 18px rgba(0,0,0,0.12);
+    }
+    .floating-tooltip-aside-card.debuff {
+      box-shadow: inset 3px 0 0 rgba(176, 68, 49, 0.72), 0 8px 18px rgba(0,0,0,0.12);
+    }
+    .floating-tooltip-aside-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #1f1710;
+    }
+    .floating-tooltip-aside-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(22, 17, 13, 0.88);
+      color: #f7efda;
+      font-size: 11px;
+      line-height: 1;
+      font-family: var(--font-heading-sub);
+    }
+    .floating-tooltip-aside-detail {
+      display: grid;
+      gap: 2px;
+      color: #5c5349;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .floating-tooltip-aside-line {
       display: block;
     }
     .skill-tooltip-desc {
@@ -1754,6 +1808,40 @@
     .skill-tooltip-note {
       color: #8a7766;
       font-size: 12px;
+    }
+    .skill-tooltip-buff-entry {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(34, 26, 19, 0.06);
+      color: #2f241b;
+      font-weight: 600;
+    }
+    .skill-tooltip-buff-entry.debuff {
+      background: rgba(176, 68, 49, 0.1);
+    }
+    .skill-tooltip-buff-entry.buff {
+      background: rgba(69, 147, 93, 0.1);
+    }
+    .skill-tooltip-buff-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(22, 17, 13, 0.88);
+      color: #f7efda;
+      font-size: 11px;
+      line-height: 1;
+      font-family: var(--font-heading-sub);
+    }
+    .skill-tooltip-buff-meta {
+      color: #6c5b4b;
+      font-size: 12px;
+      font-weight: 500;
     }
     .skill-formula-breakdown {
       color: #5c5349;
@@ -2122,6 +2210,43 @@
     }
     .action-tab-pane.active {
       display: block;
+    }
+    .action-skill-subtabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .action-skill-subtab-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 8px;
+      border: 1px solid var(--wash-ink);
+      background: rgba(255,255,255,0.46);
+      color: var(--ink-grey);
+      font-family: var(--font-heading-sub);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .action-skill-subtab-btn:hover {
+      background: var(--highlight);
+      color: var(--ink-black);
+    }
+    .action-skill-subtab-btn.active {
+      border-color: var(--stamp-red);
+      background: rgba(125, 27, 27, 0.08);
+      color: var(--stamp-red);
+      box-shadow: inset 0 -2px 0 var(--stamp-red);
+    }
+    .action-skill-subtab-count {
+      min-width: 16px;
+      padding: 1px 5px;
+      border: 1px solid currentColor;
+      font-size: 11px;
+      line-height: 1.1;
     }
 
     .world-hero {

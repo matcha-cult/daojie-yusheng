@@ -118,23 +118,6 @@ const DEFAULT_MONSTER_RATIO_DIVISORS: NumericRatioDivisors = {
     earth: DEFAULT_RATIO_DIVISOR,
   },
 };
-const SKILL_ELEMENTS: Partial<Record<string, ElementKey>> = {
-  'skill.qingmu_slash': 'wood',
-  'skill.fire_talisman': 'fire',
-  'skill.wind_edge': 'wood',
-  'skill.thunder_palm': 'metal',
-  'skill.stillheart_seal': 'earth',
-  'skill.iron_bone_strike': 'earth',
-  'skill.iron_guard_roar': 'earth',
-  'skill.cloud_cut': 'metal',
-  'skill.dragon_turn': 'metal',
-  'skill.frost_mark': 'water',
-  'skill.cold_moon_seal': 'water',
-  'skill.anchor_pulse': 'earth',
-  'skill.soul_chain': 'earth',
-  'skill.starfall_thrust': 'metal',
-  'skill.meteor_break': 'fire',
-};
 const OBSERVATION_FULL_RATIO = 1.2;
 const OBSERVATION_BLIND_RATIO = 0.2;
 const NPC_ROLE_PROFILES: Record<string, { title: string; spirit: number; hp: number; qi: number }> = {
@@ -527,7 +510,7 @@ export class WorldService {
           };
           const baseDamage = Math.max(1, Math.round(this.evaluateSkillFormula(effect.formula, context)));
           const update = target.kind === 'monster'
-            ? this.attackMonster(player, target.monster, baseDamage, `${skill.name}击中`, effect.damageKind ?? 'spell', skill, qiCost)
+            ? this.attackMonster(player, target.monster, baseDamage, `${skill.name}击中`, effect.damageKind ?? 'spell', effect.element, qiCost)
             : this.attackTerrain(player, target.x, target.y, baseDamage, skill.name, target.tileType ?? '目标');
           result.messages.push(...update.messages);
           for (const flag of update.dirty) {
@@ -721,6 +704,8 @@ export class WorldService {
         sourceSkillId: buff.sourceSkillId,
         sourceSkillName: buff.sourceSkillName,
         color: buff.color,
+        attrs: buff.attrs,
+        stats: buff.stats,
       }));
     return visible.length > 0 ? visible : undefined;
   }
@@ -1097,10 +1082,10 @@ export class WorldService {
     baseDamage: number,
     prefix: string,
     damageKind: SkillDamageKind = 'physical',
-    skill?: SkillDef,
+    element?: ElementKey,
     qiCost = 0,
   ): WorldUpdate {
-    const resolved = this.resolvePlayerAttack(player, monster, baseDamage, damageKind, skill, qiCost);
+    const resolved = this.resolvePlayerAttack(player, monster, baseDamage, damageKind, element, qiCost);
 
     this.pushEffect(player.mapId, {
       type: 'attack',
@@ -1169,15 +1154,13 @@ export class WorldService {
     monster: RuntimeMonster,
     baseDamage: number,
     damageKind: SkillDamageKind,
-    skill?: SkillDef,
+    element: ElementKey | undefined,
     qiCost = 0,
   ): ResolvedHit {
     const attacker = this.getPlayerCombatSnapshot(player);
     const defender = this.getMonsterCombatSnapshot(monster);
-    const rawDamage = skill
-      ? baseDamage
-      : baseDamage + (damageKind === 'physical' ? attacker.stats.physAtk : attacker.stats.spellAtk);
-    return this.resolveHit(attacker, defender, rawDamage, damageKind, qiCost, skill ? SKILL_ELEMENTS[skill.id] : undefined, (damage) => {
+    const rawDamage = baseDamage;
+    return this.resolveHit(attacker, defender, rawDamage, damageKind, qiCost, element, (damage) => {
       monster.hp = Math.max(0, monster.hp - damage);
     });
   }

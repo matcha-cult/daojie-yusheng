@@ -1,7 +1,10 @@
 import { ActionDef, AutoBattleSkillConfig, PlayerState, SkillDef } from '@mud/shared';
 import { FloatingTooltip } from '../floating-tooltip';
-import { buildSkillTooltipLines } from '../skill-tooltip';
+import { buildSkillTooltipContent } from '../skill-tooltip';
 import { preserveSelection } from '../selection-preserver';
+
+type ActionMainTab = 'dialogue' | 'skill' | 'toggle';
+type SkillSubTab = 'auto' | 'manual';
 
 const TYPE_NAMES: Record<string, string> = {
   skill: '技能',
@@ -37,7 +40,8 @@ export class ActionPanel {
   private pane = document.getElementById('pane-action')!;
   private onAction: ((actionId: string, requiresTarget?: boolean, targetMode?: string, range?: number, actionName?: string) => void) | null = null;
   private onUpdateAutoBattleSkills: ((skills: AutoBattleSkillConfig[]) => void) | null = null;
-  private activeTab: 'dialogue' | 'skill' | 'toggle' = 'dialogue';
+  private activeTab: ActionMainTab = 'dialogue';
+  private activeSkillTab: SkillSubTab = 'auto';
   private autoBattle = false;
   private autoRetaliate = true;
   private currentActions: ActionDef[] = [];
@@ -117,7 +121,7 @@ export class ActionPanel {
     }
 
     const tabGroups: Array<{
-      id: 'dialogue' | 'skill' | 'toggle';
+      id: ActionMainTab;
       label: string;
       types: string[];
     }> = [
@@ -131,6 +135,7 @@ export class ActionPanel {
       list.push(action);
       groups.set(action.type, list);
     }
+    const autoBattleDisplayOrders = this.buildAutoBattleDisplayOrderMap(actions);
 
     let html = `<div class="panel-section">
       <div class="panel-section-title">战斗开关</div>
@@ -198,19 +203,14 @@ export class ActionPanel {
       } else {
         for (const type of relevantTypes) {
           const entries = groups.get(type) ?? [];
+          if (type === 'skill') {
+            html += this.renderSkillSection(entries, autoBattleDisplayOrders);
+            continue;
+          }
           html += `<div class="panel-section">
             <div class="panel-section-title">${TYPE_NAMES[type] || type}</div>`;
-          if (type === 'skill') {
-            html += '<div class="action-section-hint">自动战斗会按列表从上到下尝试已启用技能，可直接拖拽调整优先级。</div>';
-          }
-          if (type === 'skill') {
-            html += '<div class="action-skill-list">';
-          }
           for (const action of entries) {
             html += this.renderActionItem(action);
-          }
-          if (type === 'skill') {
-            html += '</div>';
           }
           html += '</div>';
         }
@@ -228,9 +228,17 @@ export class ActionPanel {
   private bindEvents(actions: ActionDef[]): void {
     this.pane.querySelectorAll<HTMLElement>('[data-action-tab]').forEach((button) => {
       button.addEventListener('click', () => {
-        const tab = button.dataset.actionTab as 'dialogue' | 'skill' | 'toggle' | undefined;
+        const tab = button.dataset.actionTab as ActionMainTab | undefined;
         if (!tab) return;
         this.activeTab = tab;
+        this.render(actions);
+      });
+    });
+    this.pane.querySelectorAll<HTMLElement>('[data-action-skill-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const tab = button.dataset.actionSkillTab as SkillSubTab | undefined;
+        if (!tab) return;
+        this.activeSkillTab = tab;
         this.render(actions);
       });
     });
@@ -326,11 +334,18 @@ export class ActionPanel {
   private bindTooltips(): void {
     this.pane.querySelectorAll<HTMLElement>('[data-action-tooltip-title]').forEach((node) => {
       const title = node.dataset.actionTooltipTitle ?? '';
-      const detail = node.dataset.actionTooltipDetail ?? '';
       const rich = node.dataset.actionTooltipRich === '1';
-      const lines = detail.split('\n');
+      const skillId = node.dataset.actionTooltipSkillId ?? '';
+      const skillContext = skillId ? this.skillLookup.get(skillId) : undefined;
       node.addEventListener('pointerenter', (event) => {
-        this.tooltip.show(title, lines, event.clientX, event.clientY, { allowHtml: rich });
+        const tooltip = skillContext ? buildSkillTooltipContent(skillContext.skill, {
+          techLevel: skillContext.techLevel,
+          player: this.previewPlayer,
+        }) : { lines: [], asideCards: [] };
+        this.tooltip.show(title, tooltip.lines, event.clientX, event.clientY, {
+          allowHtml: rich,
+          asideCards: tooltip.asideCards,
+        });
       });
       node.addEventListener('pointermove', (event) => {
         this.tooltip.move(event.clientX, event.clientY);
@@ -434,20 +449,24 @@ export class ActionPanel {
     return result;
   }
 
-  private renderActionItem(action: ActionDef): string {
+  private renderActionItem(
+    action: ActionDef,
+    options?: {
+      showDragHandle?: boolean;
+      autoBattleDisplayOrder?: number | null;
+    },
+  ): string {
     const onCd = action.cooldownLeft > 0;
     const isAutoBattleSkill = action.type === 'skill';
     const skillContext = this.skillLookup.get(action.id);
-    const tooltipLines = skillContext ? buildSkillTooltipLines(skillContext.skill, {
-      techLevel: skillContext.techLevel,
-      player: this.previewPlayer,
-    }) : [];
     const tooltipAttrs = skillContext
-      ? ` data-action-tooltip-title="${escapeHtml(skillContext.skill.name)}" data-action-tooltip-detail="${escapeHtml(tooltipLines.join('\n'))}" data-action-tooltip-rich="1"`
+      ? ` data-action-tooltip-title="${escapeHtml(skillContext.skill.name)}" data-action-tooltip-skill-id="${escapeHtml(skillContext.skill.id)}" data-action-tooltip-rich="1"`
       : '';
     const autoBattleEnabled = action.autoBattleEnabled !== false;
-    const autoBattleOrder = typeof action.autoBattleOrder === 'number' ? action.autoBattleOrder + 1 : undefined;
-    const rowAttrs = isAutoBattleSkill
+    const autoBattleOrder = typeof options?.autoBattleDisplayOrder === 'number'
+      ? options.autoBattleDisplayOrder + 1
+      : undefined;
+    const rowAttrs = isAutoBattleSkill && options?.showDragHandle
       ? ` data-auto-battle-skill-row="${action.id}"`
       : '';
     const autoBattleMeta = isAutoBattleSkill
@@ -456,7 +475,7 @@ export class ActionPanel {
       : '';
     const autoBattleControls = isAutoBattleSkill
       ? `<button class="small-btn ghost ${autoBattleEnabled ? 'active' : ''}" data-auto-battle-toggle="${action.id}" type="button">${autoBattleEnabled ? '自动 开' : '自动 关'}</button>
-         <button class="small-btn ghost action-drag-handle" data-auto-battle-drag="${action.id}" draggable="true" type="button">拖拽</button>`
+         ${options?.showDragHandle ? `<button class="small-btn ghost action-drag-handle" data-auto-battle-drag="${action.id}" draggable="true" type="button">拖拽</button>` : ''}`
       : '';
 
     return `<div class="action-item ${onCd ? 'cooldown' : ''} ${isAutoBattleSkill ? 'action-item-draggable' : ''}" data-action-row="${action.id}"${rowAttrs}>
@@ -483,6 +502,10 @@ export class ActionPanel {
   }
 
   private toggleAutoBattleSkill(actionId: string): void {
+    const current = this.currentActions.find((action) => action.id === actionId && action.type === 'skill');
+    if (current && current.autoBattleEnabled !== false) {
+      this.activeSkillTab = 'manual';
+    }
     this.applyAutoBattleSkillMutation((skills) => skills.map((action) => (
       action.id === actionId
         ? { ...action, autoBattleEnabled: action.autoBattleEnabled === false }
@@ -592,6 +615,7 @@ export class ActionPanel {
   }
 
   private patchActionRows(): boolean {
+    const autoBattleDisplayOrders = this.buildAutoBattleDisplayOrderMap(this.currentActions);
     for (const action of this.currentActions) {
       if (
         action.id === 'toggle:auto_battle'
@@ -602,6 +626,9 @@ export class ActionPanel {
       }
       const row = this.pane.querySelector<HTMLElement>(`[data-action-row="${CSS.escape(action.id)}"]`);
       if (!row) {
+        if (action.type === 'skill') {
+          continue;
+        }
         return false;
       }
       const onCd = action.cooldownLeft > 0;
@@ -625,17 +652,72 @@ export class ActionPanel {
           return false;
         }
         const enabled = action.autoBattleEnabled !== false;
-        const order = typeof action.autoBattleOrder === 'number' ? action.autoBattleOrder + 1 : null;
+        const showOrder = this.activeSkillTab === 'auto' && enabled;
+        const order = showOrder ? (autoBattleDisplayOrders.get(action.id) ?? null) : null;
         stateNode.textContent = enabled ? '自动已启用' : '自动已停用';
         stateNode.classList.toggle('auto-battle-enabled', enabled);
         stateNode.classList.toggle('auto-battle-disabled', !enabled);
         orderNode.hidden = order === null;
-        orderNode.textContent = order === null ? '' : `顺位 ${order}`;
+        orderNode.textContent = order === null ? '' : `顺位 ${order + 1}`;
         toggleNode.classList.toggle('active', enabled);
         toggleNode.textContent = enabled ? '自动 开' : '自动 关';
       }
     }
 
     return true;
+  }
+
+  private renderSkillSection(actions: ActionDef[], autoBattleDisplayOrders: Map<string, number>): string {
+    const autoSkills = actions.filter((action) => action.autoBattleEnabled !== false);
+    const manualSkills = actions.filter((action) => action.autoBattleEnabled === false);
+    const visibleSkills = this.activeSkillTab === 'auto' ? autoSkills : manualSkills;
+    const hint = this.activeSkillTab === 'auto'
+      ? '自动战斗会按列表从上到下尝试已启用技能，可直接拖拽调整优先级。'
+      : '这里的技能不会参与自动战斗，但仍可手动点击或使用绑定键触发。';
+
+    let html = `<div class="panel-section">
+      <div class="panel-section-title">技能</div>
+      <div class="action-skill-subtabs">
+        <button class="action-skill-subtab-btn ${this.activeSkillTab === 'auto' ? 'active' : ''}" data-action-skill-tab="auto" type="button">
+          自动
+          <span class="action-skill-subtab-count">${autoSkills.length}</span>
+        </button>
+        <button class="action-skill-subtab-btn ${this.activeSkillTab === 'manual' ? 'active' : ''}" data-action-skill-tab="manual" type="button">
+          手动
+          <span class="action-skill-subtab-count">${manualSkills.length}</span>
+        </button>
+      </div>
+      <div class="action-section-hint">${hint}</div>`;
+
+    if (visibleSkills.length === 0) {
+      html += `<div class="empty-hint">${this.activeSkillTab === 'auto' ? '当前没有启用自动战斗的技能' : '当前没有仅手动触发的技能'}</div>`;
+    } else {
+      html += '<div class="action-skill-list">';
+      for (const action of visibleSkills) {
+        html += this.renderActionItem(action, {
+          showDragHandle: this.activeSkillTab === 'auto',
+          autoBattleDisplayOrder: this.activeSkillTab === 'auto'
+            ? (autoBattleDisplayOrders.get(action.id) ?? null)
+            : null,
+        });
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  private buildAutoBattleDisplayOrderMap(actions: ActionDef[]): Map<string, number> {
+    const displayOrder = new Map<string, number>();
+    let nextOrder = 0;
+    for (const action of actions) {
+      if (action.type !== 'skill' || action.autoBattleEnabled === false) {
+        continue;
+      }
+      displayOrder.set(action.id, nextOrder);
+      nextOrder += 1;
+    }
+    return displayOrder;
   }
 }

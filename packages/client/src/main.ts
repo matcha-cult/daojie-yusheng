@@ -30,6 +30,7 @@ import {
   manhattanDistance,
   PlayerState,
   RenderEntity,
+  NUMERIC_SCALAR_STAT_KEYS,
   SkillDef,
   Tile,
   TileType,
@@ -117,6 +118,42 @@ const ENTITY_KIND_NAMES: Record<string, string> = {
   player: '修士',
   monster: '妖兽',
   npc: '人物',
+};
+
+const ATTR_LABELS = {
+  constitution: '体魄',
+  spirit: '神识',
+  perception: '身法',
+  talent: '根骨',
+  comprehension: '悟性',
+  luck: '气运',
+} as const;
+
+const NUMERIC_STAT_LABELS: Partial<Record<(typeof NUMERIC_SCALAR_STAT_KEYS)[number], string>> = {
+  maxHp: '最大生命',
+  maxQi: '最大灵力',
+  physAtk: '物理攻击',
+  spellAtk: '法术攻击',
+  physDef: '物理防御',
+  spellDef: '法术防御',
+  hit: '命中',
+  dodge: '闪避',
+  crit: '暴击',
+  critDamage: '暴击伤害',
+  breakPower: '破招',
+  resolvePower: '化解',
+  maxQiOutputPerTick: '灵力输出',
+  qiRegenRate: '灵力回复',
+  hpRegenRate: '生命回复',
+  cooldownSpeed: '冷却速度',
+  auraCostReduce: '灵耗减免',
+  auraPowerRate: '术法增幅',
+  playerExpRate: '角色经验',
+  techniqueExpRate: '功法经验',
+  lootRate: '掉落增幅',
+  rareLootRate: '稀有掉落',
+  viewRange: '视野',
+  moveSpeed: '移动速度',
 };
 
 type ObservedEntity = {
@@ -324,6 +361,41 @@ function formatBuffDuration(buff: VisibleBuffState): string {
   return `${Math.max(0, Math.round(buff.remainingTicks))} / ${Math.max(1, Math.round(buff.duration))} 息`;
 }
 
+function formatSignedValue(value: number): string {
+  return `${value >= 0 ? '+' : ''}${Math.round(value * 100) / 100}`;
+}
+
+function buildBuffEffectLines(buff: VisibleBuffState): string[] {
+  const lines: string[] = [];
+  if (buff.attrs) {
+    for (const [key, value] of Object.entries(buff.attrs)) {
+      if (typeof value !== 'number' || value === 0) continue;
+      const label = ATTR_LABELS[key as keyof typeof ATTR_LABELS] ?? key;
+      lines.push(`${label} ${formatSignedValue(value)}`);
+    }
+  }
+  if (buff.stats) {
+    for (const key of NUMERIC_SCALAR_STAT_KEYS) {
+      const value = buff.stats[key];
+      if (typeof value !== 'number' || value === 0) continue;
+      lines.push(`${NUMERIC_STAT_LABELS[key] ?? key} ${formatSignedValue(value)}`);
+    }
+    if (buff.stats.elementDamageBonus) {
+      for (const [key, value] of Object.entries(buff.stats.elementDamageBonus)) {
+        if (typeof value !== 'number' || value === 0) continue;
+        lines.push(`${key}行增伤 ${formatSignedValue(value)}`);
+      }
+    }
+    if (buff.stats.elementDamageReduce) {
+      for (const [key, value] of Object.entries(buff.stats.elementDamageReduce)) {
+        if (typeof value !== 'number' || value === 0) continue;
+        lines.push(`${key}行减伤 ${formatSignedValue(value)}`);
+      }
+    }
+  }
+  return lines;
+}
+
 function buildBuffTooltipLines(buff: VisibleBuffState): string[] {
   const lines = [
     `类别：${buff.category === 'debuff' ? '减益' : '增益'}`,
@@ -335,6 +407,10 @@ function buildBuffTooltipLines(buff: VisibleBuffState): string[] {
   if (buff.sourceSkillName || buff.sourceSkillId) {
     lines.push(`来源：${buff.sourceSkillName ?? buff.sourceSkillId}`);
   }
+  const effectLines = buildBuffEffectLines(buff);
+  if (effectLines.length > 0) {
+    lines.push(`效果：${effectLines.join('，')}`);
+  }
   if (buff.desc) {
     lines.push(buff.desc);
   }
@@ -345,17 +421,14 @@ function buildBuffBadgeHtml(buff: VisibleBuffState): string {
   const title = escapeHtml(buff.name);
   const detail = escapeHtml(buildBuffTooltipLines(buff).join('\n'));
   const stackText = buff.maxStacks > 1 ? `<span class="observe-buff-stack">${buff.stacks}</span>` : '';
-  const durationText = `<span class="observe-buff-duration">${escapeHtml(formatBuffDuration(buff))}</span>`;
   const className = buff.category === 'debuff' ? 'observe-buff-chip debuff' : 'observe-buff-chip buff';
   return `<button class="${className}"
     type="button"
     data-buff-tooltip-title="${title}"
     data-buff-tooltip-detail="${detail}">
     <span class="observe-buff-mark">${escapeHtml(buff.shortMark)}</span>
-    <span class="observe-buff-main">
-      <span class="observe-buff-name">${escapeHtml(buff.name)}</span>
-      ${durationText}
-    </span>
+    <span class="observe-buff-name">${escapeHtml(buff.name)}</span>
+    <span class="observe-buff-duration">${escapeHtml(formatBuffDuration(buff))}</span>
     ${stackText}
   </button>`;
 }

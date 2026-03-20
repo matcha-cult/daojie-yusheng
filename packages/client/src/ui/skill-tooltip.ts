@@ -1,4 +1,4 @@
-import { NumericScalarStatKey, SkillDef, SkillFormula, SkillFormulaVar } from '@mud/shared';
+import { ElementKey, NumericScalarStatKey, NUMERIC_SCALAR_STAT_KEYS, SkillDef, SkillFormula, SkillFormulaVar } from '@mud/shared';
 import type { PlayerState } from '@mud/shared';
 
 type SkillTooltipPreviewPlayer = Pick<PlayerState, 'hp' | 'maxHp' | 'qi' | 'numericStats'>;
@@ -23,6 +23,18 @@ type FormulaPreview = {
   html: string;
   resolved: number | null;
 };
+
+export interface SkillTooltipAsideCard {
+  mark?: string;
+  title: string;
+  lines: string[];
+  tone?: 'buff' | 'debuff';
+}
+
+export interface SkillTooltipContent {
+  lines: string[];
+  asideCards: SkillTooltipAsideCard[];
+}
 
 const FORMULA_VAR_LABELS: Record<string, string> = {
   techLevel: '功法层数',
@@ -103,6 +115,50 @@ const FORMULA_VAR_META: Partial<Record<SkillFormulaVar, ScalingMeta>> = {
   'target.stat.resolvePower': { badgeClassName: 'skill-scaling-resolve', icon: '⬢', label: '目标化解', termClassName: 'skill-formula-term-resolve' },
 };
 
+const ELEMENT_NAMES: Record<ElementKey, string> = {
+  metal: '金',
+  wood: '木',
+  water: '水',
+  fire: '火',
+  earth: '土',
+};
+
+const ATTR_LABELS = {
+  constitution: '体魄',
+  spirit: '神识',
+  perception: '身法',
+  talent: '根骨',
+  comprehension: '悟性',
+  luck: '气运',
+} as const;
+
+const NUMERIC_STAT_LABELS: Partial<Record<NumericScalarStatKey, string>> = {
+  maxHp: '最大生命',
+  maxQi: '最大灵力',
+  physAtk: '物理攻击',
+  spellAtk: '法术攻击',
+  physDef: '物理防御',
+  spellDef: '法术防御',
+  hit: '命中',
+  dodge: '闪避',
+  crit: '暴击',
+  critDamage: '暴击伤害',
+  breakPower: '破招',
+  resolvePower: '化解',
+  maxQiOutputPerTick: '灵力输出',
+  qiRegenRate: '灵力回复',
+  hpRegenRate: '生命回复',
+  cooldownSpeed: '冷却速度',
+  auraCostReduce: '灵耗减免',
+  auraPowerRate: '术法增幅',
+  playerExpRate: '角色经验',
+  techniqueExpRate: '功法经验',
+  lootRate: '掉落增幅',
+  rareLootRate: '稀有掉落',
+  viewRange: '视野',
+  moveSpeed: '移动速度',
+};
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -126,12 +182,73 @@ function formatPercent(scale: number): string {
   return `${formatNumber(scale * 100)}%`;
 }
 
+function normalizeBuffMark(name: string, shortMark?: string): string {
+  const value = shortMark?.trim();
+  if (value) return [...value][0] ?? value;
+  return [...name.trim()][0] ?? '气';
+}
+
 function renderLabelLine(label: string, value: string): string {
   return `<span class="skill-tooltip-label">${escapeHtml(label)}：</span>${value}`;
 }
 
 function renderPlainLine(label: string, value: string): string {
   return renderLabelLine(label, escapeHtml(value));
+}
+
+function formatSignedValue(value: number): string {
+  return `${value >= 0 ? '+' : ''}${formatNumber(value)}`;
+}
+
+function describeBuffEffect(effect: Extract<SkillDef['effects'][number], { type: 'buff' }>): string[] {
+  const lines: string[] = [];
+  if (effect.attrs) {
+    for (const [key, value] of Object.entries(effect.attrs)) {
+      if (typeof value !== 'number' || value === 0) continue;
+      lines.push(`${ATTR_LABELS[key as keyof typeof ATTR_LABELS] ?? key} ${formatSignedValue(value)}`);
+    }
+  }
+  if (effect.stats) {
+    for (const key of NUMERIC_SCALAR_STAT_KEYS) {
+      const value = effect.stats[key];
+      if (typeof value !== 'number' || value === 0) continue;
+      lines.push(`${NUMERIC_STAT_LABELS[key] ?? key} ${formatSignedValue(value)}`);
+    }
+    if (effect.stats.elementDamageBonus) {
+      for (const [key, value] of Object.entries(effect.stats.elementDamageBonus)) {
+        if (typeof value !== 'number' || value === 0) continue;
+        lines.push(`${ELEMENT_NAMES[key as ElementKey]}行增伤 ${formatSignedValue(value)}`);
+      }
+    }
+    if (effect.stats.elementDamageReduce) {
+      for (const [key, value] of Object.entries(effect.stats.elementDamageReduce)) {
+        if (typeof value !== 'number' || value === 0) continue;
+        lines.push(`${ELEMENT_NAMES[key as ElementKey]}行减伤 ${formatSignedValue(value)}`);
+      }
+    }
+  }
+  return lines;
+}
+
+function buildBuffInlineBadge(effect: Extract<SkillDef['effects'][number], { type: 'buff' }>): string {
+  const toneClass = effect.category === 'debuff' ? 'debuff' : 'buff';
+  const mark = normalizeBuffMark(effect.name, effect.shortMark);
+  return `<span class="skill-tooltip-buff-entry ${toneClass}"><span class="skill-tooltip-buff-mark">${escapeHtml(mark)}</span><span>${escapeHtml(effect.name)}</span></span>`;
+}
+
+function buildBuffAsideCard(effect: Extract<SkillDef['effects'][number], { type: 'buff' }>): SkillTooltipAsideCard {
+  const effectLines = describeBuffEffect(effect);
+  const lines = [
+    `${effect.target === 'target' ? '目标' : '自身'} · ${effect.duration} 息${effect.maxStacks && effect.maxStacks > 1 ? ` · 最多 ${effect.maxStacks} 层` : ''}`,
+    ...(effectLines.length > 0 ? [`效果：${effectLines.join('，')}`] : []),
+    ...(effect.desc ? [effect.desc] : []),
+  ];
+  return {
+    mark: normalizeBuffMark(effect.name, effect.shortMark),
+    title: effect.name,
+    lines,
+    tone: effect.category === 'debuff' ? 'debuff' : 'buff',
+  };
 }
 
 function renderScalingBadge(meta: ScalingMeta): string {
@@ -313,8 +430,9 @@ function formatTargeting(skill: SkillDef): string {
   return skill.targetMode === 'tile' ? '单体地块' : '单体';
 }
 
-export function buildSkillTooltipLines(skill: SkillDef, context: SkillTooltipPreviewContext = {}): string[] {
+export function buildSkillTooltipContent(skill: SkillDef, context: SkillTooltipPreviewContext = {}): SkillTooltipContent {
   const lines: string[] = [`<span class="skill-tooltip-desc">${escapeHtml(skill.desc)}</span>`];
+  const asideCards: SkillTooltipAsideCard[] = [];
   if (context.unlockLevel !== undefined) {
     lines.push(renderPlainLine('解锁层数', `第 ${context.unlockLevel} 层`));
   }
@@ -323,14 +441,29 @@ export function buildSkillTooltipLines(skill: SkillDef, context: SkillTooltipPre
   for (const effect of skill.effects) {
     if (effect.type === 'damage') {
       const damageKind = effect.damageKind === 'physical' ? 'physical' : 'spell';
-      lines.push(renderLabelLine(damageKind === 'physical' ? '物理伤害' : '法术伤害', formatDamageFormula(effect.formula, context, damageKind)));
+      const damageLabel = damageKind === 'physical'
+        ? (effect.element ? `${ELEMENT_NAMES[effect.element]}行物理伤害` : '物理伤害')
+        : `${effect.element ? `${ELEMENT_NAMES[effect.element]}行` : ''}法术伤害`;
+      lines.push(renderLabelLine(damageLabel, formatDamageFormula(effect.formula, context, damageKind)));
       continue;
     }
     const stackText = effect.maxStacks && effect.maxStacks > 1 ? `，最多 ${effect.maxStacks} 层` : '';
-    lines.push(renderPlainLine('增益', `${effect.name}，持续 ${effect.duration} 息${stackText}`));
+    const categoryLabel = effect.category === 'debuff' ? '减益' : '增益';
+    const targetLabel = effect.target === 'target' ? '目标' : '自身';
+    const badge = buildBuffInlineBadge(effect);
+    lines.push(renderLabelLine(categoryLabel, `${badge}<span class="skill-tooltip-buff-meta">${escapeHtml(` ${targetLabel} · ${effect.duration} 息${stackText}`)}</span>`));
+    const effectLines = describeBuffEffect(effect);
+    if (effectLines.length > 0) {
+      lines.push(renderPlainLine('效果', effectLines.join('，')));
+    }
+    asideCards.push(buildBuffAsideCard(effect));
   }
   lines.push(renderPlainLine('灵力消耗', String(skill.cost)));
   lines.push(renderPlainLine('冷却', `${skill.cooldown} 息`));
   lines.push('<span class="skill-tooltip-note">实际结算仍会受命中、闪避、破招、化解、暴击与目标防御影响。</span>');
-  return lines;
+  return { lines, asideCards };
+}
+
+export function buildSkillTooltipLines(skill: SkillDef, context: SkillTooltipPreviewContext = {}): string[] {
+  return buildSkillTooltipContent(skill, context).lines;
 }

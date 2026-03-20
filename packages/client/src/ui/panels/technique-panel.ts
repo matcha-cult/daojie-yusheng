@@ -12,7 +12,7 @@ import {
 } from '@mud/shared';
 import { FloatingTooltip } from '../floating-tooltip';
 import { detailModalHost } from '../detail-modal-host';
-import { buildSkillTooltipLines } from '../skill-tooltip';
+import { buildSkillTooltipContent } from '../skill-tooltip';
 import { preserveSelection } from '../selection-preserver';
 
 const ATTR_NAMES: Record<keyof Attributes, string> = {
@@ -193,17 +193,10 @@ export class TechniquePanel {
     const skills = skillsByLevel.get(layer.level) ?? [];
     const skillTags = skills.length > 0
       ? skills.map((skill) => {
-        const detail = {
-          title: skill.name,
-          lines: buildSkillTooltipLines(skill, {
-            unlockLevel: resolveSkillUnlockLevel(skill),
-            techLevel: currentLevel,
-            player: this.lastState.previewPlayer,
-          }),
-        };
         return `<span class="tech-skill-tag"
-          data-skill-tooltip-title="${escapeHtml(detail.title)}"
-          data-skill-tooltip-detail="${escapeHtml(detail.lines.join('\n'))}"
+          data-skill-tooltip-title="${escapeHtml(skill.name)}"
+          data-skill-tooltip-skill-id="${escapeHtml(skill.id)}"
+          data-skill-tooltip-unlock-level="${resolveSkillUnlockLevel(skill)}"
           data-skill-tooltip-rich="1">${escapeHtml(skill.name)}</span>`;
       }).join('')
       : '<span class="tech-layer-empty">本层无新技能</span>';
@@ -244,11 +237,21 @@ export class TechniquePanel {
   private bindSkillTooltips(modalBody: HTMLElement): void {
     modalBody.querySelectorAll<HTMLElement>('[data-skill-tooltip-title]').forEach((node) => {
       const title = node.dataset.skillTooltipTitle ?? '';
-      const detail = node.dataset.skillTooltipDetail ?? '';
       const rich = node.dataset.skillTooltipRich === '1';
-      const lines = detail.split('\n');
+      const skillId = node.dataset.skillTooltipSkillId ?? '';
+      const unlockLevel = Number(node.dataset.skillTooltipUnlockLevel ?? '0') || undefined;
       node.addEventListener('pointerenter', (event) => {
-        this.tooltip.show(title, lines, event.clientX, event.clientY, { allowHtml: rich });
+        const technique = this.lastState.techniques.find((entry) => entry.skills.some((skill) => skill.id === skillId));
+        const skill = technique?.skills.find((entry) => entry.id === skillId);
+        const tooltip = skill ? buildSkillTooltipContent(skill, {
+          unlockLevel,
+          techLevel: technique?.level,
+          player: this.lastState.previewPlayer,
+        }) : { lines: [], asideCards: [] };
+        this.tooltip.show(title, tooltip.lines, event.clientX, event.clientY, {
+          allowHtml: rich,
+          asideCards: tooltip.asideCards,
+        });
       });
       node.addEventListener('pointermove', (event) => {
         this.tooltip.move(event.clientX, event.clientY);

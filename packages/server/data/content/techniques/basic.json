@@ -19,7 +19,7 @@
       {
         "id": "skill.qingmu_slash",
         "name": "青木斩",
-        "desc": "将灵气灌入剑锋，对近身妖物造成稳定伤害。",
+        "desc": "木脉剑气顺着伤口侵入经络，越斩越能削弱目标气机。",
         "cooldown": 16,
         "cost": 5,
         "range": 1,
@@ -27,13 +27,32 @@
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "wood",
             "formula": {
               "op": "add",
               "args": [
-                20,
-                { "var": "techLevel", "scale": 2 },
-                { "var": "caster.stat.spellAtk", "scale": 1 }
+                18,
+                { "var": "techLevel", "scale": 2.1 },
+                { "var": "caster.stat.spellAtk", "scale": 0.95 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.qingmu_mark",
+            "name": "青痕",
+            "desc": "木灵缠入经络，削弱法抗、闪避与化解。",
+            "shortMark": "青",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#68b96c",
+            "duration": 4,
+            "maxStacks": 3,
+            "stats": {
+              "spellDef": -8,
+              "dodge": -15,
+              "resolvePower": -12
             }
           }
         ],
@@ -61,22 +80,40 @@
       {
         "id": "skill.wind_edge",
         "name": "风痕",
-        "desc": "借步法切入身位，对两格内目标打出轻快一击。",
-        "cooldown": 16,
+        "desc": "借步法切入身位，速度越快，这一击越像木叶掠风般轻灵狠准。",
+        "cooldown": 14,
         "cost": 5,
         "range": 2,
         "effects": [
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "wood",
             "formula": {
               "op": "add",
               "args": [
-                18,
-                { "var": "techLevel", "scale": 2 },
-                { "var": "caster.stat.spellAtk", "scale": 0.9 },
-                { "var": "caster.stat.moveSpeed", "scale": 1.5 }
+                16,
+                { "var": "techLevel", "scale": 2.1 },
+                { "var": "caster.stat.spellAtk", "scale": 0.8 },
+                { "var": "caster.stat.moveSpeed", "scale": 4.5 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.wind_step_flow",
+            "name": "踏风",
+            "desc": "借风回身，短时间提升移速与闪避。",
+            "shortMark": "风",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#82c77b",
+            "duration": 3,
+            "maxStacks": 2,
+            "stats": {
+              "moveSpeed": 1,
+              "dodge": 18
             }
           }
         ],
@@ -102,7 +139,7 @@
       {
         "id": "skill.iron_bone_strike",
         "name": "铁骨崩拳",
-        "desc": "以内劲震骨，近身爆发伤害。",
+        "desc": "以内劲震骨，出拳同时叠起护体罡劲，越打越硬。",
         "cooldown": 16,
         "cost": 6,
         "range": 1,
@@ -113,11 +150,28 @@
             "formula": {
               "op": "add",
               "args": [
-                16,
-                { "var": "techLevel", "scale": 2 },
-                { "var": "caster.stat.physAtk", "scale": 1.15 },
-                { "var": "caster.stat.physDef", "scale": 0.25 }
+                14,
+                { "var": "techLevel", "scale": 2.2 },
+                { "var": "caster.stat.physAtk", "scale": 1.05 },
+                { "var": "caster.stat.physDef", "scale": 0.5 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.iron_bone_guard",
+            "name": "罡劲",
+            "desc": "罡气绕体，提高护甲与化解，供后续重击借势。",
+            "shortMark": "罡",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#a28d74",
+            "duration": 4,
+            "maxStacks": 3,
+            "stats": {
+              "physDef": 6,
+              "resolvePower": 12
             }
           }
         ],
@@ -126,8 +180,8 @@
       {
         "id": "skill.iron_guard_roar",
         "name": "震罡怒吼",
-        "desc": "鼓荡护体罡气，轰击中距离目标。",
-        "cooldown": 40,
+        "desc": "鼓荡护体罡气轰开身前敌群，罡劲越厚，这一吼越沉。",
+        "cooldown": 36,
         "cost": 10,
         "range": 2,
         "targeting": {
@@ -142,11 +196,29 @@
             "formula": {
               "op": "add",
               "args": [
-                22,
+                18,
                 { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.physAtk", "scale": 0.9 },
-                { "var": "caster.stat.physDef", "scale": 0.45 }
+                { "var": "caster.stat.physAtk", "scale": 0.85 },
+                { "var": "caster.stat.physDef", "scale": 0.9 },
+                { "var": "caster.maxHp", "scale": 0.04 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.iron_bone_shock",
+            "name": "震骨",
+            "desc": "被怒吼震散气血，攻击力短暂下滑。",
+            "shortMark": "震",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#b08c6b",
+            "duration": 3,
+            "maxStacks": 2,
+            "stats": {
+              "physAtk": -8,
+              "spellAtk": -8
             }
           }
         ],

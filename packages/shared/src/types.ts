@@ -1,4 +1,4 @@
-import type { NumericRatioDivisors, NumericScalarStatKey, NumericStats, PartialNumericStats } from './numeric';
+import type { ElementKey, NumericRatioDivisors, NumericScalarStatKey, NumericStats, PartialNumericStats } from './numeric';
 import type { TargetingShape } from './targeting';
 
 /** 地形类型 */
@@ -112,6 +112,8 @@ export interface VisibleBuffState {
   sourceSkillId: string;
   sourceSkillName?: string;
   color?: string;
+  attrs?: Partial<Attributes>;
+  stats?: PartialNumericStats;
 }
 
 /** 视口 */
@@ -273,6 +275,7 @@ export interface SkillTargetingDef {
 export interface SkillDamageEffectDef {
   type: 'damage';
   damageKind?: SkillDamageKind;
+  element?: ElementKey;
   formula: SkillFormula;
 }
 

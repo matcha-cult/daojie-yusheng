@@ -25,22 +25,41 @@
       {
         "id": "skill.stillheart_seal",
         "name": "止念印",
-        "desc": "以神识压迫敌念，对四格内目标造成强力打击。",
-        "cooldown": 50,
+        "desc": "神识先压住对手心神，再让其术念与化解一并迟滞。",
+        "cooldown": 44,
         "cost": 12,
         "range": 4,
         "effects": [
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "earth",
             "formula": {
               "op": "add",
               "args": [
-                34,
-                { "var": "techLevel", "scale": 3.5 },
-                { "var": "caster.stat.spellAtk", "scale": 1.2 },
-                { "var": "target.stat.resolvePower", "scale": 0.45 }
+                26,
+                { "var": "techLevel", "scale": 3.3 },
+                { "var": "caster.stat.spellAtk", "scale": 1.1 },
+                { "var": "target.stat.resolvePower", "scale": 0.35 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.stillheart_suppress",
+            "name": "止念",
+            "desc": "神识遭镇，法攻、破招与化解皆被压住。",
+            "shortMark": "念",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#8f8a70",
+            "duration": 4,
+            "maxStacks": 2,
+            "stats": {
+              "spellAtk": -12,
+              "breakPower": -18,
+              "resolvePower": -24
             }
           }
         ],
@@ -76,20 +95,21 @@
       {
         "id": "skill.anchor_pulse",
         "name": "镇灵冲",
-        "desc": "神识冲击近中距离目标。",
-        "cooldown": 30,
+        "desc": "以神识先钉住气机，再借凝神之势衔接后续杀招。",
+        "cooldown": 28,
         "cost": 9,
         "range": 2,
         "effects": [
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "earth",
             "formula": {
               "op": "add",
               "args": [
-                26,
-                { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.spellAtk", "scale": 1.05 }
+                22,
+                { "var": "techLevel", "scale": 2.8 },
+                { "var": "caster.stat.spellAtk", "scale": 1.0 }
               ]
             }
           },
@@ -98,7 +118,7 @@
             "target": "self",
             "buffId": "buff.anchor_focus",
             "name": "镇灵凝神",
-            "desc": "凝聚心神，暂时提高法术攻击与暴击，便于衔接后续神识技。",
+            "desc": "凝聚心神，暂时提高法术攻击、暴击与化解。",
             "shortMark": "凝",
             "category": "buff",
             "visibility": "public",
@@ -106,8 +126,9 @@
             "duration": 3,
             "maxStacks": 2,
             "stats": {
-              "spellAtk": 10,
-              "crit": 80
+              "spellAtk": 8,
+              "crit": 50,
+              "resolvePower": 18
             }
           }
         ],
@@ -116,8 +137,8 @@
       {
         "id": "skill.soul_chain",
         "name": "缚魄锁",
-        "desc": "以灵链拘束并重创四格内敌人。",
-        "cooldown": 50,
+        "desc": "以灵链束住魂魄与气机，让被锁之敌更难招架后续神识压制。",
+        "cooldown": 46,
         "cost": 15,
         "range": 4,
         "targeting": {
@@ -128,14 +149,33 @@
           {
             "type": "damage",
             "damageKind": "spell",
+            "element": "earth",
             "formula": {
               "op": "add",
               "args": [
-                38,
-                { "var": "techLevel", "scale": 4 },
-                { "var": "caster.stat.spellAtk", "scale": 1.2 },
-                { "var": "target.maxHp", "scale": 0.04 }
+                32,
+                { "var": "techLevel", "scale": 3.6 },
+                { "var": "caster.stat.spellAtk", "scale": 1.15 },
+                { "var": "target.maxHp", "scale": 0.03 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.soul_chain_bind",
+            "name": "缚魄",
+            "desc": "魂魄被锁，法抗、闪避与化解一并下滑。",
+            "shortMark": "锁",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#9280c6",
+            "duration": 4,
+            "maxStacks": 2,
+            "stats": {
+              "spellDef": -10,
+              "dodge": -20,
+              "resolvePower": -20
             }
           }
         ],
@@ -173,8 +213,8 @@
       {
         "id": "skill.starfall_thrust",
         "name": "坠星刺",
-        "desc": "枪意贯空，穿刺三格内目标。",
-        "cooldown": 30,
+        "desc": "先校准枪势，再借坠势贯穿敌阵，越蓄越适合破强敌。",
+        "cooldown": 28,
         "cost": 10,
         "range": 3,
         "targeting": {
@@ -188,10 +228,29 @@
             "formula": {
               "op": "add",
               "args": [
-                30,
-                { "var": "techLevel", "scale": 3.5 },
-                { "var": "caster.stat.physAtk", "scale": 1.25 }
+                24,
+                { "var": "techLevel", "scale": 3.2 },
+                { "var": "caster.stat.physAtk", "scale": 1.15 },
+                { "var": "caster.stat.hit", "scale": 0.5 }
               ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.starfall_momentum",
+            "name": "坠势",
+            "desc": "枪势下压，提高命中、破招与暴击。",
+            "shortMark": "坠",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#d6a86a",
+            "duration": 4,
+            "maxStacks": 2,
+            "stats": {
+              "hit": 18,
+              "breakPower": 16,
+              "crit": 20
             }
           }
         ],
@@ -200,8 +259,8 @@
       {
         "id": "skill.meteor_break",
         "name": "陨焰破",
-        "desc": "牵引星火猛击，粉碎远距强敌。",
-        "cooldown": 60,
+        "desc": "借坠势与枪意同时爆开，对强敌与高血目标尤为致命。",
+        "cooldown": 56,
         "cost": 18,
         "range": 4,
         "targeting": {
@@ -216,10 +275,11 @@
             "formula": {
               "op": "add",
               "args": [
-                44,
+                36,
                 { "var": "techLevel", "scale": 4 },
-                { "var": "caster.stat.physAtk", "scale": 1.3 },
-                { "var": "target.maxHp", "scale": 0.035 }
+                { "var": "caster.stat.physAtk", "scale": 1.2 },
+                { "var": "caster.stat.breakPower", "scale": 1.1 },
+                { "var": "target.maxHp", "scale": 0.03 }
               ]
             }
           }
