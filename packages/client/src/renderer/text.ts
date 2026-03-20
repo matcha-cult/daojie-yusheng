@@ -5,10 +5,15 @@ import { getCellSize } from '../display';
 
 const TILE_BG: Record<TileType, string> = {
   [TileType.Floor]: '#ddd8cf',
+  [TileType.Road]: '#cdb89c',
+  [TileType.Trail]: '#b4946f',
   [TileType.Wall]: '#3e3a35',
   [TileType.Door]: '#8b7355',
   [TileType.Portal]: '#5c3d7a',
-  [TileType.Grass]: '#c2cba8',
+  [TileType.Grass]: '#b8c98b',
+  [TileType.Hill]: '#b7a17f',
+  [TileType.Mud]: '#8b6a4c',
+  [TileType.Swamp]: '#556b3f',
   [TileType.Water]: '#6e9ab8',
   [TileType.Tree]: '#4d6b3a',
   [TileType.Stone]: '#7a7570',
@@ -16,10 +21,15 @@ const TILE_BG: Record<TileType, string> = {
 
 const TILE_CHAR: Record<TileType, string> = {
   [TileType.Floor]: '·',
+  [TileType.Road]: '路',
+  [TileType.Trail]: '径',
   [TileType.Wall]: '▓',
   [TileType.Door]: '门',
   [TileType.Portal]: '阵',
   [TileType.Grass]: '草',
+  [TileType.Hill]: '坡',
+  [TileType.Mud]: '泥',
+  [TileType.Swamp]: '沼',
   [TileType.Water]: '水',
   [TileType.Tree]: '木',
   [TileType.Stone]: '石',
@@ -27,10 +37,15 @@ const TILE_CHAR: Record<TileType, string> = {
 
 const CHAR_COLOR: Record<TileType, string> = {
   [TileType.Floor]: 'rgba(0,0,0,0.15)',
+  [TileType.Road]: 'rgba(90,55,24,0.35)',
+  [TileType.Trail]: 'rgba(84,52,28,0.42)',
   [TileType.Wall]: 'rgba(255,255,255,0.2)',
   [TileType.Door]: '#f0e0c0',
   [TileType.Portal]: '#d0b0f0',
   [TileType.Grass]: 'rgba(50,80,30,0.35)',
+  [TileType.Hill]: 'rgba(92,60,32,0.36)',
+  [TileType.Mud]: 'rgba(250,240,220,0.34)',
+  [TileType.Swamp]: 'rgba(220,240,180,0.4)',
   [TileType.Water]: 'rgba(30,50,80,0.4)',
   [TileType.Tree]: 'rgba(20,40,15,0.5)',
   [TileType.Stone]: 'rgba(40,35,30,0.35)',

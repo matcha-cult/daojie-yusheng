@@ -1,6 +1,6 @@
 import { Tile, TileType, VisibleTile } from '@mud/shared';
 
-const MAP_MEMORY_STORAGE_KEY = 'mud:map-memory:v1';
+const MAP_MEMORY_STORAGE_KEY = 'mud:map-memory:v2';
 
 type RememberedTile = Pick<Tile, 'type' | 'walkable' | 'blocksSight'>;
 type SerializedMapMemory = Record<string, Record<string, RememberedTile>>;

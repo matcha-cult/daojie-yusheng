@@ -105,14 +105,23 @@ let pendingTargetedAction: {
 
 const TILE_TYPE_NAMES: Record<TileType, string> = {
   [TileType.Floor]: '地面',
+  [TileType.Road]: '大路',
+  [TileType.Trail]: '小路',
   [TileType.Wall]: '墙体',
   [TileType.Door]: '门扉',
   [TileType.Portal]: '传送阵',
   [TileType.Grass]: '草地',
+  [TileType.Hill]: '山地',
+  [TileType.Mud]: '泥地',
+  [TileType.Swamp]: '沼泽',
   [TileType.Water]: '水域',
   [TileType.Tree]: '树木',
   [TileType.Stone]: '岩石',
 };
+
+function getTileTypeName(type: TileType): string {
+  return TILE_TYPE_NAMES[type] ?? '未知地貌';
+}
 
 const ENTITY_KIND_NAMES: Record<string, string> = {
   player: '修士',
@@ -466,7 +475,7 @@ function formatTraversalCost(tile: Tile): string {
     return '无法通行';
   }
   const cost = getTileTraversalCost(tile.type);
-  return `${cost}`;
+  return `${cost} 点/格`;
 }
 
 function buildObservedEntityCardHtml(entity: ObservedEntity): string {
@@ -540,7 +549,7 @@ function showObserveModal(targetX: number, targetY: number): void {
     return order(left.kind) - order(right.kind);
   });
   const terrainRows = [
-    { label: '地貌', value: TILE_TYPE_NAMES[tile.type] ?? tile.type },
+    { label: '地貌', value: getTileTypeName(tile.type) },
     { label: '是否可通行', value: tile.walkable ? '可通行' : '不可通行' },
     { label: '行走消耗', value: formatTraversalCost(tile) },
     { label: '是否阻挡视线', value: tile.blocksSight ? '会阻挡' : '不会阻挡' },
@@ -876,6 +885,8 @@ function buildTechniqueRenderSignature(techniques: TechniqueState[], cultivating
       techId: technique.techId,
       name: technique.name,
       level: technique.level,
+      exp: technique.exp,
+      expToNext: technique.expToNext,
       realm: technique.realm,
       skills: technique.skills.map((skill) => skill.id),
     })),

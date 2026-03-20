@@ -8,12 +8,13 @@ import {
   DEFAULT_RATIO_DIVISOR,
   ELEMENT_KEYS,
   ElementKey,
-  MOVE_POINT_UNIT,
   NumericRatioDivisors,
   NumericStats,
   PlayerState,
   ratioValue,
   S2C_AttrUpdate,
+  TileType,
+  getTileTraversalCost,
 } from '@mud/shared';
 import { FloatingTooltip } from '../floating-tooltip';
 
@@ -110,7 +111,7 @@ const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
   techniqueExpRate: '提高功法经验获取效率。',
   lootRate: '提高常规掉落收益。',
   rareLootRate: '提高稀有掉落收益。',
-  moveSpeed: '决定每息获得的移动预算。平地消耗较低，草地等复杂地形会消耗更多预算，因此会自然变慢。',
+  moveSpeed: '决定每息获得的移动预算。大路、小路、草地、泥地与沼泽会按不同消耗结算，因此地形会直接影响赶路效率。',
   viewRange: '决定地图上的可见范围。',
 };
 
@@ -201,15 +202,21 @@ function formatDefenseReduction(value: number): string {
 function formatMoveSpeedEffect(value: number): string {
   const safeValue = Math.max(0, value);
   const movePoints = BASE_MOVE_POINTS_PER_TICK + safeValue;
-  const flatTiles = movePoints / MOVE_POINT_UNIT;
-  const grassTiles = movePoints / (MOVE_POINT_UNIT * 2);
-  return `每息获得 ${movePoints.toFixed(movePoints % 1 === 0 ? 0 : 2)} 点移动预算，约等于 ${flatTiles.toFixed(flatTiles % 1 === 0 ? 0 : 2)} 格平地 / ${grassTiles.toFixed(grassTiles % 1 === 0 ? 0 : 2)} 格草地`;
+  const roadTiles = movePoints / getTileTraversalCost(TileType.Road);
+  const trailTiles = movePoints / getTileTraversalCost(TileType.Trail);
+  const grassTiles = movePoints / getTileTraversalCost(TileType.Grass);
+  const swampTiles = movePoints / getTileTraversalCost(TileType.Swamp);
+  return `每息获得 ${movePoints.toFixed(movePoints % 1 === 0 ? 0 : 2)} 点移动预算，约等于 ${roadTiles.toFixed(roadTiles % 1 === 0 ? 0 : 2)} 格大路 / ${trailTiles.toFixed(trailTiles % 1 === 0 ? 0 : 2)} 格小路 / ${grassTiles.toFixed(grassTiles % 1 === 0 ? 0 : 2)} 格草地 / ${swampTiles.toFixed(swampTiles % 1 === 0 ? 0 : 2)} 格沼泽`;
+}
+
+function formatMoveSpeedDisplay(value: number): string {
+  return `${Math.round(BASE_MOVE_POINTS_PER_TICK + Math.max(0, value))}`;
 }
 
 function buildNumericTooltip(label: string, key: NumericCardKey, numericValue: number, ratioValueText?: string): string {
   const lines = [
     NUMERIC_TOOLTIP_DESCRIPTIONS[key] ?? '该属性影响角色的实际战斗表现。',
-    `当前数值：${key === 'critDamage' ? formatCritDamageDisplay(numericValue) : RATE_BP_KEYS.has(key) ? formatRateBp(numericValue) : Math.round(numericValue)}`,
+    `当前数值：${key === 'critDamage' ? formatCritDamageDisplay(numericValue) : key === 'moveSpeed' ? formatMoveSpeedDisplay(numericValue) : RATE_BP_KEYS.has(key) ? formatRateBp(numericValue) : Math.round(numericValue)}`,
   ];
   if (key === 'physDef' || key === 'spellDef') {
     lines.push(`实际减伤：${formatDefenseReduction(numericValue)}`);
@@ -524,6 +531,8 @@ export class AttrPanel {
       }
       const displayValue = key === 'critDamage'
         ? formatCritDamageDisplay(numericValue)
+        : key === 'moveSpeed'
+          ? formatMoveSpeedDisplay(numericValue)
         : RATE_BP_KEYS.has(key)
           ? formatRateBp(numericValue)
           : `${Math.round(numericValue)}`;

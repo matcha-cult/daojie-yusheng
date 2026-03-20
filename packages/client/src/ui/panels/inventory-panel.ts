@@ -253,20 +253,18 @@ export class InventoryPanel {
       .inventory-tooltip {
         position: fixed;
         pointer-events: none;
-        background: rgba(255,255,255,0.96);
-        border: 1px solid rgba(34,26,19,0.15);
-        padding: 8px 12px;
-        border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
         font-size: 13px;
         color: #1a120a;
         z-index: 2000;
         opacity: 0;
         transition: opacity 120ms ease;
-        min-width: 160px;
+        min-width: 0;
       }
       .inventory-tooltip.visible {
         opacity: 1;
+      }
+      .inventory-tooltip .floating-tooltip-body {
+        min-width: 160px;
       }
       .inventory-tooltip .floating-tooltip-body {
         display: flex;
