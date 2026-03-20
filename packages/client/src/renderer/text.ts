@@ -1,5 +1,5 @@
 import { IRenderer, TargetingOverlayState } from './types';
-import { Tile, TileType, VIEW_RADIUS } from '@mud/shared';
+import { NpcQuestMarker, Tile, TileType, VIEW_RADIUS } from '@mud/shared';
 import { Camera } from './camera';
 import { getCellSize } from '../display';
 
@@ -59,6 +59,7 @@ interface AnimEntity {
   kind?: string;
   hp?: number;
   maxHp?: number;
+  npcQuestMarker?: NpcQuestMarker;
 }
 
 interface FloatingText {
@@ -228,7 +229,7 @@ export class TextRenderer implements IRenderer {
   }
 
   updateEntities(
-    list: { id: string; wx: number; wy: number; char: string; color: string; name?: string; kind?: string; hp?: number; maxHp?: number }[],
+    list: { id: string; wx: number; wy: number; char: string; color: string; name?: string; kind?: string; hp?: number; maxHp?: number; npcQuestMarker?: NpcQuestMarker }[],
     movedId?: string,
     shiftX = 0,
     shiftY = 0,
@@ -251,6 +252,7 @@ export class TextRenderer implements IRenderer {
         anim.kind = e.kind;
         anim.hp = e.hp;
         anim.maxHp = e.maxHp;
+        anim.npcQuestMarker = e.npcQuestMarker;
         if (e.id === movedId) {
           anim.oldWX = (e.wx - shiftX) * cellSize;
           anim.oldWY = (e.wy - shiftY) * cellSize;
@@ -268,6 +270,7 @@ export class TextRenderer implements IRenderer {
           kind: e.kind,
           hp: e.hp,
           maxHp: e.maxHp,
+          npcQuestMarker: e.npcQuestMarker,
         });
       }
     }
@@ -333,7 +336,88 @@ export class TextRenderer implements IRenderer {
           ctx.fillStyle = isMonster ? '#d15252' : isNpc ? '#58a8ff' : '#63c46b';
           ctx.fillRect(barX, barY, barW * ratio, 3);
         }
+
+        if (isNpc && anim.npcQuestMarker) {
+          this.drawNpcQuestMarker(sx, sy, cellSize, anim.npcQuestMarker);
+        }
       }
+    }
+  }
+
+  private drawNpcQuestMarker(sx: number, sy: number, cellSize: number, marker: NpcQuestMarker) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const centerX = sx + cellSize + Math.max(8, cellSize * 0.18);
+    const centerY = sy + Math.max(9, cellSize * 0.18);
+    const size = Math.max(8, cellSize * 0.18);
+    const symbol = marker.state === 'ready' ? '?' : marker.state === 'active' ? '…' : '!';
+    const palette = this.getNpcQuestMarkerPalette(marker);
+
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.fillStyle = palette.fill;
+    ctx.strokeStyle = palette.stroke;
+
+    switch (palette.shape) {
+      case 'square':
+        ctx.beginPath();
+        ctx.roundRect(centerX - size, centerY - size, size * 2, size * 2, Math.max(3, size * 0.45));
+        ctx.fill();
+        ctx.stroke();
+        break;
+      case 'diamond':
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY - size);
+        ctx.lineTo(centerX + size, centerY);
+        ctx.lineTo(centerX, centerY + size);
+        ctx.lineTo(centerX - size, centerY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      case 'shield':
+        ctx.beginPath();
+        ctx.moveTo(centerX - size * 0.9, centerY - size * 0.7);
+        ctx.quadraticCurveTo(centerX, centerY - size * 1.2, centerX + size * 0.9, centerY - size * 0.7);
+        ctx.lineTo(centerX + size * 0.8, centerY + size * 0.25);
+        ctx.quadraticCurveTo(centerX, centerY + size * 1.2, centerX - size * 0.8, centerY + size * 0.25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        break;
+      case 'circle':
+      default:
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        break;
+    }
+
+    ctx.fillStyle = palette.text;
+    ctx.font = `bold ${Math.max(11, cellSize * 0.26)}px "Noto Serif SC", serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(symbol, centerX, centerY + 0.5);
+    ctx.restore();
+  }
+
+  private getNpcQuestMarkerPalette(marker: NpcQuestMarker): {
+    fill: string;
+    stroke: string;
+    text: string;
+    shape: 'circle' | 'square' | 'diamond' | 'shield';
+  } {
+    switch (marker.line) {
+      case 'main':
+        return { fill: 'rgba(236, 179, 55, 0.95)', stroke: '#fff0b0', text: '#3d2500', shape: 'circle' };
+      case 'daily':
+        return { fill: 'rgba(84, 188, 125, 0.95)', stroke: '#d5ffe2', text: '#0f3420', shape: 'square' };
+      case 'encounter':
+        return { fill: 'rgba(217, 88, 88, 0.95)', stroke: '#ffd7cf', text: '#3f0e0e', shape: 'diamond' };
+      case 'side':
+      default:
+        return { fill: 'rgba(84, 156, 222, 0.95)', stroke: '#d8f1ff', text: '#0d2337', shape: 'shield' };
     }
   }
 

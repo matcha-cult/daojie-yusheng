@@ -128,6 +128,7 @@ type ObservedEntity = {
   maxHp?: number;
   qi?: number;
   maxQi?: number;
+  npcQuestMarker?: RenderEntity['npcQuestMarker'];
   observation?: RenderEntity['observation'];
 };
 
@@ -327,6 +328,7 @@ function toObservedEntity(entity: RenderEntity): ObservedEntity {
     maxHp: entity.maxHp,
     qi: entity.qi,
     maxQi: entity.maxQi,
+    npcQuestMarker: entity.npcQuestMarker,
     observation: entity.observation,
   };
 }

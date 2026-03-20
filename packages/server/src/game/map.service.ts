@@ -364,7 +364,9 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           id: rawQuest.id!,
           title: rawQuest.title!,
           desc: rawQuest.desc!,
-          line: rawQuest.line === 'main' ? 'main' : 'side',
+          line: rawQuest.line === 'main' || rawQuest.line === 'daily' || rawQuest.line === 'encounter'
+            ? rawQuest.line
+            : 'side',
           chapter: typeof rawQuest.chapter === 'string' ? rawQuest.chapter : undefined,
           story: typeof rawQuest.story === 'string' ? rawQuest.story : undefined,
           objectiveType,

@@ -14,6 +14,7 @@ import {
   ItemStack,
   NumericRatioDivisors,
   NumericStats,
+  NpcQuestMarker,
   ObservationInsight,
   parseTileTargetRef,
   PlayerState,
@@ -1221,6 +1222,7 @@ export class WorldService {
       { threshold: 0.3, label: '身份', value: profile.title },
       ...this.buildObservationLineSpecs(snapshot, false),
     ];
+    const npcQuestMarker = this.resolveNpcQuestMarker(viewer, npc);
     return {
       id: `npc:${npc.id}`,
       x: npc.x,
@@ -1233,6 +1235,7 @@ export class WorldService {
       maxHp: snapshot.maxHp,
       qi: snapshot.qi,
       maxQi: snapshot.maxQi,
+      npcQuestMarker,
       observation: this.buildObservationInsight(
         viewer,
         snapshot,
@@ -1627,6 +1630,20 @@ export class WorldService {
       }
     }
     return {};
+  }
+
+  private resolveNpcQuestMarker(player: PlayerState, npc: NpcConfig): NpcQuestMarker | undefined {
+    const interaction = this.getNpcInteractionState(player, npc);
+    if (interaction.quest && !interaction.questState) {
+      return { line: interaction.quest.line, state: 'available' };
+    }
+    if (interaction.questState?.status === 'ready') {
+      return { line: interaction.questState.line, state: 'ready' };
+    }
+    if (interaction.questState?.status === 'active') {
+      return { line: interaction.questState.line, state: 'active' };
+    }
+    return undefined;
   }
 
   private buildRewardItems(quest: QuestConfig): ItemStack[] {

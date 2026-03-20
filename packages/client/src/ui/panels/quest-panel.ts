@@ -17,6 +17,8 @@ const STATUS_CLASS: Record<QuestState['status'], string> = {
 const LINE_TEXT: Record<QuestState['line'], string> = {
   main: '主线',
   side: '支线',
+  daily: '日常',
+  encounter: '奇遇',
 };
 
 /** 任务面板：显示当前任务进度与奖励信息 */

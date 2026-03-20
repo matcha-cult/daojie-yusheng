@@ -347,7 +347,9 @@ export class PlayerService {
   private normalizeQuests(quests: QuestState[]): QuestState[] {
     return quests.map((quest) => ({
       ...quest,
-      line: quest.line === 'main' ? 'main' : 'side',
+      line: quest.line === 'main' || quest.line === 'daily' || quest.line === 'encounter'
+        ? quest.line
+        : 'side',
       objectiveType: quest.objectiveType ?? 'kill',
       targetName: quest.targetName ?? quest.title,
       targetMonsterId: quest.targetMonsterId ?? '',

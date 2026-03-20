@@ -69,7 +69,15 @@ export interface RenderEntity {
   maxHp?: number;
   qi?: number;
   maxQi?: number;
+  npcQuestMarker?: NpcQuestMarker;
   observation?: ObservationInsight;
+}
+
+export type NpcQuestMarkerState = 'available' | 'ready' | 'active';
+
+export interface NpcQuestMarker {
+  line: QuestLine;
+  state: NpcQuestMarkerState;
 }
 
 export interface ObservationLine {
@@ -349,7 +357,7 @@ export type EntityKind = 'npc' | 'monster';
 export type QuestStatus = 'available' | 'active' | 'ready' | 'completed';
 
 /** 任务线类型 */
-export type QuestLine = 'main' | 'side';
+export type QuestLine = 'main' | 'side' | 'daily' | 'encounter';
 
 /** 任务目标类型 */
 export type QuestObjectiveType = 'kill' | 'learn_technique' | 'realm_progress' | 'realm_stage';
