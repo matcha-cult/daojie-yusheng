@@ -593,6 +593,13 @@ export class ActionPanel {
 
   private patchActionRows(): boolean {
     for (const action of this.currentActions) {
+      if (
+        action.id === 'toggle:auto_battle'
+        || action.id === 'toggle:auto_retaliate'
+        || action.id === 'client:observe'
+      ) {
+        continue;
+      }
       const row = this.pane.querySelector<HTMLElement>(`[data-action-row="${CSS.escape(action.id)}"]`);
       if (!row) {
         return false;
@@ -613,7 +620,8 @@ export class ActionPanel {
       if (action.type === 'skill') {
         const stateNode = this.pane.querySelector<HTMLElement>(`[data-action-auto-state="${CSS.escape(action.id)}"]`);
         const orderNode = this.pane.querySelector<HTMLElement>(`[data-action-auto-order="${CSS.escape(action.id)}"]`);
-        if (!stateNode || !orderNode) {
+        const toggleNode = this.pane.querySelector<HTMLButtonElement>(`[data-auto-battle-toggle="${CSS.escape(action.id)}"]`);
+        if (!stateNode || !orderNode || !toggleNode) {
           return false;
         }
         const enabled = action.autoBattleEnabled !== false;
@@ -623,6 +631,8 @@ export class ActionPanel {
         stateNode.classList.toggle('auto-battle-disabled', !enabled);
         orderNode.hidden = order === null;
         orderNode.textContent = order === null ? '' : `顺位 ${order}`;
+        toggleNode.classList.toggle('active', enabled);
+        toggleNode.textContent = enabled ? '自动 开' : '自动 关';
       }
     }
 
