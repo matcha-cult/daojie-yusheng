@@ -8,6 +8,7 @@ import {
   Inventory,
   ItemStack,
   PlayerRealmStage,
+  scaleTechniqueExp,
   SkillDef,
   TechniqueGrade,
   TechniqueLayerDef,
@@ -38,11 +39,16 @@ interface RawSkillDef extends Omit<SkillDef, 'unlockRealm' | 'unlockPlayerRealm'
   unlockPlayerRealm?: keyof typeof PlayerRealmStage | PlayerRealmStage;
 }
 
+interface RawTechniqueLayerDef extends Omit<TechniqueLayerDef, 'expToNext'> {
+  expToNext?: number;
+  expFactor?: number;
+}
+
 interface RawTechniqueTemplate {
   id: string;
   name: string;
   grade: TechniqueGrade;
-  layers: TechniqueLayerDef[];
+  layers: RawTechniqueLayerDef[];
   skills: RawSkillDef[];
 }
 
@@ -76,7 +82,14 @@ export class ContentService implements OnModuleInit {
         id: raw.id,
         name: raw.name,
         grade: raw.grade,
-        layers: [...(raw.layers ?? [])].sort((left, right) => left.level - right.level),
+        layers: [...(raw.layers ?? [])]
+          .map((layer) => ({
+            ...layer,
+            expToNext: layer.expFactor === undefined
+              ? Math.max(0, layer.expToNext ?? 0)
+              : scaleTechniqueExp(layer.expFactor),
+          }))
+          .sort((left, right) => left.level - right.level),
         skills: raw.skills.map((skill) => ({
           ...skill,
           unlockLevel: resolveSkillUnlockLevel({

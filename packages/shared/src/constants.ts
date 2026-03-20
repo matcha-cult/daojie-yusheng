@@ -3,6 +3,7 @@ import {
   AttrKey,
   BreakthroughItemRequirement,
   PlayerRealmStage,
+  TechniqueGrade,
   TechniqueRealm,
 } from './types';
 import type {
@@ -112,7 +113,7 @@ export const ATTR_TO_NUMERIC_WEIGHTS: Record<AttrKey, PartialNumericStats> = {
   comprehension: {
     playerExpRate: 100,
     techniqueExpRate: 100,
-    auraPowerRate: 1,
+    auraPowerRate: 100,
     breakPower: 1,
   },
   luck: {
@@ -143,9 +144,29 @@ export const ATTR_TO_PERCENT_NUMERIC_WEIGHTS: Record<AttrKey, Partial<Record<Att
 };
 
 /** 修炼每 tick 获得经验 */
-export const CULTIVATE_EXP_PER_TICK = 5;
+export const CULTIVATE_EXP_PER_TICK = 10;
 
-/** 功法升级经验表（realm → expToNext） */
+/** 功法层级经验基准值 */
+export const TECHNIQUE_EXP_BASE = 1000;
+
+/** 各品阶功法默认经验倍率基线 */
+export const TECHNIQUE_GRADE_EXP_BASE_FACTORS: Record<TechniqueGrade, number> = {
+  mortal: 10,
+  yellow: 30,
+  mystic: 90,
+  earth: 270,
+  heaven: 810,
+  spirit: 2430,
+  saint: 7290,
+  emperor: 21870,
+};
+
+export function scaleTechniqueExp(expFactor: number): number {
+  if (expFactor <= 0) return 0;
+  return Math.max(0, Math.round(expFactor * TECHNIQUE_EXP_BASE));
+}
+
+/** 旧版固定功法经验表，当前内容已按逐层配置为准 */
 export const TECHNIQUE_EXP_TABLE: Record<number, number> = {
   0: 100,   // Entry → Minor
   1: 300,   // Minor → Major
