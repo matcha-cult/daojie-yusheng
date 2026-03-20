@@ -47,12 +47,12 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#68b96c",
-            "duration": 4,
+            "duration": 3,
             "maxStacks": 3,
             "stats": {
-              "spellDef": -8,
-              "dodge": -15,
-              "resolvePower": -12
+              "spellDef": -5,
+              "dodge": -8,
+              "resolvePower": -6
             }
           }
         ],
@@ -90,12 +90,23 @@
             "damageKind": "spell",
             "element": "wood",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                16,
-                { "var": "techLevel", "scale": 2.1 },
-                { "var": "caster.stat.spellAtk", "scale": 0.8 },
-                { "var": "caster.stat.moveSpeed", "scale": 4.5 }
+                {
+                  "op": "add",
+                  "args": [
+                    20,
+                    { "var": "techLevel", "scale": 2.3 },
+                    { "var": "caster.stat.spellAtk", "scale": 0.9 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                  ]
+                }
               ]
             }
           },
@@ -113,7 +124,7 @@
             "maxStacks": 2,
             "stats": {
               "moveSpeed": 1,
-              "dodge": 18
+              "dodge": 12
             }
           }
         ],
@@ -198,9 +209,9 @@
               "args": [
                 18,
                 { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.physAtk", "scale": 0.85 },
-                { "var": "caster.stat.physDef", "scale": 0.9 },
-                { "var": "caster.maxHp", "scale": 0.04 }
+                { "var": "caster.stat.physAtk", "scale": 0.75 },
+                { "var": "caster.stat.physDef", "scale": 0.7 },
+                { "var": "caster.maxHp", "scale": 0.03 }
               ]
             }
           },

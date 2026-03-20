@@ -57,9 +57,9 @@
             "duration": 4,
             "maxStacks": 2,
             "stats": {
-              "spellAtk": -12,
-              "breakPower": -18,
-              "resolvePower": -24
+              "spellAtk": -10,
+              "breakPower": -10,
+              "resolvePower": -12
             }
           }
         ],
@@ -126,9 +126,9 @@
             "duration": 3,
             "maxStacks": 2,
             "stats": {
-              "spellAtk": 8,
-              "crit": 50,
-              "resolvePower": 18
+              "spellAtk": 10,
+              "crit": 22,
+              "resolvePower": 14
             }
           }
         ],
@@ -173,9 +173,9 @@
             "duration": 4,
             "maxStacks": 2,
             "stats": {
-              "spellDef": -10,
-              "dodge": -20,
-              "resolvePower": -20
+              "spellDef": -8,
+              "dodge": -12,
+              "resolvePower": -14
             }
           }
         ],
@@ -248,9 +248,9 @@
             "duration": 4,
             "maxStacks": 2,
             "stats": {
-              "hit": 18,
-              "breakPower": 16,
-              "crit": 20
+              "hit": 14,
+              "breakPower": 14,
+              "crit": 16
             }
           }
         ],

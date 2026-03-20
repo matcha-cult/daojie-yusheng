@@ -8,3 +8,5 @@ export * from './direction';
 export * from './targeting';
 export * from './target-ref';
 export * from './terrain';
+export * from './value';
+export * from './combat';

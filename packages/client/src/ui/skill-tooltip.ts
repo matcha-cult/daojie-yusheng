@@ -284,10 +284,10 @@ function resolvePreviewVar(varName: SkillFormulaVar, context: SkillTooltipPrevie
       return player?.qi ?? null;
     case 'caster.maxQi':
       return player?.numericStats?.maxQi ?? null;
+    case 'target.maxHp':
+      return null;
     case 'target.hp':
       return target?.hp ?? null;
-    case 'target.maxHp':
-      return target?.maxHp ?? null;
     case 'target.qi':
       return target?.qi ?? null;
     case 'target.maxQi':
@@ -297,6 +297,9 @@ function resolvePreviewVar(varName: SkillFormulaVar, context: SkillTooltipPrevie
         return resolveCasterStat(player, varName.slice('caster.stat.'.length) as NumericScalarStatKey);
       }
       if (varName.startsWith('target.stat.')) {
+        if (varName === 'target.stat.maxHp') {
+          return null;
+        }
         return resolveCasterStat(target, varName.slice('target.stat.'.length) as NumericScalarStatKey);
       }
       return null;

@@ -49,11 +49,11 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#ef6b3b",
-            "duration": 4,
+            "duration": 3,
             "maxStacks": 3,
             "stats": {
-              "spellDef": -10,
-              "resolvePower": -15
+              "spellDef": -8,
+              "resolvePower": -10
             }
           }
         ],
@@ -121,9 +121,9 @@
             "duration": 3,
             "maxStacks": 2,
             "stats": {
-              "hit": 12,
-              "crit": 35,
-              "breakPower": 18
+              "hit": 10,
+              "crit": 20,
+              "breakPower": 14
             }
           }
         ],
@@ -166,12 +166,23 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                18,
-                { "var": "techLevel", "scale": 2.4 },
-                { "var": "caster.stat.physAtk", "scale": 1.0 },
-                { "var": "caster.stat.moveSpeed", "scale": 2.5 }
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    { "var": "techLevel", "scale": 2.6 },
+                    { "var": "caster.stat.physAtk", "scale": 1.05 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                  ]
+                }
               ]
             }
           },
@@ -189,8 +200,8 @@
             "maxStacks": 2,
             "stats": {
               "moveSpeed": 1,
-              "dodge": 15,
-              "crit": 20
+              "dodge": 10,
+              "crit": 12
             }
           }
         ],
@@ -215,10 +226,26 @@
             "formula": {
               "op": "add",
               "args": [
-                24,
-                { "var": "techLevel", "scale": 3.1 },
-                { "var": "caster.stat.physAtk", "scale": 1.1 },
-                { "var": "caster.stat.moveSpeed", "scale": 5 },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        28,
+                        { "var": "techLevel", "scale": 3.3 },
+                        { "var": "caster.stat.physAtk", "scale": 1.15 }
+                      ]
+                    },
+                    {
+                      "op": "add",
+                      "args": [
+                        1,
+                        { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                      ]
+                    }
+                  ]
+                },
                 { "var": "target.maxHp", "scale": 0.015 }
               ]
             }
@@ -283,9 +310,9 @@
             "duration": 4,
             "maxStacks": 3,
             "stats": {
-              "spellDef": -8,
-              "dodge": -15,
-              "hit": -12
+              "spellDef": -6,
+              "dodge": -10,
+              "hit": -8
             }
           }
         ],
@@ -331,8 +358,8 @@
             "duration": 3,
             "maxStacks": 2,
             "stats": {
-              "dodge": -20,
-              "breakPower": -16
+              "dodge": -12,
+              "breakPower": -10
             }
           }
         ],
