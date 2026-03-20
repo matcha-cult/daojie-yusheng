@@ -22,7 +22,7 @@
         "id": "skill.fire_talisman",
         "name": "离火符",
         "desc": "引燃符火，攻击三格内的目标。",
-        "cooldown": 3,
+        "cooldown": 24,
         "cost": 8,
         "range": 3,
         "effects": [
@@ -68,7 +68,7 @@
         "id": "skill.thunder_palm",
         "name": "惊雷掌",
         "desc": "掌心引雷，重创近中距离目标。",
-        "cooldown": 4,
+        "cooldown": 40,
         "cost": 10,
         "range": 2,
         "targeting": {
@@ -117,7 +117,7 @@
         "id": "skill.cloud_cut",
         "name": "流云断",
         "desc": "刀势如云，斩击两格内目标。",
-        "cooldown": 2,
+        "cooldown": 20,
         "cost": 7,
         "range": 2,
         "targeting": {
@@ -144,7 +144,7 @@
         "id": "skill.dragon_turn",
         "name": "回龙转锋",
         "desc": "连环变招，重创三格内目标。",
-        "cooldown": 4,
+        "cooldown": 40,
         "cost": 12,
         "range": 3,
         "targeting": {
@@ -196,7 +196,7 @@
         "id": "skill.frost_mark",
         "name": "霜痕",
         "desc": "冰灵附刃，远距点杀目标。",
-        "cooldown": 3,
+        "cooldown": 24,
         "cost": 8,
         "range": 3,
         "effects": [
@@ -219,7 +219,7 @@
         "id": "skill.cold_moon_seal",
         "name": "寒月印",
         "desc": "凝寒印镇压四格内敌手。",
-        "cooldown": 5,
+        "cooldown": 50,
         "cost": 13,
         "range": 4,
         "targeting": {

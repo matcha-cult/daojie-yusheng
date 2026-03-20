@@ -20,7 +20,7 @@
         "id": "skill.qingmu_slash",
         "name": "青木斩",
         "desc": "将灵气灌入剑锋，对近身妖物造成稳定伤害。",
-        "cooldown": 2,
+        "cooldown": 16,
         "cost": 5,
         "range": 1,
         "effects": [
@@ -62,7 +62,7 @@
         "id": "skill.wind_edge",
         "name": "风痕",
         "desc": "借步法切入身位，对两格内目标打出轻快一击。",
-        "cooldown": 2,
+        "cooldown": 16,
         "cost": 5,
         "range": 2,
         "effects": [
@@ -103,7 +103,7 @@
         "id": "skill.iron_bone_strike",
         "name": "铁骨崩拳",
         "desc": "以内劲震骨，近身爆发伤害。",
-        "cooldown": 2,
+        "cooldown": 16,
         "cost": 6,
         "range": 1,
         "effects": [
@@ -127,7 +127,7 @@
         "id": "skill.iron_guard_roar",
         "name": "震罡怒吼",
         "desc": "鼓荡护体罡气，轰击中距离目标。",
-        "cooldown": 4,
+        "cooldown": 40,
         "cost": 10,
         "range": 2,
         "targeting": {
