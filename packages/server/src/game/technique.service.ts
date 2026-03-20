@@ -65,8 +65,10 @@ export class TechniqueService {
     const progress = persisted.progress ?? player.realm?.progress ?? 0;
     const normalized = this.createRealmState(stage, progress);
     player.realm = normalized;
+    player.realmLv = normalized.realmLv;
     player.realmName = normalized.name;
-    player.realmStage = normalized.shortName;
+    player.realmStage = normalized.shortName || undefined;
+    player.realmReview = normalized.review;
     player.breakthroughReady = normalized.breakthroughReady;
 
     this.syncTechniqueMetadata(player);
@@ -211,12 +213,12 @@ export class TechniqueService {
     const realm = player.realm;
     if (!realm?.breakthroughReady || realm.nextStage === undefined) return null;
 
-    const nextConfig = PLAYER_REALM_CONFIG[realm.nextStage];
+    const nextEntry = this.contentService.getRealmStageStartEntry(realm.nextStage);
     const requirementText = this.describeBreakthroughRequirements(player, realm);
 
     return {
       id: 'realm:breakthrough',
-      name: `突破至 ${nextConfig.shortName}`,
+      name: `突破至 ${nextEntry?.displayName ?? PLAYER_REALM_CONFIG[realm.nextStage].shortName}`,
       type: 'breakthrough',
       desc: requirementText
         ? `修为已满，冲境前仍需确认：${requirementText}。`
@@ -257,8 +259,10 @@ export class TechniqueService {
 
     const nextState = this.createRealmState(realm.nextStage, 0);
     player.realm = nextState;
+    player.realmLv = nextState.realmLv;
     player.realmName = nextState.name;
-    player.realmStage = nextState.shortName;
+    player.realmStage = nextState.shortName || undefined;
+    player.realmReview = nextState.review;
     player.breakthroughReady = nextState.breakthroughReady;
     this.applyRealmBonus(player, nextState);
     this.attrService.recalcPlayer(player);
@@ -294,7 +298,8 @@ export class TechniqueService {
     const messages: TechniqueMessage[] = [];
     if (realm.breakthroughReady) {
       const nextName = realm.nextStage !== undefined
-        ? PLAYER_REALM_CONFIG[realm.nextStage].name
+        ? this.contentService.getRealmStageStartEntry(realm.nextStage)?.displayName
+          ?? PLAYER_REALM_CONFIG[realm.nextStage].name
         : '更高境界';
       const requirementText = this.describeBreakthroughRequirements(player, realm);
       messages.push({
@@ -363,16 +368,26 @@ export class TechniqueService {
     const cappedProgress = config.progressToNext > 0
       ? Math.min(progress, config.progressToNext)
       : 0;
+    const breakthroughReady = config.progressToNext > 0 ? cappedProgress >= config.progressToNext : false;
+    const realmEntry = this.contentService.resolveRealmLevelEntry(
+      stage,
+      cappedProgress,
+      config.progressToNext,
+      breakthroughReady,
+    );
 
     return {
       stage,
-      name: config.name,
-      shortName: config.shortName,
-      path: config.path,
+      realmLv: realmEntry.realmLv,
+      displayName: realmEntry.displayName,
+      name: realmEntry.name,
+      shortName: realmEntry.phaseName ?? '',
+      path: realmEntry.path,
       narrative: config.narrative,
+      review: realmEntry.review,
       progress: cappedProgress,
       progressToNext: config.progressToNext,
-      breakthroughReady: config.progressToNext > 0 ? cappedProgress >= config.progressToNext : false,
+      breakthroughReady,
       nextStage,
       breakthroughItems: config.breakthroughItems.map((entry) => ({ ...entry })),
       minTechniqueLevel: config.minTechniqueLevel,
@@ -403,6 +418,7 @@ export class TechniqueService {
       attrs: {},
       meta: {
         stage: realm.stage,
+        realmLv: realm.realmLv,
         progress: realm.progress,
       },
     });

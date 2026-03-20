@@ -1951,24 +1951,7 @@ export class WorldService {
   }
 
   private getRealmStageName(stage: PlayerRealmStage): string {
-    switch (stage) {
-      case PlayerRealmStage.Mortal:
-        return '凡俗境';
-      case PlayerRealmStage.BodyTempering:
-        return '炼体境';
-      case PlayerRealmStage.BoneForging:
-        return '锻骨境';
-      case PlayerRealmStage.Meridian:
-        return '通脉境';
-      case PlayerRealmStage.Innate:
-        return '先天境';
-      case PlayerRealmStage.QiRefining:
-        return '练气境';
-      case PlayerRealmStage.Foundation:
-        return '筑基境';
-      default:
-        return '未知境界';
-    }
+    return this.contentService.getRealmStageStartEntry(stage)?.displayName ?? '未知境界';
   }
 
   private findNearestLivingMonster(player: PlayerState, maxDistance: number): RuntimeMonster | undefined {

@@ -221,10 +221,13 @@ export enum PlayerRealmStage {
 /** 玩家大境界状态 */
 export interface PlayerRealmState {
   stage: PlayerRealmStage;
+  realmLv: number;
+  displayName: string;
   name: string;
   shortName: string;
-  path: 'martial' | 'immortal';
+  path: 'martial' | 'immortal' | 'ascended';
   narrative: string;
+  review?: string;
   progress: number;
   progressToNext: number;
   breakthroughReady: boolean;
@@ -426,8 +429,10 @@ export interface PlayerState {
   name: string;
   isBot?: boolean;
   autoRetaliate?: boolean;
+  realmLv?: number;
   realmName?: string;
   realmStage?: string;
+  realmReview?: string;
   breakthroughReady?: boolean;
   mapId: string;
   x: number;

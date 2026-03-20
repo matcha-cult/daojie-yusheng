@@ -52,16 +52,68 @@ interface RawTechniqueTemplate {
   skills: RawSkillDef[];
 }
 
+type RealmSegmentId = 'martial' | 'immortal' | 'ascended';
+
+export interface RealmLevelEntry {
+  realmLv: number;
+  displayName: string;
+  name: string;
+  phaseName: string | null;
+  segment: RealmSegmentId;
+  path: RealmSegmentId;
+  grade: TechniqueGrade;
+  gradeLabel: string;
+  review: string;
+}
+
+interface RealmLevelBand {
+  grade: TechniqueGrade;
+  gradeLabel: string;
+  levelFrom: number;
+  levelTo: number;
+}
+
+interface RealmLevelSegment {
+  id: RealmSegmentId;
+  label: string;
+  levelFrom: number;
+  levelTo: number;
+  rule: string;
+}
+
+interface RealmLevelsConfig {
+  version: number;
+  baseLevelKey: string;
+  gradeSpan: number;
+  immortalStageSpan: number;
+  segments: RealmLevelSegment[];
+  gradeBands: RealmLevelBand[];
+  levels: RealmLevelEntry[];
+}
+
+const PLAYER_REALM_STAGE_LEVEL_RANGES: Record<PlayerRealmStage, { levelFrom: number; levelTo: number }> = {
+  [PlayerRealmStage.Mortal]: { levelFrom: 1, levelTo: 5 },
+  [PlayerRealmStage.BodyTempering]: { levelFrom: 6, levelTo: 8 },
+  [PlayerRealmStage.BoneForging]: { levelFrom: 9, levelTo: 12 },
+  [PlayerRealmStage.Meridian]: { levelFrom: 13, levelTo: 15 },
+  [PlayerRealmStage.Innate]: { levelFrom: 16, levelTo: 18 },
+  [PlayerRealmStage.QiRefining]: { levelFrom: 19, levelTo: 24 },
+  [PlayerRealmStage.Foundation]: { levelFrom: 25, levelTo: 30 },
+};
+
 @Injectable()
 export class ContentService implements OnModuleInit {
   private readonly logger = new Logger(ContentService.name);
   private readonly techniques = new Map<string, TechniqueTemplate>();
   private readonly items = new Map<string, ItemTemplate>();
+  private realmLevelsConfig: RealmLevelsConfig | null = null;
+  private readonly realmLevels = new Map<number, RealmLevelEntry>();
   private starterInventoryEntries: StarterInventoryEntry[] = [];
   private readonly contentDir = path.join(process.cwd(), 'data', 'content');
   private readonly techniquesDir = path.join(this.contentDir, 'techniques');
   private readonly itemsDir = path.join(this.contentDir, 'items');
   private readonly starterInventoryPath = path.join(this.contentDir, 'starter-inventory.json');
+  private readonly realmLevelsPath = path.join(this.contentDir, 'realm-levels.json');
 
   onModuleInit(): void {
     this.loadContent();
@@ -70,10 +122,12 @@ export class ContentService implements OnModuleInit {
   private loadContent(): void {
     this.techniques.clear();
     this.items.clear();
+    this.realmLevels.clear();
     this.loadTechniques();
     this.loadItems();
     this.loadStarterInventory();
-    this.logger.log(`内容已加载：功法 ${this.techniques.size} 条，物品 ${this.items.size} 条`);
+    this.loadRealmLevels();
+    this.logger.log(`内容已加载：功法 ${this.techniques.size} 条，物品 ${this.items.size} 条，境界 ${this.realmLevels.size} 条`);
   }
 
   private loadTechniques(): void {
@@ -115,6 +169,14 @@ export class ContentService implements OnModuleInit {
   private loadStarterInventory(): void {
     const raw = JSON.parse(fs.readFileSync(this.starterInventoryPath, 'utf-8')) as { items?: StarterInventoryEntry[] };
     this.starterInventoryEntries = Array.isArray(raw.items) ? raw.items : [];
+  }
+
+  private loadRealmLevels(): void {
+    const raw = JSON.parse(fs.readFileSync(this.realmLevelsPath, 'utf-8')) as RealmLevelsConfig;
+    this.realmLevelsConfig = raw;
+    for (const entry of raw.levels ?? []) {
+      this.realmLevels.set(entry.realmLv, entry);
+    }
   }
 
   private readJsonEntries<T>(dirPath: string): T[] {
@@ -196,6 +258,56 @@ export class ContentService implements OnModuleInit {
 
   getTechnique(techniqueId: string): TechniqueTemplate | undefined {
     return this.techniques.get(techniqueId);
+  }
+
+  getRealmLevelsConfig(): RealmLevelsConfig | null {
+    return this.realmLevelsConfig;
+  }
+
+  getRealmLevelEntry(realmLv: number): RealmLevelEntry | undefined {
+    return this.realmLevels.get(realmLv);
+  }
+
+  getRealmLevelRange(stage: PlayerRealmStage): { levelFrom: number; levelTo: number } {
+    return PLAYER_REALM_STAGE_LEVEL_RANGES[stage] ?? PLAYER_REALM_STAGE_LEVEL_RANGES[PlayerRealmStage.Mortal];
+  }
+
+  getRealmStageStartEntry(stage: PlayerRealmStage): RealmLevelEntry | undefined {
+    return this.getRealmLevelEntry(this.getRealmLevelRange(stage).levelFrom);
+  }
+
+  resolveRealmLevelEntry(
+    stage: PlayerRealmStage,
+    progress = 0,
+    progressToNext = 0,
+    breakthroughReady = false,
+  ): RealmLevelEntry {
+    const range = this.getRealmLevelRange(stage);
+    const span = Math.max(1, range.levelTo - range.levelFrom + 1);
+    let realmLv = range.levelFrom;
+
+    if (span > 1) {
+      if (breakthroughReady || progressToNext <= 0) {
+        realmLv = range.levelTo;
+      } else {
+        const normalized = Math.max(0, Math.min(progress / progressToNext, 0.999999));
+        realmLv = range.levelFrom + Math.min(span - 1, Math.floor(normalized * span));
+      }
+    }
+
+    return this.realmLevels.get(realmLv)
+      ?? this.realmLevels.get(range.levelFrom)
+      ?? {
+        realmLv: range.levelFrom,
+        displayName: '未知境界',
+        name: '未知境界',
+        phaseName: null,
+        segment: 'martial',
+        path: 'martial',
+        grade: 'mortal',
+        gradeLabel: '凡阶',
+        review: '',
+      };
   }
 
   getSkill(skillId: string): SkillDef | undefined {

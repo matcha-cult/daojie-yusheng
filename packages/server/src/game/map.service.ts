@@ -15,6 +15,7 @@ import {
 } from '@mud/shared';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveRealmStageTargetLabel } from './quest-display';
 
 export interface QuestConfig {
   id: string;
@@ -380,7 +381,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
             : objectiveType === 'learn_technique'
               ? rawQuest.targetTechniqueId!
               : parsedRealmStage !== undefined
-                ? PlayerRealmStage[parsedRealmStage]
+                ? resolveRealmStageTargetLabel(parsedRealmStage) ?? PlayerRealmStage[parsedRealmStage]
                 : rawQuest.title!;
         quests.push({
           id: rawQuest.id!,

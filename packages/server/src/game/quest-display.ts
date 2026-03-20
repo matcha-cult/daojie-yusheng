@@ -18,6 +18,27 @@ export function isLikelyInternalContentId(value?: string | null): boolean {
   return /^[\x00-\x7F]+$/.test(trimmed) && /[._-]/.test(trimmed) && !/\s/.test(trimmed);
 }
 
+export function resolveRealmStageTargetLabel(stage?: PlayerRealmStage): string | undefined {
+  switch (stage) {
+    case PlayerRealmStage.Mortal:
+      return '凡胎';
+    case PlayerRealmStage.BodyTempering:
+      return '养气';
+    case PlayerRealmStage.BoneForging:
+      return '开阳';
+    case PlayerRealmStage.Meridian:
+      return '天璇';
+    case PlayerRealmStage.Innate:
+      return '大宗师';
+    case PlayerRealmStage.QiRefining:
+      return '练气前期';
+    case PlayerRealmStage.Foundation:
+      return '筑基前期';
+    default:
+      return undefined;
+  }
+}
+
 export function resolveQuestTargetName({
   objectiveType,
   title,
@@ -41,7 +62,7 @@ export function resolveQuestTargetName({
   }
 
   if ((objectiveType === 'realm_progress' || objectiveType === 'realm_stage') && targetRealmStage !== undefined) {
-    return PlayerRealmStage[targetRealmStage];
+    return resolveRealmStageTargetLabel(targetRealmStage) ?? PlayerRealmStage[targetRealmStage];
   }
 
   return targetName ?? title;
