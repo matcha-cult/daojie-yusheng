@@ -13,6 +13,7 @@ import {
   ratioValue,
   S2C_AttrUpdate,
 } from '@mud/shared';
+import { FloatingTooltip } from '../floating-tooltip';
 
 type AttrTab = 'base' | 'root' | 'combat' | 'qi' | 'special';
 type NumericCardKey = Exclude<keyof NumericStats, 'elementDamageBonus' | 'elementDamageReduce'>;
@@ -241,7 +242,7 @@ interface RadarEntry {
 export class AttrPanel {
   private pane = document.getElementById('pane-attr')!;
   private activeTab: AttrTab = 'base';
-  private tooltip: HTMLDivElement | null = null;
+  private tooltip = new FloatingTooltip('floating-tooltip attr-tooltip');
 
   constructor() {
     this.ensureTooltipStyle();
@@ -578,28 +579,28 @@ export class AttrPanel {
         z-index: 2000;
         transition: opacity 120ms ease, transform 120ms ease;
         opacity: 0;
-        transform: translate(-50%, -8px);
+        transform: translateY(-8px);
         font-family: var(--font-text);
         min-width: 140px;
       }
       .attr-tooltip.visible {
         opacity: 1;
       }
-      .attr-tooltip-body {
+      .attr-tooltip .floating-tooltip-body {
         display: flex;
         flex-direction: column;
         gap: 4px;
         line-height: 1.35;
       }
-      .attr-tooltip-body strong {
+      .attr-tooltip .floating-tooltip-body strong {
         font-weight: 600;
         display: block;
         margin-bottom: 4px;
       }
-      .attr-tooltip-line {
+      .attr-tooltip .floating-tooltip-line {
         display: block;
       }
-      .attr-tooltip-detail {
+      .attr-tooltip .floating-tooltip-detail {
         font-size: 12px;
         line-height: 1.4;
         color: var(--ink-grey);
@@ -661,28 +662,10 @@ export class AttrPanel {
     document.head.appendChild(style);
   }
 
-  private getTooltip(): HTMLDivElement {
-    if (!this.tooltip) {
-      const tooltip = document.createElement('div');
-      tooltip.className = 'attr-tooltip';
-      document.body.appendChild(tooltip);
-      this.tooltip = tooltip;
-    }
-    return this.tooltip;
-  }
-
   private bindRadarTooltips(): void {
-    const tooltip = this.getTooltip();
     const showTooltip = (title: string, detail: string, event: PointerEvent) => {
       const lines = splitTooltipLines(detail);
-      tooltip.innerHTML = `<div class="attr-tooltip-body"><strong>${title}</strong>${
-        lines.length > 0
-          ? `<div class="attr-tooltip-detail">${lines.map((line) => `<span class="attr-tooltip-line">${line}</span>`).join('')}</div>`
-          : ''
-      }</div>`;
-      tooltip.style.left = `${event.clientX + 14}px`;
-      tooltip.style.top = `${event.clientY + 10}px`;
-      tooltip.classList.add('visible');
+      this.tooltip.show(title, lines, event.clientX, event.clientY);
     };
 
     const triggers = this.pane.querySelectorAll<SVGTextElement>('.attr-radar-trigger');
@@ -694,11 +677,10 @@ export class AttrPanel {
         showTooltip(title, detail, event);
       });
       trigger.addEventListener('pointermove', (event) => {
-        tooltip.style.left = `${event.clientX + 14}px`;
-        tooltip.style.top = `${event.clientY + 10}px`;
+        this.tooltip.move(event.clientX, event.clientY);
       });
       trigger.addEventListener('pointerleave', () => {
-        tooltip.classList.remove('visible');
+        this.tooltip.hide();
       });
     });
 
@@ -710,11 +692,10 @@ export class AttrPanel {
         showTooltip(title, detail, event);
       });
       card.addEventListener('pointermove', (event) => {
-        tooltip.style.left = `${event.clientX + 14}px`;
-        tooltip.style.top = `${event.clientY + 10}px`;
+        this.tooltip.move(event.clientX, event.clientY);
       });
       card.addEventListener('pointerleave', () => {
-        tooltip.classList.remove('visible');
+        this.tooltip.hide();
       });
     });
   }

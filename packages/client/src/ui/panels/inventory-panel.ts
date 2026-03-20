@@ -1,4 +1,5 @@
 import { Inventory, PlayerState } from '@mud/shared';
+import { FloatingTooltip } from '../floating-tooltip';
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
   consumable: '消耗品',
@@ -66,7 +67,7 @@ export class InventoryPanel {
   private onUseItem: ((slotIndex: number) => void) | null = null;
   private onDropItem: ((slotIndex: number, count: number) => void) | null = null;
   private onEquipItem: ((slotIndex: number) => void) | null = null;
-  private tooltip: HTMLDivElement | null = null;
+  private tooltip = new FloatingTooltip('floating-tooltip inventory-tooltip');
 
   constructor() {
     this.ensureTooltipStyle();
@@ -159,28 +160,14 @@ export class InventoryPanel {
     });
   }
 
-  private getTooltip(): HTMLDivElement {
-    if (!this.tooltip) {
-      const tooltip = document.createElement('div');
-      tooltip.className = 'inventory-tooltip';
-      document.body.appendChild(tooltip);
-      this.tooltip = tooltip;
-    }
-    return this.tooltip;
-  }
-
   private bindTooltips(): void {
-    const tooltip = this.getTooltip();
     const cells = this.pane.querySelectorAll<HTMLElement>('.inventory-cell');
     const show = (title: string, detail: string, event: PointerEvent) => {
       const lines = detail
         .split('\n')
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
-      tooltip.innerHTML = `<div class="inventory-tooltip-body"><strong>${title}</strong>${lines.length > 0 ? `<div class="inventory-tooltip-detail">${lines.map((line) => `<span class="inventory-tooltip-line">${line}</span>`).join('')}</div>` : ''}</div>`;
-      tooltip.style.left = `${event.clientX + 14}px`;
-      tooltip.style.top = `${event.clientY + 10}px`;
-      tooltip.classList.add('visible');
+      this.tooltip.show(title, lines, event.clientX, event.clientY);
     };
 
     cells.forEach((cell) => {
@@ -188,11 +175,10 @@ export class InventoryPanel {
       const detail = cell.dataset.tooltipDetail ?? '';
       cell.addEventListener('pointerenter', (event) => show(title, detail, event));
       cell.addEventListener('pointermove', (event) => {
-        tooltip.style.left = `${event.clientX + 14}px`;
-        tooltip.style.top = `${event.clientY + 10}px`;
+        this.tooltip.move(event.clientX, event.clientY);
       });
       cell.addEventListener('pointerleave', () => {
-        tooltip.classList.remove('visible');
+        this.tooltip.hide();
       });
     });
   }
@@ -220,22 +206,22 @@ export class InventoryPanel {
       .inventory-tooltip.visible {
         opacity: 1;
       }
-      .inventory-tooltip-body {
+      .inventory-tooltip .floating-tooltip-body {
         display: flex;
         flex-direction: column;
         gap: 4px;
         line-height: 1.4;
       }
-      .inventory-tooltip-body strong {
+      .inventory-tooltip .floating-tooltip-body strong {
         display: block;
       }
-      .inventory-tooltip-detail {
+      .inventory-tooltip .floating-tooltip-detail {
         display: flex;
         flex-direction: column;
         gap: 2px;
         color: #5c5349;
       }
-      .inventory-tooltip-line {
+      .inventory-tooltip .floating-tooltip-line {
         display: block;
       }
     `;
