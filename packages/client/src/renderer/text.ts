@@ -192,6 +192,7 @@ export class TextRenderer implements IRenderer {
 
         if (!isVisible && Math.abs(gx - playerX) > displayRangeX) continue;
         if (!isVisible && Math.abs(gy - playerY) > displayRangeY) continue;
+        if (!tile && !isVisible) continue;
 
         if (tile) {
           ctx.fillStyle = TILE_BG[tile.type] ?? '#333';
@@ -267,12 +268,6 @@ export class TextRenderer implements IRenderer {
               ctx.strokeRect(sx + 1.5, sy + 1.5, cellSize - 3, cellSize - 3);
             }
           }
-        } else {
-          ctx.fillStyle = '#0d0b0a';
-          ctx.fillRect(sx, sy, cellSize, cellSize);
-          ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(sx, sy, cellSize, cellSize);
         }
 
         if (!isVisible) {
