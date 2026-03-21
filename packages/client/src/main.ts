@@ -158,6 +158,8 @@ const NUMERIC_STAT_LABELS: Partial<Record<(typeof NUMERIC_SCALAR_STAT_KEYS)[numb
   auraPowerRate: '术法增幅',
   playerExpRate: '角色经验',
   techniqueExpRate: '功法经验',
+  realmExpPerTick: '每息境界经验',
+  techniqueExpPerTick: '每息功法经验',
   lootRate: '掉落增幅',
   rareLootRate: '稀有掉落',
   viewRange: '视野',
@@ -333,17 +335,22 @@ function resolveTargetRefForAction(
   action: Pick<NonNullable<typeof pendingTargetedAction>, 'shape' | 'targetMode'>,
   target: { x: number; y: number; entityId?: string; entityKind?: string },
 ): string | null {
+  const entityTargetRef = target.entityKind === 'player' && target.entityId
+    ? `player:${target.entityId}`
+    : target.entityKind === 'monster' && target.entityId
+      ? target.entityId
+      : null;
   if (action.shape && action.shape !== 'single') {
     return encodeTileTargetRef({ x: target.x, y: target.y });
   }
   if (action.targetMode === 'entity') {
-    return target.entityKind === 'monster' && target.entityId ? target.entityId : null;
+    return entityTargetRef;
   }
   if (action.targetMode === 'tile') {
     return encodeTileTargetRef({ x: target.x, y: target.y });
   }
-  if (target.entityKind === 'monster' && target.entityId) {
-    return target.entityId;
+  if (entityTargetRef) {
+    return entityTargetRef;
   }
   return encodeTileTargetRef({ x: target.x, y: target.y });
 }
@@ -362,7 +369,8 @@ function hasAffectableTargetInArea(
   }
   return affectedCells.some((cell) => {
     const hasMonster = latestEntities.some((entity) => entity.kind === 'monster' && entity.wx === cell.x && entity.wy === cell.y);
-    if (hasMonster) {
+    const hasPlayer = latestEntities.some((entity) => entity.kind === 'player' && entity.wx === cell.x && entity.wy === cell.y);
+    if (hasMonster || hasPlayer) {
       return true;
     }
     const tile = getVisibleTileAt(cell.x, cell.y);

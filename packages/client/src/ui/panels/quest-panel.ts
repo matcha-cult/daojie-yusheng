@@ -256,10 +256,10 @@ export class QuestPanel {
       return `使用技能书并学会 ${quest.targetName}`;
     }
     if (quest.objectiveType === 'realm_progress') {
-      return `切换到修炼状态，继续积累 ${quest.targetName}`;
+      return `前往历练并击败敌人，继续积累 ${quest.targetName}`;
     }
     if (quest.objectiveType === 'realm_stage') {
-      return `切换到修炼状态，继续提升至 ${quest.targetName}`;
+      return `继续历练、积累境界经验并突破至 ${quest.targetName}`;
     }
     return `前往击杀 ${quest.targetName}`;
   }

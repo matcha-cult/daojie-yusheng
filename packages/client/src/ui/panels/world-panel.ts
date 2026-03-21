@@ -262,7 +262,7 @@ export class WorldPanel {
         <div class="info-line"><span>推进路线</span><strong>${escapeHtml(guide.route)}</strong></div>
         <div class="info-line"><span>主要资源</span><strong>${escapeHtml(guide.resources.join('、') || '暂无')}</strong></div>
         <div class="info-line"><span>主要威胁</span><strong>${escapeHtml(guide.threats.join('、') || '未知')}</strong></div>
-        <div class="info-line"><span>当前修炼</span><strong>${escapeHtml(cultivating?.name ?? '未设定')}</strong></div>
+        <div class="info-line"><span>当前主修</span><strong>${escapeHtml(cultivating?.name ?? '未设定')}</strong></div>
       </div>
     `;
 

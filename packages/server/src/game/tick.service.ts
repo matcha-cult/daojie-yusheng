@@ -171,8 +171,10 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           if (player.autoBattle) {
             player.autoBattle = false;
             player.combatTargetId = undefined;
+            player.combatTargetLocked = false;
             this.playerService.markDirty(player.id, 'actions');
           }
+          this.applyCultivationResult(player.id, this.techniqueService.interruptCultivation(player, 'move'), messages);
           const { d } = cmd.data as { d: Direction };
           this.navigationService.stepPlayerByDirection(player, d);
           break;
@@ -181,8 +183,10 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           if (player.autoBattle) {
             player.autoBattle = false;
             player.combatTargetId = undefined;
+            player.combatTargetLocked = false;
             this.playerService.markDirty(player.id, 'actions');
           }
+          this.applyCultivationResult(player.id, this.techniqueService.interruptCultivation(player, 'move'), messages);
           const { x, y, allowNearestReachable } = cmd.data as { x: number; y: number; allowNearestReachable?: boolean };
           const error = this.navigationService.setMoveTarget(player, x, y, { allowNearestReachable });
           if (error) {
@@ -250,21 +254,25 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         case 'cultivate': {
           const { techId } = cmd.data as { techId: string | null };
           if (!techId) {
+            const cultivation = this.techniqueService.stopCultivation(player, '你收束气机，停止了当前修炼。', 'quest');
             player.cultivatingTechId = undefined;
-            messages.push({ playerId: player.id, text: '你收束气机，暂时停止修炼。', kind: 'quest' });
+            this.applyCultivationResult(player.id, cultivation, messages);
+            messages.push({ playerId: player.id, text: '你收束气机，取消了当前主修功法。', kind: 'quest' });
             this.playerService.markDirty(player.id, 'tech');
+            this.playerService.markDirty(player.id, 'actions');
             break;
           }
 
           const technique = player.techniques.find((entry) => entry.techId === techId);
           if (!technique) {
-            messages.push({ playerId: player.id, text: '尚未掌握该功法，无法运转修炼。', kind: 'system' });
+            messages.push({ playerId: player.id, text: '尚未掌握该功法，无法设为主修。', kind: 'system' });
             break;
           }
 
           player.cultivatingTechId = techId;
-          messages.push({ playerId: player.id, text: `你开始运转 ${technique.name}，持续凝练修为。`, kind: 'quest' });
+          messages.push({ playerId: player.id, text: `你将 ${technique.name} 设为当前主修，修炼与战斗所得功法经验都会优先流入此法。`, kind: 'quest' });
           this.playerService.markDirty(player.id, 'tech');
+          this.playerService.markDirty(player.id, 'actions');
           break;
         }
         case 'updateAutoBattleSkills': {
@@ -316,6 +324,8 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
                 result.dirty.push('actions');
               }
             }
+          } else if (action.requiresTarget) {
+            result = this.worldService.handleTargetedInteraction(player, actionId, target);
           } else {
             result = this.worldService.handleInteraction(player, actionId);
           }
@@ -440,6 +450,20 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
     messages.push(...update.messages);
     this.markDirty(playerId, update.dirty as DirtyFlag[]);
+    for (const dirtyPlayerId of update.dirtyPlayers ?? []) {
+      this.playerService.markDirty(dirtyPlayerId, 'attr');
+      this.playerService.markDirty(dirtyPlayerId, 'actions');
+    }
+  }
+
+  private applyCultivationResult(playerId: string, result: ReturnType<TechniqueService['interruptCultivation']>, messages: WorldMessage[]) {
+    if (!result.changed) {
+      return;
+    }
+    this.markDirty(playerId, result.dirty as DirtyFlag[]);
+    for (const message of result.messages) {
+      messages.push({ playerId, text: message.text, kind: message.kind });
+    }
   }
 
   private markDirty(playerId: string, flags: DirtyFlag[]) {

@@ -477,6 +477,7 @@ export interface PlayerState {
   autoBattle: boolean;
   autoBattleSkills: AutoBattleSkillConfig[];
   combatTargetId?: string;
+  combatTargetLocked?: boolean;
   cultivatingTechId?: string;
   revealedBreakthroughRequirementIds?: string[];
   realm?: PlayerRealmState;

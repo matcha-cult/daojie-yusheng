@@ -47,6 +47,8 @@ const STAT_LABELS: Record<string, string> = {
   auraPowerRate: '光环效果增强',
   playerExpRate: '角色经验',
   techniqueExpRate: '功法经验',
+  realmExpPerTick: '每息境界经验',
+  techniqueExpPerTick: '每息功法经验',
   lootRate: '掉落增幅',
   rareLootRate: '稀有掉落',
   viewRange: '视野范围',

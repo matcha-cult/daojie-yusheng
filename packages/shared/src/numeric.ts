@@ -37,6 +37,8 @@ export const NUMERIC_SCALAR_STAT_KEYS = [
   'auraPowerRate',
   'playerExpRate',
   'techniqueExpRate',
+  'realmExpPerTick',
+  'techniqueExpPerTick',
   'lootRate',
   'rareLootRate',
   'viewRange',
@@ -66,6 +68,8 @@ export interface NumericStats {
   auraPowerRate: number;
   playerExpRate: number;
   techniqueExpRate: number;
+  realmExpPerTick: number;
+  techniqueExpPerTick: number;
   lootRate: number;
   rareLootRate: number;
   viewRange: number;
@@ -124,6 +128,8 @@ export const NUMERIC_SCALAR_STAT_VALUE_TYPES: Record<NumericScalarStatKey, Numer
   auraPowerRate: 'rate_bp',
   playerExpRate: 'rate_bp',
   techniqueExpRate: 'rate_bp',
+  realmExpPerTick: 'throughput',
+  techniqueExpPerTick: 'throughput',
   lootRate: 'rate_bp',
   rareLootRate: 'rate_bp',
   viewRange: 'flat',
@@ -193,6 +199,8 @@ export function createNumericStats(): NumericStats {
     auraPowerRate: 0,
     playerExpRate: 0,
     techniqueExpRate: 0,
+    realmExpPerTick: 0,
+    techniqueExpPerTick: 0,
     lootRate: 0,
     rareLootRate: 0,
     viewRange: 0,
@@ -224,6 +232,8 @@ export function cloneNumericStats(source: NumericStats): NumericStats {
     auraPowerRate: source.auraPowerRate,
     playerExpRate: source.playerExpRate,
     techniqueExpRate: source.techniqueExpRate,
+    realmExpPerTick: source.realmExpPerTick,
+    techniqueExpPerTick: source.techniqueExpPerTick,
     lootRate: source.lootRate,
     rareLootRate: source.rareLootRate,
     viewRange: source.viewRange,
@@ -254,6 +264,8 @@ export function resetNumericStats(target: NumericStats): NumericStats {
   target.auraPowerRate = 0;
   target.playerExpRate = 0;
   target.techniqueExpRate = 0;
+  target.realmExpPerTick = 0;
+  target.techniqueExpPerTick = 0;
   target.lootRate = 0;
   target.rareLootRate = 0;
   target.viewRange = 0;
@@ -285,6 +297,8 @@ export function addPartialNumericStats(target: NumericStats, patch?: PartialNume
   if (patch.auraPowerRate !== undefined) target.auraPowerRate += patch.auraPowerRate;
   if (patch.playerExpRate !== undefined) target.playerExpRate += patch.playerExpRate;
   if (patch.techniqueExpRate !== undefined) target.techniqueExpRate += patch.techniqueExpRate;
+  if (patch.realmExpPerTick !== undefined) target.realmExpPerTick += patch.realmExpPerTick;
+  if (patch.techniqueExpPerTick !== undefined) target.techniqueExpPerTick += patch.techniqueExpPerTick;
   if (patch.lootRate !== undefined) target.lootRate += patch.lootRate;
   if (patch.rareLootRate !== undefined) target.rareLootRate += patch.rareLootRate;
   if (patch.viewRange !== undefined) target.viewRange += patch.viewRange;

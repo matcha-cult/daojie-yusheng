@@ -11,7 +11,7 @@ const TYPE_NAMES: Record<string, string> = {
   gather: '采集',
   interact: '交互',
   battle: '战斗',
-  toggle: '操作',
+  toggle: '行动',
   quest: '任务',
   travel: '传送',
   breakthrough: '突破',
@@ -127,7 +127,7 @@ export class ActionPanel {
     }> = [
       { id: 'dialogue', label: '对话', types: ['quest', 'interact', 'travel'] },
       { id: 'skill', label: '技能', types: ['skill', 'battle', 'gather', 'breakthrough'] },
-      { id: 'toggle', label: '操作', types: ['toggle'] },
+      { id: 'toggle', label: '行动', types: ['toggle'] },
     ];
     const groups = new Map<string, ActionDef[]>();
     for (const action of actions) {
@@ -171,28 +171,15 @@ export class ActionPanel {
     for (const tab of tabGroups) {
       html += `<div class="action-tab-pane ${this.activeTab === tab.id ? 'active' : ''}" data-action-pane="${tab.id}">`;
       if (tab.id === 'toggle') {
-        const utilityEntries = actions.filter((action) => action.id === 'client:observe');
+        const utilityEntries = actions.filter((action) => action.type === 'toggle' && action.id !== 'toggle:auto_battle' && action.id !== 'toggle:auto_retaliate');
         if (utilityEntries.length === 0) {
           html += '<div class="empty-hint">当前分组暂无内容</div></div>';
           continue;
         }
         html += `<div class="panel-section">
-          <div class="panel-section-title">环境观察</div>`;
+          <div class="panel-section-title">行动</div>`;
         for (const action of utilityEntries) {
-          html += `<div class="action-item">
-            <div class="action-copy">
-              <div>
-                <span class="action-name">${escapeHtml(action.name)}</span>
-                <span class="action-type">[操作]</span>
-                ${this.renderShortcutBadge(action.id)}
-              </div>
-              <div class="action-desc">${escapeHtml(action.desc)}</div>
-            </div>
-            <div class="action-cta">
-              <button class="small-btn ghost" data-bind-action="${action.id}" type="button">${this.getBindButtonLabel(action.id)}</button>
-              <button class="small-btn" data-action="${action.id}" data-action-name="${escapeHtml(action.name)}" data-action-range="${action.range ?? ''}" data-action-target="${action.requiresTarget ? '1' : '0'}" data-action-target-mode="${action.targetMode ?? ''}">执行</button>
-            </div>
-          </div>`;
+          html += this.renderActionItem(action);
         }
         html += '</div></div>';
         continue;

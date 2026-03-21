@@ -333,6 +333,8 @@ function makeRealmNumericTemplate(
       auraPowerRate: scalar.auraPowerRate ?? 0,
       playerExpRate: scalar.playerExpRate ?? 0,
       techniqueExpRate: scalar.techniqueExpRate ?? 0,
+      realmExpPerTick: scalar.realmExpPerTick ?? 0,
+      techniqueExpPerTick: scalar.techniqueExpPerTick ?? 0,
       lootRate: scalar.lootRate ?? 0,
       rareLootRate: scalar.rareLootRate ?? 0,
       viewRange: VIEW_RADIUS + (scalar.viewRange ?? 0),

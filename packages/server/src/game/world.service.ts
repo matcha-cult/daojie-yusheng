@@ -36,6 +36,7 @@ import { ContentService } from './content.service';
 import { InventoryService } from './inventory.service';
 import { DropConfig, MapService, MonsterSpawnConfig, NpcConfig, QuestConfig } from './map.service';
 import { NavigationService } from './navigation.service';
+import { PlayerService } from './player.service';
 import { isLikelyInternalContentId, resolveQuestTargetName } from './quest-display';
 import { TechniqueService } from './technique.service';
 
@@ -149,6 +150,7 @@ interface ResolvedHit {
 
 type ResolvedTarget =
   | { kind: 'monster'; x: number; y: number; monster: RuntimeMonster }
+  | { kind: 'player'; x: number; y: number; player: PlayerState }
   | { kind: 'tile'; x: number; y: number; tileType?: string };
 
 interface SkillFormulaContext {
@@ -178,6 +180,7 @@ export class WorldService {
     private readonly navigationService: NavigationService,
     private readonly techniqueService: TechniqueService,
     private readonly attrService: AttrService,
+    private readonly playerService: PlayerService,
   ) {}
 
   getVisibleEntities(player: PlayerState, visibleKeys: Set<string>): RenderEntity[] {
@@ -233,6 +236,25 @@ export class WorldService {
       type: 'toggle',
       desc: player.autoRetaliate === false ? '被攻击时不会自动开启自动战斗。' : '被攻击时自动开启自动战斗。',
       cooldownLeft: 0,
+    }, {
+      id: 'cultivation:toggle',
+      name: this.techniqueService.hasCultivationBuff(player) ? '停止修炼' : '开始修炼',
+      type: 'toggle',
+      desc: player.cultivatingTechId
+        ? (this.techniqueService.hasCultivationBuff(player)
+          ? '收束当前运转的气机，停止修炼。'
+          : '运转当前主修功法，每息获得境界与功法经验。')
+        : '需先在功法面板选择主修功法，才能开始修炼。',
+      cooldownLeft: 0,
+    }, {
+      id: 'battle:force_attack',
+      name: '强制攻击',
+      type: 'toggle',
+      desc: '指定任意目标为攻击目标，并开启自动战斗持续追击。',
+      cooldownLeft: 0,
+      requiresTarget: true,
+      targetMode: 'any',
+      range: Math.max(1, player.viewRange),
     }];
 
     const breakthroughAction = this.techniqueService.getBreakthroughAction(player);
@@ -294,7 +316,7 @@ export class WorldService {
     if (actionId === 'toggle:auto_battle') {
       player.autoBattle = !player.autoBattle;
       if (!player.autoBattle) {
-        player.combatTargetId = undefined;
+        this.clearCombatTarget(player);
       }
       if (player.autoBattle) {
         this.navigationService.clearMoveTarget(player.id);
@@ -318,6 +340,21 @@ export class WorldService {
           kind: 'combat',
         }],
         dirty: ['actions'],
+      };
+    }
+
+    if (actionId === 'cultivation:toggle') {
+      const result = this.techniqueService.hasCultivationBuff(player)
+        ? this.techniqueService.stopCultivation(player)
+        : this.techniqueService.startCultivation(player);
+      return {
+        error: result.error,
+        messages: result.messages.map((message) => ({
+          playerId: player.id,
+          text: message.text,
+          kind: message.kind,
+        })),
+        dirty: result.dirty,
       };
     }
 
@@ -349,6 +386,13 @@ export class WorldService {
     }
 
     return this.handleNpcInteraction(player, npc);
+  }
+
+  handleTargetedInteraction(player: PlayerState, actionId: string, targetRef?: string): WorldUpdate {
+    if (actionId === 'battle:force_attack') {
+      return this.forceAttackTarget(player, targetRef);
+    }
+    return { ...EMPTY_UPDATE, error: '该行动不支持指定目标' };
   }
 
   syncQuestState(player: PlayerState): WorldDirtyFlag[] {
@@ -407,9 +451,30 @@ export class WorldService {
   performAutoBattle(player: PlayerState): WorldUpdate {
     if (!player.autoBattle || player.dead) return EMPTY_UPDATE;
 
-    const target = this.resolveCombatTarget(player) ?? this.findNearestLivingMonster(player, 8);
-    if (!target) return EMPTY_UPDATE;
-    player.combatTargetId = target.runtimeId;
+    let target = this.resolveCombatTarget(player);
+    const dirty = new Set<WorldDirtyFlag>();
+
+    if (!target) {
+      if (player.combatTargetLocked) {
+        player.autoBattle = false;
+        this.clearCombatTarget(player);
+        return {
+          messages: [{
+            playerId: player.id,
+            text: '强制攻击目标已经失去踪迹，自动战斗已停止。',
+            kind: 'combat',
+          }],
+          dirty: ['actions'],
+        };
+      }
+      const fallback = this.findNearestLivingMonster(player, 8);
+      if (!fallback) {
+        this.clearCombatTarget(player);
+        return EMPTY_UPDATE;
+      }
+      target = { kind: 'monster', x: fallback.x, y: fallback.y, monster: fallback };
+      player.combatTargetId = fallback.runtimeId;
+    }
 
     const skillActionMap = new Map(
       player.actions
@@ -421,27 +486,42 @@ export class WorldService {
       .map((entry) => skillActionMap.get(entry.skillId))
       .find((action): action is ActionDef => action !== undefined && action.cooldownLeft === 0);
     const availableSkillDef = availableSkill ? this.contentService.getSkill(availableSkill.id) : null;
+    const targetRef = this.getTargetRef(target);
 
-    if (availableSkillDef && isPointInRange(player, target, availableSkillDef.range)) {
-      const update = this.performTargetedSkill(player, availableSkillDef.id, target.runtimeId);
+    if (availableSkillDef && targetRef && isPointInRange(player, target, availableSkillDef.range)) {
+      const update = this.performTargetedSkill(player, availableSkillDef.id, targetRef);
       if (update.consumedAction) {
         return { ...update, usedActionId: availableSkillDef.id };
       }
       if (isPointInRange(player, target, 1)) {
-        return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
+        return this.performBasicAttack(player, target);
       }
     }
 
     if (isPointInRange(player, target, 1)) {
       this.faceToward(player, target.x, target.y);
-      return this.attackMonster(player, target, 6, '你挥剑斩中', 'physical');
+      return this.performBasicAttack(player, target);
     }
 
     const facing = this.stepToward(player.mapId, player, target.x, target.y, player.id);
     if (facing !== null) {
       player.facing = facing;
+      const cultivation = this.techniqueService.interruptCultivation(player, 'move');
+      if (cultivation.changed) {
+        for (const flag of cultivation.dirty) {
+          dirty.add(flag as WorldDirtyFlag);
+        }
+        return {
+          messages: cultivation.messages.map((message) => ({
+            playerId: player.id,
+            text: message.text,
+            kind: message.kind,
+          })),
+          dirty: [...dirty],
+        };
+      }
     }
-    return EMPTY_UPDATE;
+    return dirty.size > 0 ? { messages: [], dirty: [...dirty] } : EMPTY_UPDATE;
   }
 
   performSkill(player: PlayerState, skillId: string): WorldUpdate {
@@ -476,6 +556,17 @@ export class WorldService {
   }
 
   private castSkill(player: PlayerState, skill: SkillDef, primaryTarget?: ResolvedTarget): WorldUpdate {
+    const cultivation = this.techniqueService.interruptCultivation(player, 'attack');
+    const dirty = new Set<WorldDirtyFlag>(cultivation.dirty as WorldDirtyFlag[]);
+    const result: WorldUpdate = {
+      messages: cultivation.messages.map((message) => ({
+        playerId: player.id,
+        text: message.text,
+        kind: message.kind,
+      })),
+      dirty: [],
+      consumedAction: true,
+    };
     if (primaryTarget) {
       this.faceToward(player, primaryTarget.x, primaryTarget.y);
     }
@@ -491,8 +582,6 @@ export class WorldService {
 
     const casterStats = this.attrService.getPlayerNumericStats(player);
     const techLevel = this.getSkillTechniqueLevel(player, skill.id);
-    const result: WorldUpdate = { messages: [], dirty: [], consumedAction: true };
-    const dirty = new Set<WorldDirtyFlag>();
     let appliedEffect = false;
     let firstError: string | undefined;
 
@@ -510,15 +599,30 @@ export class WorldService {
             targetCount: damageTargets.length,
             casterStats,
             target,
-            targetStats: target.kind === 'monster' ? this.getMonsterCombatSnapshot(target.monster).stats : undefined,
+            targetStats: target.kind === 'monster'
+              ? this.getMonsterCombatSnapshot(target.monster).stats
+              : target.kind === 'player'
+                ? this.getPlayerCombatSnapshot(target.player).stats
+                : undefined,
           };
           const baseDamage = Math.max(1, Math.round(this.evaluateSkillFormula(effect.formula, context)));
           const update = target.kind === 'monster'
             ? this.attackMonster(player, target.monster, baseDamage, `${skill.name}击中`, effect.damageKind ?? 'spell', effect.element, qiCost)
-            : this.attackTerrain(player, target.x, target.y, baseDamage, skill.name, target.tileType ?? '目标', effect.damageKind ?? 'spell', effect.element);
+            : target.kind === 'player'
+              ? this.attackPlayer(player, target.player, baseDamage, `${skill.name}击中`, effect.damageKind ?? 'spell', effect.element, qiCost)
+              : this.attackTerrain(player, target.x, target.y, baseDamage, skill.name, target.tileType ?? '目标', effect.damageKind ?? 'spell', effect.element);
           result.messages.push(...update.messages);
           for (const flag of update.dirty) {
             dirty.add(flag);
+          }
+          for (const playerId of update.dirtyPlayers ?? []) {
+            if (playerId === player.id) {
+              continue;
+            }
+            result.dirtyPlayers ??= [];
+            if (!result.dirtyPlayers.includes(playerId)) {
+              result.dirtyPlayers.push(playerId);
+            }
           }
           if (update.error) {
             firstError ??= update.error;
@@ -533,6 +637,15 @@ export class WorldService {
       result.messages.push(...update.messages);
       for (const flag of update.dirty) {
         dirty.add(flag);
+      }
+      for (const playerId of update.dirtyPlayers ?? []) {
+        if (playerId === player.id) {
+          continue;
+        }
+        result.dirtyPlayers ??= [];
+        if (!result.dirtyPlayers.includes(playerId)) {
+          result.dirtyPlayers.push(playerId);
+        }
       }
       if (update.error) {
         firstError ??= update.error;
@@ -559,6 +672,29 @@ export class WorldService {
 
     player.autoBattle = true;
     player.combatTargetId = target.monster.runtimeId;
+    player.combatTargetLocked = false;
+    this.navigationService.clearMoveTarget(player.id);
+    const update = this.performAutoBattle(player);
+    const dirty = new Set(update.dirty);
+    dirty.add('actions');
+    return { ...update, dirty: [...dirty] };
+  }
+
+  forceAttackTarget(player: PlayerState, targetRef?: string): WorldUpdate {
+    if (!targetRef) {
+      return { ...EMPTY_UPDATE, error: '请选择目标' };
+    }
+    const target = this.resolveTargetRef(player, targetRef);
+    if (!target) {
+      return { ...EMPTY_UPDATE, error: '目标不存在或不可选中' };
+    }
+    if (!isPointInRange(player, target, Math.max(1, player.viewRange))) {
+      return { ...EMPTY_UPDATE, error: '目标超出可锁定范围' };
+    }
+
+    player.autoBattle = true;
+    player.combatTargetId = this.getTargetRef(target);
+    player.combatTargetLocked = true;
     this.navigationService.clearMoveTarget(player.id);
     const update = this.performAutoBattle(player);
     const dirty = new Set(update.dirty);
@@ -577,13 +713,15 @@ export class WorldService {
     }
 
     const monsters = this.monstersByMap.get(player.mapId) ?? [];
+    const players = this.playerService.getPlayersByMap(player.mapId)
+      .filter((entry) => entry.id !== player.id && !entry.dead);
     const maxTargets = Math.max(1, targeting?.maxTargets ?? 99);
     if (shape === 'line') {
       const cells = computeAffectedCellsFromAnchor(player, primaryTarget, {
         range: skill.range,
         shape: 'line',
       });
-      return this.collectTargetsFromCells(player, monsters, cells, maxTargets);
+      return this.collectTargetsFromCells(player, monsters, players, cells, maxTargets);
     }
 
     const cells = computeAffectedCellsFromAnchor(player, primaryTarget, {
@@ -591,12 +729,13 @@ export class WorldService {
       shape: 'area',
       radius: targeting?.radius,
     });
-    return this.collectTargetsFromCells(player, monsters, cells, maxTargets);
+    return this.collectTargetsFromCells(player, monsters, players, cells, maxTargets);
   }
 
   private collectTargetsFromCells(
     player: PlayerState,
     monsters: RuntimeMonster[],
+    players: PlayerState[],
     cells: Array<{ x: number; y: number }>,
     maxTargets: number,
   ): ResolvedTarget[] {
@@ -609,6 +748,18 @@ export class WorldService {
         const key = `monster:${monster.runtimeId}`;
         if (!seen.has(key)) {
           resolved.push({ kind: 'monster', x: monster.x, y: monster.y, monster });
+          seen.add(key);
+          if (resolved.length >= maxTargets) {
+            return resolved;
+          }
+        }
+      }
+
+      const targetPlayer = players.find((entry) => entry.x === cell.x && entry.y === cell.y);
+      if (targetPlayer) {
+        const key = `player:${targetPlayer.id}`;
+        if (!seen.has(key)) {
+          resolved.push({ kind: 'player', x: targetPlayer.x, y: targetPlayer.y, player: targetPlayer });
           seen.add(key);
           if (resolved.length >= maxTargets) {
             return resolved;
@@ -735,19 +886,37 @@ export class WorldService {
       this.attrService.recalcPlayer(player);
       affected.push({ target: { kind: 'player', player }, buff: current });
     } else {
-      const targets = this.pickDamageTargets(selectedTargets, primaryTarget).filter((entry): entry is Extract<ResolvedTarget, { kind: 'monster' }> => entry.kind === 'monster');
+      const targets = this.pickDamageTargets(selectedTargets, primaryTarget)
+        .filter((entry): entry is Extract<ResolvedTarget, { kind: 'monster' | 'player' }> => entry.kind === 'monster' || entry.kind === 'player');
       if (targets.length === 0) {
         return { ...EMPTY_UPDATE, error: '当前技能没有可施加状态的有效目标' };
       }
       for (const target of targets) {
-        target.monster.temporaryBuffs ??= [];
-        const current = this.applyBuffState(target.monster.temporaryBuffs, this.buildTemporaryBuffState(skill, effect));
-        affected.push({ target: { kind: 'monster', monster: target.monster }, buff: current });
+        if (target.kind === 'monster') {
+          target.monster.temporaryBuffs ??= [];
+          const current = this.applyBuffState(target.monster.temporaryBuffs, this.buildTemporaryBuffState(skill, effect));
+          affected.push({ target: { kind: 'monster', monster: target.monster }, buff: current });
+          continue;
+        }
+        target.player.temporaryBuffs ??= [];
+        const current = this.applyBuffState(target.player.temporaryBuffs, this.buildTemporaryBuffState(skill, effect));
+        this.attrService.recalcPlayer(target.player);
+        affected.push({ target: { kind: 'player', player: target.player }, buff: current });
       }
     }
 
-    const selfDirty = affected.some((entry) => entry.target.kind === 'player');
-    const targetNames = affected.map((entry) => entry.target.kind === 'player' ? '你' : entry.target.monster.name);
+    const selfDirty = affected.some((entry) => entry.target.kind === 'player' && entry.target.player.id === player.id);
+    const dirtyPlayers = affected
+      .filter((entry): entry is { target: { kind: 'player'; player: PlayerState }; buff: TemporaryBuffState } => (
+        entry.target.kind === 'player' && entry.target.player.id !== player.id
+      ))
+      .map((entry) => entry.target.player.id);
+    const targetNames = affected.map((entry) => {
+      if (entry.target.kind === 'monster') {
+        return entry.target.monster.name;
+      }
+      return entry.target.player.id === player.id ? '你' : entry.target.player.name;
+    });
     const uniqueNames = [...new Set(targetNames)];
     const summary = uniqueNames.join('、');
     const primaryBuff = affected[0]?.buff;
@@ -759,6 +928,7 @@ export class WorldService {
         kind: 'combat',
       }],
       dirty: selfDirty ? ['attr'] : [],
+      dirtyPlayers,
     };
   }
 
@@ -819,12 +989,23 @@ export class WorldService {
       case 'caster.maxQi':
         return Math.max(0, Math.round(context.casterStats.maxQi));
       case 'target.hp':
-        return context.target?.kind === 'monster' ? context.target.monster.hp : 0;
+        return context.target?.kind === 'monster'
+          ? context.target.monster.hp
+          : context.target?.kind === 'player'
+            ? context.target.player.hp
+            : 0;
       case 'target.maxHp':
-        return context.target?.kind === 'monster' ? context.target.monster.maxHp : 0;
+        return context.target?.kind === 'monster'
+          ? context.target.monster.maxHp
+          : context.target?.kind === 'player'
+            ? context.target.player.maxHp
+            : 0;
       case 'target.qi':
+        return context.target?.kind === 'player' ? context.target.player.qi : 0;
       case 'target.maxQi':
-        return 0;
+        return context.target?.kind === 'player'
+          ? Math.max(0, Math.round(this.attrService.getPlayerNumericStats(context.target.player).maxQi))
+          : 0;
       default:
         if (variable.startsWith('caster.stat.')) {
           const key = variable.slice('caster.stat.'.length) as keyof NumericStats;
@@ -855,7 +1036,7 @@ export class WorldService {
     player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
     player.dead = false;
     player.autoBattle = false;
-    player.combatTargetId = undefined;
+    this.clearCombatTarget(player);
     this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
 
     return {
@@ -904,11 +1085,24 @@ export class WorldService {
       if (!target) continue;
 
       if (isPointInRange(monster, target, 1)) {
+        const cultivation = this.techniqueService.interruptCultivation(target, 'hit');
         const resolved = this.resolveMonsterAttack(monster, target);
         const monsterElement = this.inferMonsterElement(monster);
         const effectColor = getDamageTrailColor(monsterElement ? 'spell' : 'physical', monsterElement);
+        for (const message of cultivation.messages) {
+          allMessages.push({
+            playerId: target.id,
+            text: message.text,
+            kind: message.kind,
+          });
+        }
+        if (cultivation.changed) {
+          dirtyPlayers.add(target.id);
+        }
         if (target.hp > 0 && target.autoRetaliate !== false && !target.autoBattle) {
           target.autoBattle = true;
+          target.combatTargetId = monster.runtimeId;
+          target.combatTargetLocked = false;
           this.navigationService.clearMoveTarget(target.id);
           dirtyPlayers.add(target.id);
         }
@@ -935,6 +1129,7 @@ export class WorldService {
             kind: 'combat',
           });
           this.respawnPlayer(target);
+          dirtyPlayers.add(target.id);
         }
       } else {
         this.stepToward(mapId, monster, target.x, target.y, monster.runtimeId);
@@ -1082,7 +1277,7 @@ export class WorldService {
     player.x = portal.targetX;
     player.y = portal.targetY;
     player.autoBattle = false;
-    player.combatTargetId = undefined;
+    this.clearCombatTarget(player);
     this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
 
     const targetMapMeta = this.mapService.getMapMeta(player.mapId);
@@ -1104,7 +1299,11 @@ export class WorldService {
     damageKind: SkillDamageKind = 'physical',
     element?: ElementKey,
     qiCost = 0,
+    activeAttackBehavior = false,
   ): WorldUpdate {
+    const cultivation = activeAttackBehavior
+      ? this.techniqueService.interruptCultivation(player, 'attack')
+      : { changed: false, dirty: [], messages: [] };
     const resolved = this.resolvePlayerAttack(player, monster, baseDamage, damageKind, element, qiCost);
     const effectColor = getDamageTrailColor(damageKind, element);
 
@@ -1123,8 +1322,15 @@ export class WorldService {
       text: resolved.hit ? `-${resolved.damage}` : '闪',
       color: effectColor,
     });
-    const messages: WorldMessage[] = [this.buildPlayerAttackMessage(player, monster, prefix, resolved, effectColor)];
-    const dirty = new Set<WorldDirtyFlag>();
+    const messages: WorldMessage[] = [
+      ...cultivation.messages.map((message) => ({
+        playerId: player.id,
+        text: message.text,
+        kind: message.kind,
+      })),
+      this.buildPlayerAttackMessage(player, monster, prefix, resolved, effectColor),
+    ];
+    const dirty = new Set<WorldDirtyFlag>(cultivation.dirty as WorldDirtyFlag[]);
 
     if (monster.hp <= 0) {
       monster.alive = false;
@@ -1139,6 +1345,18 @@ export class WorldService {
 
       for (const flag of this.advanceQuestProgress(player, monster.id, monster.name)) {
         dirty.add(flag);
+      }
+
+      const combatExp = this.techniqueService.grantCombatExpFromMonsterKill(player, monster.level, monster.name);
+      if (combatExp.changed) {
+        for (const flag of combatExp.dirty) {
+          dirty.add(flag as WorldDirtyFlag);
+        }
+        messages.push(...combatExp.messages.map((message) => ({
+          playerId: player.id,
+          text: message.text,
+          kind: message.kind,
+        })));
       }
 
       for (const drop of monster.drops) {
@@ -1170,6 +1388,85 @@ export class WorldService {
     return { messages, dirty: [...dirty] };
   }
 
+  private attackPlayer(
+    attacker: PlayerState,
+    target: PlayerState,
+    baseDamage: number,
+    prefix: string,
+    damageKind: SkillDamageKind = 'physical',
+    element?: ElementKey,
+    qiCost = 0,
+    activeAttackBehavior = false,
+  ): WorldUpdate {
+    const attackerCultivation = activeAttackBehavior
+      ? this.techniqueService.interruptCultivation(attacker, 'attack')
+      : { changed: false, dirty: [], messages: [] };
+    const targetCultivation = this.techniqueService.interruptCultivation(target, 'hit');
+    const resolved = this.resolvePlayerVsPlayerAttack(attacker, target, baseDamage, damageKind, element, qiCost);
+    const effectColor = getDamageTrailColor(damageKind, element);
+
+    this.pushEffect(attacker.mapId, {
+      type: 'attack',
+      fromX: attacker.x,
+      fromY: attacker.y,
+      toX: target.x,
+      toY: target.y,
+      color: effectColor,
+    });
+    this.pushEffect(attacker.mapId, {
+      type: 'float',
+      x: target.x,
+      y: target.y,
+      text: resolved.hit ? `-${resolved.damage}` : '闪',
+      color: effectColor,
+    });
+
+    const dirty = new Set<WorldDirtyFlag>((attackerCultivation.dirty as WorldDirtyFlag[]));
+    const dirtyPlayers = new Set<string>();
+    if (targetCultivation.changed) {
+      dirtyPlayers.add(target.id);
+    }
+    const messages: WorldMessage[] = [
+      ...attackerCultivation.messages.map((message) => ({
+        playerId: attacker.id,
+        text: message.text,
+        kind: message.kind,
+      })),
+      ...targetCultivation.messages.map((message) => ({
+        playerId: target.id,
+        text: message.text,
+        kind: message.kind,
+      })),
+      this.buildPlayerVsPlayerAttackMessage(attacker, target, prefix, resolved, effectColor),
+      this.buildPlayerUnderAttackMessage(attacker, target, resolved, effectColor),
+    ];
+
+    if (target.hp > 0 && target.autoRetaliate !== false && !target.autoBattle) {
+      target.autoBattle = true;
+      target.combatTargetId = `player:${attacker.id}`;
+      target.combatTargetLocked = false;
+      this.navigationService.clearMoveTarget(target.id);
+      dirtyPlayers.add(target.id);
+    }
+
+    if (target.hp <= 0) {
+      messages.push({
+        playerId: attacker.id,
+        text: `${target.name} 被你击倒。`,
+        kind: 'combat',
+      });
+      messages.push({
+        playerId: target.id,
+        text: '你被击倒，已被护山阵法送回复活点。',
+        kind: 'combat',
+      });
+      this.respawnPlayer(target);
+      dirtyPlayers.add(target.id);
+    }
+
+    return { messages, dirty: [...dirty], dirtyPlayers: [...dirtyPlayers] };
+  }
+
   private resolvePlayerAttack(
     player: PlayerState,
     monster: RuntimeMonster,
@@ -1184,6 +1481,27 @@ export class WorldService {
     return this.resolveHit(attacker, defender, rawDamage, damageKind, qiCost, element, (damage) => {
       monster.hp = Math.max(0, monster.hp - damage);
     });
+  }
+
+  private resolvePlayerVsPlayerAttack(
+    attacker: PlayerState,
+    defender: PlayerState,
+    baseDamage: number,
+    damageKind: SkillDamageKind,
+    element: ElementKey | undefined,
+    qiCost = 0,
+  ): ResolvedHit {
+    return this.resolveHit(
+      this.getPlayerCombatSnapshot(attacker),
+      this.getPlayerCombatSnapshot(defender),
+      baseDamage,
+      damageKind,
+      qiCost,
+      element,
+      (damage) => {
+        defender.hp = Math.max(0, defender.hp - damage);
+      },
+    );
   }
 
   private resolveMonsterAttack(monster: RuntimeMonster, player: PlayerState): ResolvedHit {
@@ -1317,6 +1635,61 @@ export class WorldService {
     };
   }
 
+  private buildPlayerVsPlayerAttackMessage(
+    attacker: PlayerState,
+    target: PlayerState,
+    prefix: string,
+    resolved: ResolvedHit,
+    floatColor: string,
+  ): WorldMessage {
+    const suffix: string[] = [];
+    if (resolved.broken) suffix.push('破招');
+    if (resolved.crit) suffix.push('暴击');
+    if (resolved.resolved) suffix.push('化解');
+    const tag = suffix.length > 0 ? `（${suffix.join(' / ')}）` : '';
+    const text = resolved.hit
+      ? `${prefix} ${target.name}${tag}，造成 ${resolved.damage} 点伤害。`
+      : `${target.name}身形一晃，避开了你的攻势。`;
+    return {
+      playerId: attacker.id,
+      text,
+      kind: 'combat',
+      floating: {
+        x: target.x,
+        y: target.y,
+        text: resolved.hit ? `-${resolved.damage}` : '闪',
+        color: floatColor,
+      },
+    };
+  }
+
+  private buildPlayerUnderAttackMessage(
+    attacker: PlayerState,
+    target: PlayerState,
+    resolved: ResolvedHit,
+    floatColor: string,
+  ): WorldMessage {
+    const suffix: string[] = [];
+    if (resolved.broken) suffix.push('破招');
+    if (resolved.crit) suffix.push('暴击');
+    if (resolved.resolved) suffix.push('化解');
+    const tag = suffix.length > 0 ? `（${suffix.join(' / ')}）` : '';
+    const text = resolved.hit
+      ? `${attacker.name}袭向你${tag}，造成 ${resolved.damage} 点伤害。`
+      : `${attacker.name}的攻势被你险险避开。`;
+    return {
+      playerId: target.id,
+      text,
+      kind: 'combat',
+      floating: {
+        x: target.x,
+        y: target.y,
+        text: resolved.hit ? `-${resolved.damage}` : '闪',
+        color: floatColor,
+      },
+    };
+  }
+
   private getPlayerCombatSnapshot(player: PlayerState): CombatSnapshot {
     return {
       stats: this.attrService.getPlayerNumericStats(player),
@@ -1353,6 +1726,8 @@ export class WorldService {
       if (buff.stats.auraPowerRate !== undefined) stats.auraPowerRate += buff.stats.auraPowerRate * stacks;
       if (buff.stats.playerExpRate !== undefined) stats.playerExpRate += buff.stats.playerExpRate * stacks;
       if (buff.stats.techniqueExpRate !== undefined) stats.techniqueExpRate += buff.stats.techniqueExpRate * stacks;
+      if (buff.stats.realmExpPerTick !== undefined) stats.realmExpPerTick += buff.stats.realmExpPerTick * stacks;
+      if (buff.stats.techniqueExpPerTick !== undefined) stats.techniqueExpPerTick += buff.stats.techniqueExpPerTick * stacks;
       if (buff.stats.lootRate !== undefined) stats.lootRate += buff.stats.lootRate * stacks;
       if (buff.stats.rareLootRate !== undefined) stats.rareLootRate += buff.stats.rareLootRate * stacks;
       if (buff.stats.viewRange !== undefined) stats.viewRange += buff.stats.viewRange * stacks;
@@ -2004,7 +2379,7 @@ export class WorldService {
     player.qi = Math.round(player.numericStats?.maxQi ?? player.qi);
     player.dead = false;
     player.autoBattle = false;
-    player.combatTargetId = undefined;
+    this.clearCombatTarget(player);
     this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
   }
 
@@ -2079,11 +2454,11 @@ export class WorldService {
     return null;
   }
 
-  private resolveCombatTarget(player: PlayerState): RuntimeMonster | undefined {
+  private resolveCombatTarget(player: PlayerState): ResolvedTarget | undefined {
     if (!player.combatTargetId) return undefined;
-    const target = (this.monstersByMap.get(player.mapId) ?? []).find((monster) => monster.runtimeId === player.combatTargetId && monster.alive);
+    const target = this.resolveTargetRef(player, player.combatTargetId);
     if (!target) {
-      player.combatTargetId = undefined;
+      this.clearCombatTarget(player);
       return undefined;
     }
     return target;
@@ -2097,6 +2472,15 @@ export class WorldService {
       const monster = (this.monstersByMap.get(player.mapId) ?? []).find((entry) => entry.runtimeId === targetRef && entry.alive);
       if (!monster) return null;
       return { kind: 'monster', x: monster.x, y: monster.y, monster };
+    }
+
+    if (targetRef.startsWith('player:')) {
+      const playerId = targetRef.slice('player:'.length);
+      const targetPlayer = this.playerService.getPlayer(playerId);
+      if (!targetPlayer || targetPlayer.id === player.id || targetPlayer.mapId !== player.mapId || targetPlayer.dead) {
+        return null;
+      }
+      return { kind: 'player', x: targetPlayer.x, y: targetPlayer.y, player: targetPlayer };
     }
 
     const tileTarget = parseTileTargetRef(targetRef);
@@ -2119,7 +2503,11 @@ export class WorldService {
     targetName: string,
     damageKind: SkillDamageKind = 'physical',
     element?: ElementKey,
+    activeAttackBehavior = false,
   ): WorldUpdate {
+    const cultivation = activeAttackBehavior
+      ? this.techniqueService.interruptCultivation(player, 'attack')
+      : { changed: false, dirty: [], messages: [] };
     const result = this.mapService.damageTile(player.mapId, x, y, damage);
     if (!result) {
       return { ...EMPTY_UPDATE, error: '该目标无法被攻击' };
@@ -2141,11 +2529,18 @@ export class WorldService {
       color: getDamageTrailColor(damageKind, element),
     });
 
-    const messages: WorldMessage[] = [{
-      playerId: player.id,
-      text: `${skillName}击中${targetName}，造成 ${damage} 点伤害。`,
-      kind: 'combat',
-    }];
+    const messages: WorldMessage[] = [
+      ...cultivation.messages.map((message) => ({
+        playerId: player.id,
+        text: message.text,
+        kind: message.kind,
+      })),
+      {
+        playerId: player.id,
+        text: `${skillName}击中${targetName}，造成 ${damage} 点伤害。`,
+        kind: 'combat',
+      },
+    ];
     if (result.destroyed) {
       messages.push({
         playerId: player.id,
@@ -2153,7 +2548,7 @@ export class WorldService {
         kind: 'combat',
       });
     }
-    return { messages, dirty: [] };
+    return { messages, dirty: cultivation.dirty as WorldDirtyFlag[] };
   }
 
   private pushEffect(mapId: string, effect: CombatEffect) {
@@ -2171,5 +2566,30 @@ export class WorldService {
     if (dy !== 0) {
       player.facing = dy > 0 ? Direction.South : Direction.North;
     }
+  }
+
+  private performBasicAttack(player: PlayerState, target: ResolvedTarget): WorldUpdate {
+    if (target.kind === 'monster') {
+      return this.attackMonster(player, target.monster, 6, '你挥剑斩中', 'physical', undefined, 0, true);
+    }
+    if (target.kind === 'player') {
+      return this.attackPlayer(player, target.player, 6, '你挥剑斩中', 'physical', undefined, 0, true);
+    }
+    return this.attackTerrain(player, target.x, target.y, 6, '你挥剑', target.tileType ?? '目标', 'physical', undefined, true);
+  }
+
+  private getTargetRef(target: ResolvedTarget): string {
+    if (target.kind === 'monster') {
+      return target.monster.runtimeId;
+    }
+    if (target.kind === 'player') {
+      return `player:${target.player.id}`;
+    }
+    return `tile:${target.x}:${target.y}`;
+  }
+
+  private clearCombatTarget(player: PlayerState): void {
+    player.combatTargetId = undefined;
+    player.combatTargetLocked = false;
   }
 }

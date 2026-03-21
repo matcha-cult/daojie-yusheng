@@ -107,6 +107,7 @@ export class PlayerService {
       autoRetaliate: entity.autoRetaliate ?? true,
       actions: [],
       cultivatingTechId: entity.cultivatingTechId ?? undefined,
+      combatTargetLocked: false,
     };
     state.inventory = this.contentService.normalizeInventory(state.inventory);
     state.equipment = this.contentService.normalizeEquipment(state.equipment);
@@ -130,6 +131,7 @@ export class PlayerService {
     if (!state.quests) state.quests = [];
     if (!state.revealedBreakthroughRequirementIds) state.revealedBreakthroughRequirementIds = [];
     if (state.autoBattle === undefined) state.autoBattle = false;
+    if (state.combatTargetLocked === undefined) state.combatTargetLocked = false;
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
     if (state.autoRetaliate === undefined) state.autoRetaliate = true;
     if (!state.actions) state.actions = [];

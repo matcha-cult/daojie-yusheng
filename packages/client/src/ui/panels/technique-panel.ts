@@ -111,7 +111,7 @@ export class TechniquePanel {
           ? `${tech.exp}/${tech.expToNext}`
           : '已满层';
         const remainText = tech.expToNext > 0
-          ? `距下一层还需 ${remainingExp} 修炼经验`
+          ? `距下一层还需 ${remainingExp} 功法经验`
           : '当前已达圆满层';
         return `<div class="tech-card ${isCultivating ? 'cultivating' : ''}">
           <button class="tech-card-main" data-tech-open="${tech.techId}" type="button">
@@ -128,8 +128,8 @@ export class TechniquePanel {
           </button>
           <div class="tech-card-actions">
             ${isCultivating
-              ? `<button class="small-btn danger" data-cultivate-stop="${tech.techId}" type="button">停止修炼</button>`
-              : `<button class="small-btn" data-cultivate="${tech.techId}" type="button">修炼</button>`}
+              ? `<button class="small-btn danger" data-cultivate-stop="${tech.techId}" type="button">取消主修</button>`
+              : `<button class="small-btn" data-cultivate="${tech.techId}" type="button">设为主修</button>`}
           </div>
         </div>`;
       }).join('');
@@ -231,7 +231,7 @@ export class TechniquePanel {
 
     let expText = '已满层';
     if (layer.expToNext > 0) {
-      expText = `升下一层需 ${layer.expToNext} 修炼经验`;
+      expText = `升下一层需 ${layer.expToNext} 功法经验`;
     }
 
     return `<div class="tech-layer-row ${layer.level === currentLevel ? 'current' : ''} ${layer.level < currentLevel ? 'passed' : ''}">

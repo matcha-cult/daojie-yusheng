@@ -364,6 +364,7 @@ export class GmService {
     player.combatTargetId = player.autoBattle && typeof snapshot.combatTargetId === 'string'
       ? snapshot.combatTargetId
       : undefined;
+    player.combatTargetLocked = player.autoBattle && snapshot.combatTargetLocked === true;
 
     if (runtime) {
       this.navigationService.clearMoveTarget(player.id);
@@ -390,6 +391,7 @@ export class GmService {
     player.dead = false;
     player.autoBattle = false;
     player.combatTargetId = undefined;
+    player.combatTargetLocked = false;
   }
 
   private canSetPosition(mapId: string, x: number, y: number, playerId: string, runtime: boolean): boolean {

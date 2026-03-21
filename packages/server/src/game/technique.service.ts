@@ -5,7 +5,6 @@ import {
   BreakthroughPreviewState,
   BreakthroughRequirementView,
   calcTechniqueFinalAttrBonus,
-  CULTIVATE_EXP_PER_TICK,
   DEFAULT_PLAYER_REALM_STAGE,
   deriveTechniqueRealm,
   getTechniqueExpToNext,
@@ -15,6 +14,7 @@ import {
   PlayerRealmStage,
   PlayerRealmState,
   PlayerState,
+  TemporaryBuffState,
   TECHNIQUE_GRADE_LABELS,
   TECHNIQUE_GRADE_ORDER,
   TechniqueGrade,
@@ -37,6 +37,7 @@ interface TechniqueMessage {
 }
 
 interface CultivationResult {
+  error?: string;
   changed: boolean;
   dirty: TechniqueDirtyFlag[];
   messages: TechniqueMessage[];
@@ -52,6 +53,11 @@ const EMPTY_CULTIVATION: CultivationResult = { changed: false, dirty: [], messag
 const REALM_STAGE_SOURCE = 'realm:stage';
 const REALM_STATE_SOURCE = 'realm:state';
 const TECHNIQUE_SOURCE_PREFIX = 'technique:';
+const CULTIVATION_BUFF_ID = 'cultivation:active';
+const CULTIVATION_ACTION_ID = 'cultivation:toggle';
+const CULTIVATION_BUFF_DURATION = 1;
+const CULTIVATION_REALM_EXP_PER_TICK = 2;
+const CULTIVATION_TECHNIQUE_EXP_PER_TICK = 10;
 
 @Injectable()
 export class TechniqueService {
@@ -118,55 +124,149 @@ export class TechniqueService {
 
   cultivateTick(player: PlayerState): CultivationResult {
     this.initializePlayerProgression(player);
-    if (!player.cultivatingTechId) return EMPTY_CULTIVATION;
-    const numericStats = this.attrService.getPlayerNumericStats(player);
-    const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
-    const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
-
-    const technique = player.techniques.find((entry) => entry.techId === player.cultivatingTechId);
+    const technique = this.resolveCultivatingTechnique(player);
     if (!technique) {
-      player.cultivatingTechId = undefined;
+      return this.clearInvalidCultivation(player);
+    }
+    const cultivationBuff = this.getCultivationBuff(player);
+    if (!cultivationBuff) return EMPTY_CULTIVATION;
+    this.refreshCultivationBuff(cultivationBuff, technique.name);
+
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
+    const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
+    const dirty = new Set<TechniqueDirtyFlag>();
+    const messages: TechniqueMessage[] = [];
+
+    const realmResult = this.advanceRealmProgress(
+      player,
+      Math.max(0, Math.round(numericStats.realmExpPerTick)),
+      realmExpBonus,
+    );
+    if (realmResult.changed) {
+      dirty.add('attr');
+      dirty.add('actions');
+      messages.push(...realmResult.messages);
+    }
+
+    const techniqueResult = this.advanceTechniqueProgress(
+      player,
+      Math.max(0, Math.round(numericStats.techniqueExpPerTick)),
+      techniqueExpBonus,
+    );
+    if (techniqueResult.changed) {
+      for (const flag of techniqueResult.dirty) {
+        dirty.add(flag);
+      }
+      messages.push(...techniqueResult.messages);
+    }
+
+    return {
+      changed: dirty.size > 0,
+      dirty: [...dirty],
+      messages,
+    };
+  }
+
+  hasCultivationBuff(player: PlayerState): boolean {
+    return Boolean(this.getCultivationBuff(player));
+  }
+
+  startCultivation(player: PlayerState): CultivationResult {
+    this.initializePlayerProgression(player);
+    const technique = this.resolveCultivatingTechnique(player);
+    if (!technique) {
+      if (player.cultivatingTechId) {
+        return this.clearInvalidCultivation(player);
+      }
       return {
-        changed: true,
-        dirty: ['tech', 'actions'],
-        messages: [{ text: '当前修炼的功法不存在，已停止修炼。', kind: 'system' }],
+        error: '请先在功法面板选择一门主修功法',
+        changed: false,
+        dirty: [],
+        messages: [],
       };
     }
 
-    const dirty = new Set<TechniqueDirtyFlag>(['tech']);
-    const messages: TechniqueMessage[] = [];
-    let techniqueLeveledUp = false;
-
-    const maxLevel = getTechniqueMaxLevel(technique.layers);
-    if (technique.level < maxLevel && technique.expToNext > 0) {
-      technique.exp += this.applyRateBonus(CULTIVATE_EXP_PER_TICK, techniqueExpBonus);
-      while (technique.expToNext > 0 && technique.exp >= technique.expToNext && technique.level < maxLevel) {
-        technique.exp -= technique.expToNext;
-        technique.level += 1;
-        technique.expToNext = getTechniqueExpToNext(technique.level, technique.layers);
-        technique.realm = deriveTechniqueRealm(technique.level, technique.layers);
-        techniqueLeveledUp = true;
-        messages.push({
-          text: technique.expToNext > 0
-            ? `${technique.name} 提升至第 ${technique.level} 层。`
-            : `${technique.name} 修至圆满，共第 ${technique.level} 层。`,
-          kind: 'quest',
-        });
-        dirty.add('actions');
-      }
-    }
-
-    if (techniqueLeveledUp) {
-      this.applyTechniqueBonuses(player);
+    player.temporaryBuffs ??= [];
+    const current = this.getCultivationBuff(player);
+    if (current) {
+      this.refreshCultivationBuff(current, technique.name);
+    } else {
+      player.temporaryBuffs.push(this.buildCultivationBuffState(technique.name));
       this.attrService.recalcPlayer(player);
-      dirty.add('attr');
     }
 
-    const realmProgress = this.advanceRealmProgress(player, technique, realmExpBonus);
-    if (realmProgress.changed) {
+    return {
+      changed: true,
+      dirty: ['attr', 'actions'],
+      messages: [{
+        text: `你沉心运转 ${technique.name}，开始修炼。移动、主动出手或受击都会中断修炼。`,
+        kind: 'quest',
+      }],
+    };
+  }
+
+  stopCultivation(player: PlayerState, reason = '你收束气机，停止了修炼。', kind: TechniqueMessageKind = 'quest'): CultivationResult {
+    const removed = this.removeCultivationBuff(player);
+    if (!removed) {
+      return EMPTY_CULTIVATION;
+    }
+    return {
+      changed: true,
+      dirty: ['attr', 'actions'],
+      messages: [{ text: reason, kind }],
+    };
+  }
+
+  interruptCultivation(player: PlayerState, reason: 'move' | 'attack' | 'hit'): CultivationResult {
+    switch (reason) {
+      case 'move':
+        return this.stopCultivation(player, '你一动身，周身运转的气机便散了，修炼被打断。', 'system');
+      case 'attack':
+        return this.stopCultivation(player, '你一出手，运转中的修炼气机顿时散去。', 'combat');
+      case 'hit':
+        return this.stopCultivation(player, '你受到攻击，修炼气机被强行打断。', 'combat');
+      default:
+        return EMPTY_CULTIVATION;
+    }
+  }
+
+  grantCombatExpFromMonsterKill(player: PlayerState, monsterLevel?: number, monsterName?: string): CultivationResult {
+    this.initializePlayerProgression(player);
+    const numericStats = this.attrService.getPlayerNumericStats(player);
+    const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
+    const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
+    const normalizedMonsterLevel = Math.max(1, Math.floor(monsterLevel ?? 1));
+    const dirty = new Set<TechniqueDirtyFlag>();
+    const messages: TechniqueMessage[] = [];
+
+    const realmResult = this.advanceRealmProgress(player, this.getRealmCombatExp(normalizedMonsterLevel), realmExpBonus);
+    if (realmResult.changed) {
       dirty.add('attr');
       dirty.add('actions');
-      messages.push(...realmProgress.messages);
+      messages.push(...realmResult.messages);
+    }
+
+    const techniqueResult = this.advanceTechniqueCombatExp(player, normalizedMonsterLevel, techniqueExpBonus);
+    if (techniqueResult.changed) {
+      for (const flag of techniqueResult.dirty) {
+        dirty.add(flag);
+      }
+      messages.push(...techniqueResult.messages);
+    }
+
+    if (realmResult.gained > 0 || techniqueResult.gained > 0) {
+      const segments: string[] = [];
+      if (realmResult.gained > 0) {
+        segments.push(`获得 ${realmResult.gained} 点境界经验`);
+      }
+      if (techniqueResult.gained > 0 && techniqueResult.techniqueName) {
+        segments.push(`${techniqueResult.techniqueName} 获得 ${techniqueResult.gained} 点功法经验`);
+      }
+      messages.unshift({
+        text: `${monsterName ? `斩杀 ${monsterName}` : '击败敌人'}，${segments.join('，')}。`,
+        kind: 'quest',
+      });
     }
 
     return {
@@ -256,19 +356,19 @@ export class TechniqueService {
     };
   }
 
-  private advanceRealmProgress(player: PlayerState, technique: TechniqueState, expBonus = 0): { changed: boolean; messages: TechniqueMessage[] } {
+  private advanceRealmProgress(player: PlayerState, baseGain: number, expBonus = 0): { changed: boolean; gained: number; messages: TechniqueMessage[] } {
     const realm = player.realm;
-    if (!realm || realm.progressToNext <= 0) {
-      return { changed: false, messages: [] };
+    if (!realm || realm.progressToNext <= 0 || realm.breakthroughReady || baseGain <= 0) {
+      return { changed: false, gained: 0, messages: [] };
     }
 
-    const baseGain = 1 + Math.floor(technique.level / 2);
     const gain = this.applyRateBonus(baseGain, expBonus);
     const previousProgress = realm.progress;
     const nextState = this.normalizeRealmState(realm.realmLv, realm.progress + gain);
+    const actualGain = Math.max(0, nextState.progress - previousProgress);
 
-    if (nextState.progress === previousProgress && nextState.breakthroughReady === realm.breakthroughReady) {
-      return { changed: false, messages: [] };
+    if (actualGain <= 0 && nextState.breakthroughReady === realm.breakthroughReady) {
+      return { changed: false, gained: 0, messages: [] };
     }
 
     this.syncRealmPresentation(player, nextState);
@@ -281,7 +381,7 @@ export class TechniqueService {
       });
     }
 
-    return { changed: true, messages };
+    return { changed: true, gained: actualGain, messages };
   }
 
   private applyRateBonus(base: number, bonusRate: number): number {
@@ -292,6 +392,157 @@ export class TechniqueService {
       return guaranteed;
     }
     return guaranteed + (Math.random() < remainder ? 1 : 0);
+  }
+
+  private advanceTechniqueCombatExp(player: PlayerState, monsterLevel: number, expBonus = 0): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
+    return this.advanceTechniqueProgress(player, this.getTechniqueCombatExp(monsterLevel), expBonus);
+  }
+
+  private advanceTechniqueProgress(player: PlayerState, baseGain: number, expBonus = 0): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
+    if (!player.cultivatingTechId) {
+      return { changed: false, gained: 0, dirty: [], messages: [] };
+    }
+
+    const technique = this.resolveCultivatingTechnique(player);
+    if (!technique) {
+      const cleared = this.clearInvalidCultivation(player);
+      return {
+        changed: cleared.changed,
+        gained: 0,
+        dirty: cleared.dirty,
+        messages: cleared.messages,
+      };
+    }
+
+    const maxLevel = getTechniqueMaxLevel(technique.layers);
+    if (technique.level >= maxLevel || technique.expToNext <= 0 || baseGain <= 0) {
+      return { changed: false, gained: 0, techniqueName: technique.name, dirty: [], messages: [] };
+    }
+
+    const gain = this.applyRateBonus(baseGain, expBonus);
+    const previousLevel = technique.level;
+    const previousExp = technique.exp;
+    const messages: TechniqueMessage[] = [];
+    technique.exp += gain;
+
+    while (technique.expToNext > 0 && technique.exp >= technique.expToNext && technique.level < maxLevel) {
+      technique.exp -= technique.expToNext;
+      technique.level += 1;
+      technique.expToNext = getTechniqueExpToNext(technique.level, technique.layers);
+      technique.realm = deriveTechniqueRealm(technique.level, technique.layers);
+      messages.push({
+        text: technique.expToNext > 0
+          ? `${technique.name} 提升至第 ${technique.level} 层。`
+          : `${technique.name} 修至圆满，共第 ${technique.level} 层。`,
+        kind: 'quest',
+      });
+    }
+
+    if (technique.level === previousLevel && technique.exp === previousExp) {
+      return { changed: false, gained: 0, techniqueName: technique.name, dirty: [], messages: [] };
+    }
+
+    const dirty = new Set<TechniqueDirtyFlag>(['tech']);
+    if (technique.level !== previousLevel) {
+      this.applyTechniqueBonuses(player);
+      this.attrService.recalcPlayer(player);
+      dirty.add('attr');
+      dirty.add('actions');
+    }
+
+    return {
+      changed: true,
+      gained: gain,
+      techniqueName: technique.name,
+      dirty: [...dirty],
+      messages,
+    };
+  }
+
+  private resolveCultivatingTechnique(player: PlayerState): TechniqueState | null {
+    if (!player.cultivatingTechId) {
+      return null;
+    }
+    return player.techniques.find((entry) => entry.techId === player.cultivatingTechId) ?? null;
+  }
+
+  private getCultivationBuff(player: PlayerState): TemporaryBuffState | undefined {
+    return player.temporaryBuffs?.find((buff) => buff.buffId === CULTIVATION_BUFF_ID);
+  }
+
+  private buildCultivationBuffState(techniqueName: string): TemporaryBuffState {
+    return {
+      buffId: CULTIVATION_BUFF_ID,
+      name: '修炼中',
+      desc: `${techniqueName} 正在运转，每息获得境界与功法经验，移动、主动攻击或受击都会打断修炼。`,
+      shortMark: '修',
+      category: 'buff',
+      visibility: 'public',
+      remainingTicks: CULTIVATION_BUFF_DURATION + 1,
+      duration: CULTIVATION_BUFF_DURATION,
+      stacks: 1,
+      maxStacks: 1,
+      sourceSkillId: CULTIVATION_ACTION_ID,
+      sourceSkillName: '修炼',
+      stats: {
+        realmExpPerTick: CULTIVATION_REALM_EXP_PER_TICK,
+        techniqueExpPerTick: CULTIVATION_TECHNIQUE_EXP_PER_TICK,
+      },
+    };
+  }
+
+  private refreshCultivationBuff(buff: TemporaryBuffState, techniqueName: string): void {
+    buff.name = '修炼中';
+    buff.desc = `${techniqueName} 正在运转，每息获得境界与功法经验，移动、主动攻击或受击都会打断修炼。`;
+    buff.shortMark = '修';
+    buff.category = 'buff';
+    buff.visibility = 'public';
+    buff.duration = CULTIVATION_BUFF_DURATION;
+    buff.remainingTicks = CULTIVATION_BUFF_DURATION + 1;
+    buff.stacks = 1;
+    buff.maxStacks = 1;
+    buff.sourceSkillId = CULTIVATION_ACTION_ID;
+    buff.sourceSkillName = '修炼';
+    buff.stats = {
+      realmExpPerTick: CULTIVATION_REALM_EXP_PER_TICK,
+      techniqueExpPerTick: CULTIVATION_TECHNIQUE_EXP_PER_TICK,
+    };
+  }
+
+  private removeCultivationBuff(player: PlayerState): boolean {
+    if (!player.temporaryBuffs || player.temporaryBuffs.length === 0) {
+      return false;
+    }
+    const nextBuffs = player.temporaryBuffs.filter((buff) => buff.buffId !== CULTIVATION_BUFF_ID);
+    if (nextBuffs.length === player.temporaryBuffs.length) {
+      return false;
+    }
+    player.temporaryBuffs = nextBuffs;
+    this.attrService.recalcPlayer(player);
+    return true;
+  }
+
+  private clearInvalidCultivation(player: PlayerState): CultivationResult {
+    const hadBuff = this.removeCultivationBuff(player);
+    if (!player.cultivatingTechId && !hadBuff) {
+      return EMPTY_CULTIVATION;
+    }
+    player.cultivatingTechId = undefined;
+    return {
+      changed: true,
+      dirty: hadBuff ? ['tech', 'attr', 'actions'] : ['tech', 'actions'],
+      messages: [{ text: '当前主修功法不存在，已清空主修设置。', kind: 'system' }],
+    };
+  }
+
+  private getRealmCombatExp(monsterLevel: number): number {
+    const level = Math.max(1, Math.floor(monsterLevel));
+    return Math.max(1, level * level * level * 10);
+  }
+
+  private getTechniqueCombatExp(monsterLevel: number): number {
+    const level = Math.max(1, Math.floor(monsterLevel));
+    return Math.max(1, level * level * 300);
   }
 
   private createRealmStateFromLevel(realmLv: number, progress = 0): PlayerRealmState {
