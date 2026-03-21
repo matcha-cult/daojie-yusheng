@@ -5,6 +5,8 @@ import { getCellSize } from '../display';
 interface ClickTarget {
   x: number;
   y: number;
+  clientX?: number;
+  clientY?: number;
   entityId?: string;
   entityKind?: string;
   walkable?: boolean;
@@ -76,17 +78,19 @@ export class MouseInput {
     }
 
     const tile = this.getTileAt(worldGX, worldGY);
-    return this.buildTarget(worldGX, worldGY, tile?.walkable ?? false);
+    return this.buildTarget(worldGX, worldGY, tile?.walkable ?? false, e.clientX, e.clientY);
   }
 
-  private buildTarget(x: number, y: number, walkable: boolean): ClickTarget {
+  private buildTarget(x: number, y: number, walkable: boolean, clientX?: number, clientY?: number): ClickTarget {
     if (!this.getEntities) {
-      return { x, y, walkable };
+      return { x, y, clientX, clientY, walkable };
     }
     const entity = this.getEntities().find((entry) => entry.wx === x && entry.wy === y);
     return {
       x,
       y,
+      clientX,
+      clientY,
       entityId: entity?.id,
       entityKind: entity?.kind,
       walkable,

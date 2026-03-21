@@ -1,6 +1,16 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import {
   calculateTerrainDurability,
+  doesTileTypeBlockSight,
+  getTileTypeFromMapChar,
+  GmMapAuraRecord,
+  GmMapDocument,
+  GmMapListRes,
+  GmMapMonsterSpawnRecord,
+  GmMapNpcRecord,
+  GmMapPortalRecord,
+  GmMapSummary,
+  isTileTypeWalkable,
   manhattanDistance,
   Tile,
   TileType,
@@ -87,9 +97,17 @@ interface MapData {
   meta: MapMeta;
   tiles: Tile[][];
   portals: Portal[];
+  auraPoints: MapAuraPoint[];
   npcs: NpcConfig[];
   monsterSpawns: MonsterSpawnConfig[];
   spawnPoint: { x: number; y: number };
+  source: GmMapDocument;
+}
+
+interface MapAuraPoint {
+  x: number;
+  y: number;
+  value: number;
 }
 
 type TerrainDurabilityProfile = {
@@ -216,41 +234,19 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   private loadMap(raw: any) {
-    const legend: Record<string, TileType> = {
-      '#': TileType.Wall,
-      '.': TileType.Floor,
-      '=': TileType.Road,
-      ':': TileType.Trail,
-      'P': TileType.Portal,
-      '+': TileType.Door,
-      ',': TileType.Grass,
-      '^': TileType.Hill,
-      ';': TileType.Mud,
-      '%': TileType.Swamp,
-      '~': TileType.Water,
-      'T': TileType.Tree,
-      'o': TileType.Stone,
-    };
-    const tileRows: string[] = raw.tiles;
-    const tiles: Tile[][] = tileRows.map(row =>
-      [...row].map(ch => {
-        const type = legend[ch] ?? TileType.Floor;
-        const walkable =
-          type === TileType.Floor ||
-          type === TileType.Road ||
-          type === TileType.Trail ||
-          type === TileType.Door ||
-          type === TileType.Portal ||
-          type === TileType.Grass ||
-          type === TileType.Hill ||
-          type === TileType.Mud ||
-          type === TileType.Swamp;
-        const durability = this.tileDurability(raw.id, type);
+    const document = this.normalizeEditableMapDocument(raw);
+    const previousMap = this.maps.get(document.id);
+    const tileRows = document.tiles;
+    const tiles: Tile[][] = tileRows.map((row, y) =>
+      [...row].map((char, x) => {
+        const type = getTileTypeFromMapChar(char);
+        const durability = this.tileDurability(document.id, type);
         return {
           type,
-          walkable,
-          blocksSight: this.tileBlocksSight(type),
-          occupiedBy: null,
+          walkable: isTileTypeWalkable(type),
+          blocksSight: doesTileTypeBlockSight(type),
+          aura: 0,
+          occupiedBy: isTileTypeWalkable(type) ? (previousMap?.tiles[y]?.[x]?.occupiedBy ?? null) : null,
           modifiedAt: null,
           hp: durability > 0 ? durability : undefined,
           maxHp: durability > 0 ? durability : undefined,
@@ -259,15 +255,16 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     const meta: MapMeta = {
-      id: raw.id,
-      name: raw.name,
-      width: raw.width,
-      height: raw.height,
-      dangerLevel: Number.isFinite(raw.dangerLevel) ? Number(raw.dangerLevel) : undefined,
-      recommendedRealm: typeof raw.recommendedRealm === 'string' ? raw.recommendedRealm : undefined,
-      description: typeof raw.description === 'string' ? raw.description : undefined,
+      id: document.id,
+      name: document.name,
+      width: document.width,
+      height: document.height,
+      dangerLevel: Number.isFinite(document.dangerLevel) ? Number(document.dangerLevel) : undefined,
+      recommendedRealm: typeof document.recommendedRealm === 'string' ? document.recommendedRealm : undefined,
+      description: typeof document.description === 'string' ? document.description : undefined,
     };
-    const portals = this.normalizePortals(raw.portals, meta);
+    const portals = this.normalizePortals(document.portals, meta);
+    const auraPoints = this.normalizeAuraPoints(document.auras, meta);
 
     // 确保配置的 portal 坐标在地图上是传送门类型，避免仅靠字符图导致漏配。
     for (const portal of portals) {
@@ -279,8 +276,15 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const npcs = this.normalizeNpcs(raw.npcs, meta);
-    const monsterSpawns = this.normalizeMonsterSpawns(raw.monsterSpawns, meta);
+    for (const point of auraPoints) {
+      const tile = tiles[point.y]?.[point.x];
+      if (tile) {
+        tile.aura = point.value;
+      }
+    }
+
+    const npcs = this.normalizeNpcs(document.npcs, meta);
+    const monsterSpawns = this.normalizeMonsterSpawns(document.monsterSpawns, meta);
 
     for (const npc of npcs) {
       for (const quest of npc.quests) {
@@ -291,8 +295,91 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       this.monsters.set(monster.id, monster);
     }
 
-    this.maps.set(raw.id, { meta, tiles, portals, npcs, monsterSpawns, spawnPoint: raw.spawnPoint });
-    this.revisions.set(raw.id, (this.revisions.get(raw.id) ?? 0) + 1);
+    this.maps.set(document.id, {
+      meta,
+      tiles,
+      portals,
+      auraPoints,
+      npcs,
+      monsterSpawns,
+      spawnPoint: { ...document.spawnPoint },
+      source: document,
+    });
+    this.revisions.set(document.id, (this.revisions.get(document.id) ?? 0) + 1);
+  }
+
+  getEditableMapList(): GmMapListRes {
+    const maps = [...this.maps.values()]
+      .map<GmMapSummary>((map) => ({
+        id: map.meta.id,
+        name: map.meta.name,
+        width: map.meta.width,
+        height: map.meta.height,
+        description: map.meta.description,
+        dangerLevel: map.meta.dangerLevel,
+        recommendedRealm: map.meta.recommendedRealm,
+        portalCount: map.portals.length,
+        npcCount: map.npcs.length,
+        monsterSpawnCount: map.monsterSpawns.length,
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id, 'zh-CN'));
+    return { maps };
+  }
+
+  getEditableMap(mapId: string): GmMapDocument | undefined {
+    const map = this.maps.get(mapId);
+    if (!map) return undefined;
+    return this.cloneMapDocument(map.source);
+  }
+
+  saveEditableMap(mapId: string, document: GmMapDocument): string | null {
+    if (mapId !== document.id) {
+      return '地图 ID 不允许在编辑器中直接修改';
+    }
+
+    const normalized = this.normalizeEditableMapDocument(document);
+    const error = this.validateEditableMapDocument(normalized);
+    if (error) {
+      return error;
+    }
+
+    try {
+      fs.writeFileSync(this.resolveMapFilePath(mapId), `${JSON.stringify(normalized, null, 2)}\n`, 'utf-8');
+      this.loadMap(normalized);
+      return null;
+    } catch (saveError) {
+      return saveError instanceof Error ? saveError.message : '地图保存失败';
+    }
+  }
+
+  private normalizeAuraPoints(rawAuras: unknown, meta: MapMeta): MapAuraPoint[] {
+    if (!Array.isArray(rawAuras)) return [];
+
+    const result: MapAuraPoint[] = [];
+    for (const candidate of rawAuras) {
+      const point = candidate as Partial<MapAuraPoint>;
+      const valid =
+        Number.isInteger(point.x) &&
+        Number.isInteger(point.y) &&
+        Number.isInteger(point.value);
+      if (!valid) {
+        this.logger.warn(`地图 ${meta.id} 存在非法灵气配置，已忽略`);
+        continue;
+      }
+      if (
+        point.x! < 0 || point.x! >= meta.width ||
+        point.y! < 0 || point.y! >= meta.height
+      ) {
+        this.logger.warn(`地图 ${meta.id} 的灵气坐标越界: (${point.x}, ${point.y})`);
+        continue;
+      }
+      result.push({
+        x: point.x!,
+        y: point.y!,
+        value: Math.max(0, point.value!),
+      });
+    }
+    return result;
   }
 
   private normalizePortals(rawPortals: unknown, meta: MapMeta): Portal[] {
@@ -651,6 +738,10 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return map.tiles[y]?.[x] ?? null;
   }
 
+  getTileAura(mapId: string, x: number, y: number): number {
+    return Math.max(0, this.getTile(mapId, x, y)?.aura ?? 0);
+  }
+
   hasNpcAt(mapId: string, x: number, y: number): boolean {
     const map = this.maps.get(mapId);
     if (!map) return false;
@@ -711,7 +802,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         replacement === TileType.Hill ||
         replacement === TileType.Mud ||
         replacement === TileType.Swamp;
-      tile.blocksSight = this.tileBlocksSight(replacement);
+      tile.blocksSight = doesTileTypeBlockSight(replacement);
       tile.hp = undefined;
       tile.maxHp = undefined;
       tile.hpVisible = false;
@@ -757,6 +848,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           type: TileType.Wall,
           walkable: false,
           blocksSight: true,
+          aura: 0,
           occupiedBy: null,
           modifiedAt: null,
         });
@@ -770,8 +862,194 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return [...this.maps.keys()];
   }
 
-  private tileBlocksSight(type: TileType): boolean {
-    return type === TileType.Wall || type === TileType.Tree || type === TileType.Stone;
+  private resolveMapFilePath(mapId: string): string {
+    return path.join(this.mapsDir, `${mapId}.json`);
+  }
+
+  private cloneMapDocument(document: GmMapDocument): GmMapDocument {
+    return JSON.parse(JSON.stringify(document)) as GmMapDocument;
+  }
+
+  private normalizeEditableMapDocument(raw: unknown): GmMapDocument {
+    const source = raw as Partial<GmMapDocument>;
+    const tiles = Array.isArray(source.tiles)
+      ? source.tiles.map((row) => typeof row === 'string' ? row : '')
+      : [];
+    const auras = Array.isArray(source.auras) ? source.auras : [];
+    const portals = Array.isArray(source.portals) ? source.portals : [];
+    const npcs = Array.isArray(source.npcs) ? source.npcs : [];
+    const monsterSpawns = Array.isArray(source.monsterSpawns) ? source.monsterSpawns : [];
+
+    return this.syncPortalTiles({
+      id: typeof source.id === 'string' ? source.id : '',
+      name: typeof source.name === 'string' ? source.name : '',
+      width: Number.isInteger(source.width) ? Number(source.width) : 0,
+      height: Number.isInteger(source.height) ? Number(source.height) : 0,
+      description: typeof source.description === 'string' ? source.description : undefined,
+      dangerLevel: Number.isFinite(source.dangerLevel) ? Number(source.dangerLevel) : undefined,
+      recommendedRealm: typeof source.recommendedRealm === 'string' ? source.recommendedRealm : undefined,
+      tiles,
+      portals: portals.map((portal) => ({
+        x: Number((portal as GmMapPortalRecord).x ?? 0),
+        y: Number((portal as GmMapPortalRecord).y ?? 0),
+        targetMapId: String((portal as GmMapPortalRecord).targetMapId ?? ''),
+        targetX: Number((portal as GmMapPortalRecord).targetX ?? 0),
+        targetY: Number((portal as GmMapPortalRecord).targetY ?? 0),
+      })),
+      spawnPoint: {
+        x: Number((source.spawnPoint as { x?: number } | undefined)?.x ?? 0),
+        y: Number((source.spawnPoint as { y?: number } | undefined)?.y ?? 0),
+      },
+      auras: auras.map((point) => ({
+        x: Number((point as GmMapAuraRecord).x ?? 0),
+        y: Number((point as GmMapAuraRecord).y ?? 0),
+        value: Number((point as GmMapAuraRecord).value ?? 0),
+      })),
+      npcs: npcs.map((npc) => ({
+        id: String((npc as GmMapNpcRecord).id ?? ''),
+        name: String((npc as GmMapNpcRecord).name ?? ''),
+        x: Number((npc as GmMapNpcRecord).x ?? 0),
+        y: Number((npc as GmMapNpcRecord).y ?? 0),
+        char: String((npc as GmMapNpcRecord).char ?? ''),
+        color: String((npc as GmMapNpcRecord).color ?? ''),
+        dialogue: String((npc as GmMapNpcRecord).dialogue ?? ''),
+        role: typeof (npc as GmMapNpcRecord).role === 'string' ? (npc as GmMapNpcRecord).role : undefined,
+        quests: Array.isArray((npc as GmMapNpcRecord).quests)
+          ? JSON.parse(JSON.stringify((npc as GmMapNpcRecord).quests))
+          : [],
+      })),
+      monsterSpawns: monsterSpawns.map((spawn) => ({
+        id: String((spawn as GmMapMonsterSpawnRecord).id ?? ''),
+        name: String((spawn as GmMapMonsterSpawnRecord).name ?? ''),
+        x: Number((spawn as GmMapMonsterSpawnRecord).x ?? 0),
+        y: Number((spawn as GmMapMonsterSpawnRecord).y ?? 0),
+        char: String((spawn as GmMapMonsterSpawnRecord).char ?? ''),
+        color: String((spawn as GmMapMonsterSpawnRecord).color ?? ''),
+        hp: Number((spawn as GmMapMonsterSpawnRecord).hp ?? 0),
+        maxHp: Number.isFinite((spawn as GmMapMonsterSpawnRecord).maxHp)
+          ? Number((spawn as GmMapMonsterSpawnRecord).maxHp)
+          : undefined,
+        attack: Number((spawn as GmMapMonsterSpawnRecord).attack ?? 0),
+        radius: Number.isFinite((spawn as GmMapMonsterSpawnRecord).radius)
+          ? Number((spawn as GmMapMonsterSpawnRecord).radius)
+          : undefined,
+        maxAlive: Number.isFinite((spawn as GmMapMonsterSpawnRecord).maxAlive)
+          ? Number((spawn as GmMapMonsterSpawnRecord).maxAlive)
+          : undefined,
+        aggroRange: Number.isFinite((spawn as GmMapMonsterSpawnRecord).aggroRange)
+          ? Number((spawn as GmMapMonsterSpawnRecord).aggroRange)
+          : undefined,
+        respawnSec: Number.isFinite((spawn as GmMapMonsterSpawnRecord).respawnSec)
+          ? Number((spawn as GmMapMonsterSpawnRecord).respawnSec)
+          : undefined,
+        respawnTicks: Number.isFinite((spawn as GmMapMonsterSpawnRecord).respawnTicks)
+          ? Number((spawn as GmMapMonsterSpawnRecord).respawnTicks)
+          : undefined,
+        level: Number.isFinite((spawn as GmMapMonsterSpawnRecord).level)
+          ? Number((spawn as GmMapMonsterSpawnRecord).level)
+          : undefined,
+        expMultiplier: Number.isFinite((spawn as GmMapMonsterSpawnRecord).expMultiplier)
+          ? Number((spawn as GmMapMonsterSpawnRecord).expMultiplier)
+          : undefined,
+        drops: Array.isArray((spawn as GmMapMonsterSpawnRecord).drops)
+          ? JSON.parse(JSON.stringify((spawn as GmMapMonsterSpawnRecord).drops))
+          : [],
+      })),
+    });
+  }
+
+  private syncPortalTiles(document: GmMapDocument): GmMapDocument {
+    const rows = document.tiles.map((row) => [...row]);
+    for (const portal of document.portals) {
+      if (!rows[portal.y]?.[portal.x]) continue;
+      rows[portal.y]![portal.x] = 'P';
+    }
+    return {
+      ...document,
+      tiles: rows.map((row) => row.join('')),
+    };
+  }
+
+  private validateEditableMapDocument(document: GmMapDocument): string | null {
+    if (!document.id.trim()) return '地图 ID 不能为空';
+    if (!document.name.trim()) return '地图名称不能为空';
+    if (!Number.isInteger(document.width) || document.width <= 0) return '地图宽度必须为正整数';
+    if (!Number.isInteger(document.height) || document.height <= 0) return '地图高度必须为正整数';
+    if (document.tiles.length !== document.height) return '地图行数必须与高度一致';
+
+    const supportedChars = new Set(['#', '.', '=', ':', 'P', '+', ',', '^', ';', '%', '~', 'T', 'o']);
+    for (let y = 0; y < document.tiles.length; y += 1) {
+      const row = document.tiles[y] ?? '';
+      if (row.length !== document.width) {
+        return `第 ${y + 1} 行长度与地图宽度不一致`;
+      }
+      for (const char of row) {
+        if (!supportedChars.has(char)) {
+          return `地图中存在不支持的地块字符: ${char}`;
+        }
+      }
+    }
+
+    const ensurePointInBounds = (x: number, y: number, label: string): string | null => {
+      if (!Number.isInteger(x) || !Number.isInteger(y)) return `${label} 坐标必须为整数`;
+      if (x < 0 || x >= document.width || y < 0 || y >= document.height) {
+        return `${label} 越界: (${x}, ${y})`;
+      }
+      return null;
+    };
+
+    const ensureWalkablePoint = (x: number, y: number, label: string): string | null => {
+      const boundsError = ensurePointInBounds(x, y, label);
+      if (boundsError) return boundsError;
+      const type = getTileTypeFromMapChar(document.tiles[y]![x]!);
+      if (!isTileTypeWalkable(type)) {
+        return `${label} 必须位于可通行地块`;
+      }
+      return null;
+    };
+
+    const spawnError = ensureWalkablePoint(document.spawnPoint.x, document.spawnPoint.y, '出生点');
+    if (spawnError) return spawnError;
+
+    const portalKeys = new Set<string>();
+    for (let index = 0; index < document.portals.length; index += 1) {
+      const portal = document.portals[index]!;
+      const label = `传送点 ${index + 1}`;
+      const error = ensureWalkablePoint(portal.x, portal.y, label);
+      if (error) return error;
+      if (!portal.targetMapId.trim()) return `${label} 的目标地图不能为空`;
+      const key = `${portal.x},${portal.y}`;
+      if (portalKeys.has(key)) return `${label} 与其他传送点坐标重复`;
+      portalKeys.add(key);
+    }
+
+    for (let index = 0; index < (document.auras?.length ?? 0); index += 1) {
+      const point = document.auras![index]!;
+      const error = ensurePointInBounds(point.x, point.y, `灵气点 ${index + 1}`);
+      if (error) return error;
+    }
+
+    for (let index = 0; index < document.npcs.length; index += 1) {
+      const npc = document.npcs[index]!;
+      const label = `NPC ${npc.id || index + 1}`;
+      if (!npc.id.trim()) return `${label} 的 ID 不能为空`;
+      if (!npc.name.trim()) return `${label} 的名称不能为空`;
+      if (!npc.char.trim()) return `${label} 的字符不能为空`;
+      const error = ensureWalkablePoint(npc.x, npc.y, label);
+      if (error) return error;
+    }
+
+    for (let index = 0; index < document.monsterSpawns.length; index += 1) {
+      const spawn = document.monsterSpawns[index]!;
+      const label = `怪物刷新点 ${spawn.id || index + 1}`;
+      if (!spawn.id.trim()) return `${label} 的 ID 不能为空`;
+      if (!spawn.name.trim()) return `${label} 的名称不能为空`;
+      if (!spawn.char.trim()) return `${label} 的字符不能为空`;
+      const error = ensureWalkablePoint(spawn.x, spawn.y, label);
+      if (error) return error;
+    }
+
+    return null;
   }
 
   private tileDurability(mapId: string, type: TileType): number {

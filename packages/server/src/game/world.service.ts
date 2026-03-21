@@ -200,6 +200,19 @@ export class WorldService {
     return [...npcs, ...monsters];
   }
 
+  reloadMapRuntime(mapId: string): void {
+    const monsters = this.monstersByMap.get(mapId) ?? [];
+    for (const monster of monsters) {
+      const tile = this.mapService.getTile(mapId, monster.x, monster.y);
+      if (tile?.occupiedBy === monster.runtimeId) {
+        this.mapService.setOccupied(mapId, monster.x, monster.y, null);
+      }
+    }
+    this.monstersByMap.delete(mapId);
+    this.effectsByMap.delete(mapId);
+    this.ensureMapInitialized(mapId);
+  }
+
   buildPlayerRenderEntity(viewer: PlayerState, target: PlayerState, color: string): RenderEntity {
     const snapshot = this.createPlayerObservationSnapshot(target);
     const displayName = target.displayName ?? [...target.name][0] ?? '@';
@@ -249,6 +262,14 @@ export class WorldService {
           ? '收束当前运转的气机，停止修炼。'
           : '运转当前主修功法，每息获得境界与功法经验。')
         : '需先在功法面板选择主修功法，才能开始修炼。',
+      cooldownLeft: 0,
+    }, {
+      id: 'sense_qi:toggle',
+      name: player.senseQiActive ? '关闭感气视角' : '施展感气决',
+      type: 'toggle',
+      desc: player.senseQiActive
+        ? '收束神识回响，退出感气视角。'
+        : '展开感气视角，直接感知地块灵气浓淡与具体数值。',
       cooldownLeft: 0,
     }, {
       id: 'battle:force_attack',
@@ -359,6 +380,18 @@ export class WorldService {
           kind: message.kind,
         })),
         dirty: result.dirty,
+      };
+    }
+
+    if (actionId === 'sense_qi:toggle') {
+      player.senseQiActive = player.senseQiActive === true ? false : true;
+      return {
+        messages: [{
+          playerId: player.id,
+          text: player.senseQiActive ? '你运起感气决，视野中诸地灵气浓淡尽显。' : '你收束感气决，周遭灵光重新隐去。',
+          kind: 'system',
+        }],
+        dirty: ['actions'],
       };
     }
 

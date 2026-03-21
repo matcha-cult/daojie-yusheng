@@ -1,4 +1,4 @@
-import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig } from './types';
+import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig, ItemType, QuestLine, QuestObjectiveType } from './types';
 import { NumericRatioDivisors, NumericStats } from './numeric';
 
 // ===== 事件名 =====
@@ -234,6 +234,7 @@ export interface S2C_ActionsUpdate {
   actions: ActionDef[];
   autoBattle?: boolean;
   autoRetaliate?: boolean;
+  senseQiActive?: boolean;
 }
 
 /** 任务列表更新 */
@@ -362,4 +363,126 @@ export interface GmSpawnBotsReq {
 export interface GmRemoveBotsReq {
   playerIds?: string[];
   all?: boolean;
+}
+
+export interface GmMapPortalRecord {
+  x: number;
+  y: number;
+  targetMapId: string;
+  targetX: number;
+  targetY: number;
+}
+
+export interface GmMapAuraRecord {
+  x: number;
+  y: number;
+  value: number;
+}
+
+export interface GmMapDropRecord {
+  itemId: string;
+  name: string;
+  type: ItemType;
+  count: number;
+  chance?: number;
+}
+
+export interface GmMapQuestRecord {
+  id: string;
+  title: string;
+  desc: string;
+  line?: QuestLine;
+  chapter?: string;
+  story?: string;
+  objectiveType?: QuestObjectiveType;
+  objectiveText?: string;
+  targetName?: string;
+  targetMonsterId?: string;
+  targetTechniqueId?: string;
+  targetRealmStage?: string | number;
+  required?: number;
+  targetCount?: number;
+  rewardItemId?: string;
+  rewardText?: string;
+  reward?: GmMapDropRecord[];
+  nextQuestId?: string;
+  requiredItemId?: string;
+  requiredItemCount?: number;
+  unlockBreakthroughRequirementIds?: string[];
+}
+
+export interface GmMapNpcRecord {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  char: string;
+  color: string;
+  dialogue: string;
+  role?: string;
+  quests?: GmMapQuestRecord[];
+}
+
+export interface GmMapMonsterSpawnRecord {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  char: string;
+  color: string;
+  hp: number;
+  maxHp?: number;
+  attack: number;
+  radius?: number;
+  maxAlive?: number;
+  aggroRange?: number;
+  respawnSec?: number;
+  respawnTicks?: number;
+  level?: number;
+  expMultiplier?: number;
+  drops?: GmMapDropRecord[];
+}
+
+export interface GmMapDocument {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  description?: string;
+  dangerLevel?: number;
+  recommendedRealm?: string;
+  tiles: string[];
+  portals: GmMapPortalRecord[];
+  spawnPoint: {
+    x: number;
+    y: number;
+  };
+  auras?: GmMapAuraRecord[];
+  npcs: GmMapNpcRecord[];
+  monsterSpawns: GmMapMonsterSpawnRecord[];
+}
+
+export interface GmMapSummary {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  description?: string;
+  dangerLevel?: number;
+  recommendedRealm?: string;
+  portalCount: number;
+  npcCount: number;
+  monsterSpawnCount: number;
+}
+
+export interface GmMapListRes {
+  maps: GmMapSummary[];
+}
+
+export interface GmMapDetailRes {
+  map: GmMapDocument;
+}
+
+export interface GmUpdateMapReq {
+  map: GmMapDocument;
 }

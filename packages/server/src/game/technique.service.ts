@@ -27,6 +27,7 @@ import {
 import { AttrService } from './attr.service';
 import { BreakthroughConfigEntry, BreakthroughRequirementDef, ContentService } from './content.service';
 import { InventoryService } from './inventory.service';
+import { MapService } from './map.service';
 
 type TechniqueDirtyFlag = 'inv' | 'tech' | 'attr' | 'actions';
 type TechniqueMessageKind = 'system' | 'quest' | 'combat' | 'loot';
@@ -81,6 +82,7 @@ export class TechniqueService {
     private readonly attrService: AttrService,
     private readonly inventoryService: InventoryService,
     private readonly contentService: ContentService,
+    private readonly mapService: MapService,
   ) {}
 
   initializePlayerProgression(player: PlayerState): void {
@@ -149,6 +151,7 @@ export class TechniqueService {
     this.refreshCultivationBuff(cultivationBuff, technique.name);
 
     const numericStats = this.attrService.getPlayerNumericStats(player);
+    const auraMultiplier = this.getCultivationAuraMultiplier(player);
     const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
     const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
     const dirty = new Set<TechniqueDirtyFlag>();
@@ -156,7 +159,7 @@ export class TechniqueService {
 
     const realmResult = this.advanceRealmProgress(
       player,
-      Math.max(0, Math.round(numericStats.realmExpPerTick)),
+      Math.max(0, Math.round(numericStats.realmExpPerTick * auraMultiplier)),
       realmExpBonus,
     );
     if (realmResult.changed) {
@@ -167,7 +170,7 @@ export class TechniqueService {
 
     const techniqueResult = this.advanceTechniqueProgress(
       player,
-      Math.max(0, Math.round(numericStats.techniqueExpPerTick)),
+      Math.max(0, Math.round(numericStats.techniqueExpPerTick * auraMultiplier)),
       techniqueExpBonus,
     );
     if (techniqueResult.changed) {
@@ -495,6 +498,11 @@ export class TechniqueService {
 
   private getCultivationBuff(player: PlayerState): TemporaryBuffState | undefined {
     return player.temporaryBuffs?.find((buff) => buff.buffId === CULTIVATION_BUFF_ID);
+  }
+
+  private getCultivationAuraMultiplier(player: PlayerState): number {
+    const aura = this.mapService.getTileAura(player.mapId, player.x, player.y);
+    return 1 + Math.max(0, aura);
   }
 
   private buildCultivationBuffState(techniqueName: string): TemporaryBuffState {

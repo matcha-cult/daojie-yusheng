@@ -1,4 +1,4 @@
-import { IRenderer, TargetingOverlayState } from './types';
+import { IRenderer, SenseQiOverlayState, TargetingOverlayState } from './types';
 import { NpcQuestMarker, Tile, TileType, VIEW_RADIUS, VisibleBuffState } from '@mud/shared';
 import { Camera } from './camera';
 import { getCellSize } from '../display';
@@ -57,9 +57,19 @@ const PATH_ARROW_COLOR = 'rgba(179, 244, 255, 0.95)';
 const PATH_TARGET_FILL_COLOR = 'rgba(244, 144, 64, 0.34)';
 const PATH_TARGET_STROKE_COLOR = 'rgba(255, 216, 138, 0.96)';
 const PATH_TARGET_CORE_COLOR = 'rgba(255, 244, 219, 0.98)';
+const SENSE_QI_HOVER_STROKE = 'rgba(189, 231, 255, 0.95)';
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function getSenseQiOverlayStyle(aura: number): string {
+  const normalized = Math.max(0, Math.min(aura, 6)) / 6;
+  const red = Math.round(8 + normalized * 28);
+  const green = Math.round(12 + normalized * 96);
+  const blue = Math.round(16 + normalized * 224);
+  const alpha = 0.72 - normalized * 0.18;
+  return `rgba(${red}, ${green}, ${blue}, ${alpha.toFixed(3)})`;
 }
 
 interface AnimEntity {
@@ -113,6 +123,7 @@ export class TextRenderer implements IRenderer {
   private pathIndexByKey = new Map<string, number>();
   private pathTargetKey: string | null = null;
   private targetingOverlay: TargetingOverlayState | null = null;
+  private senseQiOverlay: SenseQiOverlayState | null = null;
   private targetingAffectedKeys = new Set<string>();
   private floatingTexts: FloatingText[] = [];
   private attackTrails: AttackTrail[] = [];
@@ -140,6 +151,10 @@ export class TextRenderer implements IRenderer {
   setTargetingOverlay(state: TargetingOverlayState | null) {
     this.targetingOverlay = state;
     this.targetingAffectedKeys = new Set((state?.affectedCells ?? []).map((cell) => `${cell.x},${cell.y}`));
+  }
+
+  setSenseQiOverlay(state: SenseQiOverlayState | null) {
+    this.senseQiOverlay = state;
   }
 
   renderWorld(camera: Camera, tileCache: Map<string, Tile>, visibleTiles: Set<string>, playerX: number, playerY: number) {
@@ -172,6 +187,11 @@ export class TextRenderer implements IRenderer {
         if (tile) {
           ctx.fillStyle = TILE_BG[tile.type] ?? '#333';
           ctx.fillRect(sx, sy, cellSize, cellSize);
+
+          if (this.senseQiOverlay) {
+            ctx.fillStyle = getSenseQiOverlayStyle(tile.aura);
+            ctx.fillRect(sx, sy, cellSize, cellSize);
+          }
 
           // 路径高亮
           if (this.pathKeys.has(key)) {
@@ -211,6 +231,12 @@ export class TextRenderer implements IRenderer {
             ctx.fillRect(barX, barY, barW, 3);
             ctx.fillStyle = '#d6c8ae';
             ctx.fillRect(barX, barY, barW * ratio, 3);
+          }
+
+          if (this.senseQiOverlay && gx === this.senseQiOverlay.hoverX && gy === this.senseQiOverlay.hoverY) {
+            ctx.strokeStyle = SENSE_QI_HOVER_STROKE;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx + 1, sy + 1, cellSize - 2, cellSize - 2);
           }
 
           if (this.targetingOverlay) {

@@ -31,6 +31,7 @@ export interface Tile {
   type: TileType;
   walkable: boolean;
   blocksSight: boolean;
+  aura: number;
   occupiedBy: string | null;
   modifiedAt: number | null;
   hp?: number;
@@ -456,6 +457,7 @@ export interface PlayerState {
   name: string;
   displayName?: string;
   isBot?: boolean;
+  senseQiActive?: boolean;
   autoRetaliate?: boolean;
   realmLv?: number;
   realmName?: string;

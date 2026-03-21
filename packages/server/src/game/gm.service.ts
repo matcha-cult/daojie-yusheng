@@ -9,6 +9,8 @@ import {
   DEFAULT_INVENTORY_CAPACITY,
   Direction,
   EquipmentSlots,
+  GmMapDocument,
+  GmMapListRes,
   GmManagedPlayerRecord,
   GmStateRes,
   Inventory,
@@ -17,6 +19,8 @@ import {
   TechniqueState,
   TemporaryBuffState,
   VIEW_RADIUS,
+  getTileTypeFromMapChar,
+  isTileTypeWalkable,
 } from '@mud/shared';
 import { PlayerEntity } from '../database/entities/player.entity';
 import { BotService } from './bot.service';
@@ -102,6 +106,42 @@ export class GmService {
       botCount: this.botService.getBotCount(),
       perf: this.performanceService.getSnapshot(),
     };
+  }
+
+  getEditableMapList(): GmMapListRes {
+    return this.mapService.getEditableMapList();
+  }
+
+  getEditableMap(mapId: string): GmMapDocument | null {
+    return this.mapService.getEditableMap(mapId) ?? null;
+  }
+
+  async saveEditableMap(mapId: string, document: GmMapDocument): Promise<string | null> {
+    if (!this.mapService.getMapMeta(mapId)) {
+      return '目标地图不存在';
+    }
+
+    for (const player of this.playerService.getPlayersByMap(mapId)) {
+      if (player.x >= document.width || player.y >= document.height || player.x < 0 || player.y < 0) {
+        return `在线角色 ${player.name} 超出新地图范围，请先移动角色后再保存`;
+      }
+      const row = document.tiles[player.y];
+      if (!row) {
+        return `在线角色 ${player.name} 所在坐标无对应地图行`;
+      }
+      const tileType = getTileTypeFromMapChar(row[player.x] ?? '#');
+      if (!isTileTypeWalkable(tileType)) {
+        return `在线角色 ${player.name} 当前站位会被改成不可通行地块，请先移动角色后再保存`;
+      }
+    }
+
+    const error = this.mapService.saveEditableMap(mapId, document);
+    if (error) {
+      return error;
+    }
+
+    this.worldService.reloadMapRuntime(mapId);
+    return null;
   }
 
   async enqueuePlayerUpdate(playerId: string, snapshot: PlayerState): Promise<string | null> {
@@ -282,6 +322,7 @@ export class GmService {
       mapId: entity.mapId,
       x: entity.x,
       y: entity.y,
+      senseQiActive: false,
       facing: this.normalizeDirection(entity.facing),
       viewRange: this.normalizePositiveInt(entity.viewRange, VIEW_RADIUS),
       hp: this.normalizeNonNegativeInt(entity.hp),

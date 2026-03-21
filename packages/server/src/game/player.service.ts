@@ -97,6 +97,7 @@ export class PlayerService {
       mapId: entity.mapId,
       x: entity.x,
       y: entity.y,
+      senseQiActive: false,
       facing: (entity.facing as Direction | null) ?? Direction.South,
       viewRange: entity.viewRange ?? VIEW_RADIUS,
       hp: entity.hp,
@@ -146,6 +147,7 @@ export class PlayerService {
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
     if (state.autoRetaliate === undefined) state.autoRetaliate = true;
     if (!state.actions) state.actions = [];
+    if (state.senseQiActive === undefined) state.senseQiActive = false;
     if (state.facing === undefined) state.facing = Direction.South;
     if (!state.viewRange) state.viewRange = VIEW_RADIUS;
     this.techniqueService.initializePlayerProgression(state);

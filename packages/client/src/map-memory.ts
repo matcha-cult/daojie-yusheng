@@ -2,7 +2,7 @@ import { Tile, TileType, VisibleTile } from '@mud/shared';
 
 const MAP_MEMORY_STORAGE_KEY = 'mud:map-memory:v2';
 
-type RememberedTile = Pick<Tile, 'type' | 'walkable' | 'blocksSight'>;
+type RememberedTile = Pick<Tile, 'type' | 'walkable' | 'blocksSight' | 'aura'>;
 type SerializedMapMemory = Record<string, Record<string, RememberedTile>>;
 
 const rememberedMaps = new Map<string, Map<string, Tile>>();
@@ -12,11 +12,12 @@ function isTileType(value: unknown): value is TileType {
   return typeof value === 'string' && Object.values(TileType).includes(value as TileType);
 }
 
-function toRememberedTile(tile: Pick<Tile, 'type' | 'walkable' | 'blocksSight'>): Tile {
+function toRememberedTile(tile: Pick<Tile, 'type' | 'walkable' | 'blocksSight' | 'aura'>): Tile {
   return {
     type: tile.type,
     walkable: tile.walkable,
     blocksSight: tile.blocksSight,
+    aura: Math.max(0, Math.floor(tile.aura ?? 0)),
     occupiedBy: null,
     modifiedAt: null,
   };
@@ -29,7 +30,8 @@ function isSerializedRememberedTile(value: unknown): value is RememberedTile {
   const candidate = value as Partial<RememberedTile>;
   return isTileType(candidate.type)
     && typeof candidate.walkable === 'boolean'
-    && typeof candidate.blocksSight === 'boolean';
+    && typeof candidate.blocksSight === 'boolean'
+    && typeof candidate.aura === 'number';
 }
 
 function ensureMemoryLoaded(): void {
@@ -81,6 +83,7 @@ function persistMemory(): void {
         type: tile.type,
         walkable: tile.walkable,
         blocksSight: tile.blocksSight,
+        aura: Math.max(0, Math.floor(tile.aura ?? 0)),
       };
     }
   }
@@ -126,6 +129,7 @@ export function rememberVisibleTiles(
         previous?.type === nextTile.type
         && previous.walkable === nextTile.walkable
         && previous.blocksSight === nextTile.blocksSight
+        && previous.aura === nextTile.aura
       ) {
         continue;
       }

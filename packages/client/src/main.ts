@@ -92,6 +92,7 @@ const observeModalEl = document.getElementById('observe-modal');
 const observeModalBodyEl = document.getElementById('observe-modal-body');
 const observeModalSubtitleEl = document.getElementById('observe-modal-subtitle');
 const observeBuffTooltip = new FloatingTooltip();
+const senseQiTooltip = new FloatingTooltip();
 let pendingTargetedAction: {
   actionId: string;
   actionName: string;
@@ -102,6 +103,12 @@ let pendingTargetedAction: {
   maxTargets?: number;
   hoverX?: number;
   hoverY?: number;
+} | null = null;
+let hoveredMapTile: {
+  x: number;
+  y: number;
+  clientX: number;
+  clientY: number;
 } | null = null;
 
 const TILE_TYPE_NAMES: Record<TileType, string> = {
@@ -259,6 +266,7 @@ function syncTargetingOverlay() {
   if (!myPlayer || !pendingTargetedAction) {
     renderer.setTargetingOverlay(null);
     targetingBadgeEl?.classList.add('hidden');
+    syncSenseQiOverlay();
     return;
   }
   const affectedCells = computeAffectedCells(pendingTargetedAction);
@@ -282,6 +290,7 @@ function syncTargetingOverlay() {
     targetingBadgeEl.textContent = `选定 ${pendingTargetedAction.actionName} 目标 · ${rangeLabel}${shapeLabel}`;
     targetingBadgeEl.classList.remove('hidden');
   }
+  syncSenseQiOverlay();
 }
 
 function cancelTargeting(showMessage = false) {
@@ -408,6 +417,40 @@ function getVisibleTileAt(x: number, y: number): Tile | null {
 
 function getKnownTileAt(x: number, y: number): Tile | null {
   return tileCache.get(getTileKey(x, y)) ?? null;
+}
+
+function syncSenseQiOverlay(): void {
+  if (!myPlayer?.senseQiActive) {
+    renderer.setSenseQiOverlay(null);
+    senseQiTooltip.hide();
+    return;
+  }
+
+  renderer.setSenseQiOverlay({
+    hoverX: hoveredMapTile?.x,
+    hoverY: hoveredMapTile?.y,
+  });
+
+  if (pendingTargetedAction || !hoveredMapTile) {
+    senseQiTooltip.hide();
+    return;
+  }
+
+  const tile = getKnownTileAt(hoveredMapTile.x, hoveredMapTile.y);
+  if (!tile) {
+    senseQiTooltip.hide();
+    return;
+  }
+
+  senseQiTooltip.show(
+    '感气视角',
+    [
+      `坐标 (${hoveredMapTile.x}, ${hoveredMapTile.y})`,
+      `灵气 ${Math.max(0, Math.floor(tile.aura ?? 0))}`,
+    ],
+    hoveredMapTile.clientX,
+    hoveredMapTile.clientY,
+  );
 }
 
 function isWithinDisplayedMemoryBounds(x: number, y: number): boolean {
@@ -620,6 +663,7 @@ function showObserveModal(targetX: number, targetY: number): void {
   });
   const terrainRows = [
     { label: '地貌', value: getTileTypeName(tile.type) },
+    { label: '灵气', value: `${Math.max(0, Math.floor(tile.aura ?? 0))}` },
     { label: '是否可通行', value: tile.walkable ? '可通行' : '不可通行' },
     { label: '行走消耗', value: formatTraversalCost(tile) },
     { label: '是否阻挡视线', value: tile.blocksSight ? '会阻挡' : '不会阻挡' },
@@ -792,6 +836,7 @@ socket.onActionsUpdate((data) => {
   const previousAutoRetaliate = myPlayer?.autoRetaliate ?? true;
   const nextAutoBattle = data.autoBattle ?? myPlayer?.autoBattle ?? false;
   const nextAutoRetaliate = data.autoRetaliate ?? myPlayer?.autoRetaliate ?? true;
+  const nextSenseQiActive = data.senseQiActive ?? myPlayer?.senseQiActive ?? false;
   const shouldRefreshActionPanel = !myPlayer
     || previousAutoBattle !== nextAutoBattle
     || previousAutoRetaliate !== nextAutoRetaliate
@@ -806,6 +851,7 @@ socket.onActionsUpdate((data) => {
       }));
     myPlayer.autoBattle = data.autoBattle ?? inferAutoBattle(myPlayer.autoBattle, data.actions);
     myPlayer.autoRetaliate = data.autoRetaliate ?? inferAutoRetaliate(myPlayer.autoRetaliate !== false, data.actions);
+    myPlayer.senseQiActive = nextSenseQiActive;
   }
   if (shouldRefreshActionPanel) {
     actionPanel.update(data.actions, nextAutoBattle, nextAutoRetaliate, myPlayer ?? undefined);
@@ -813,6 +859,7 @@ socket.onActionsUpdate((data) => {
   } else {
     actionPanel.syncDynamic(data.actions, nextAutoBattle, nextAutoRetaliate, myPlayer ?? undefined);
   }
+  syncSenseQiOverlay();
 });
 socket.onQuestUpdate((data) => {
   if (myPlayer) myPlayer.quests = data.quests;
@@ -1096,6 +1143,7 @@ function resetGameState() {
   tileCache.clear();
   currentVisibleTiles.clear();
   pendingTargetedAction = null;
+  hoveredMapTile = null;
   hideObserveModal();
   syncTargetingOverlay();
   sidePanel.hide();
@@ -1267,18 +1315,31 @@ mouseInput.init(
     planPathTo(target);
   },
   (target) => {
-    if (!pendingTargetedAction) return;
-    pendingTargetedAction.hoverX = target?.x;
-    pendingTargetedAction.hoverY = target?.y;
-    syncTargetingOverlay();
+    hoveredMapTile = target && typeof target.clientX === 'number' && typeof target.clientY === 'number'
+      ? {
+          x: target.x,
+          y: target.y,
+          clientX: target.clientX,
+          clientY: target.clientY,
+        }
+      : null;
+    if (pendingTargetedAction) {
+      pendingTargetedAction.hoverX = target?.x;
+      pendingTargetedAction.hoverY = target?.y;
+      syncTargetingOverlay();
+      return;
+    }
+    syncSenseQiOverlay();
   },
 );
 
 // 初始化
 socket.onInit((data: S2C_Init) => {
   pendingTargetedAction = null;
+  hoveredMapTile = null;
   hideObserveModal();
   myPlayer = data.self;
+  myPlayer.senseQiActive = myPlayer.senseQiActive === true;
   syncTargetingOverlay();
   currentMapMeta = data.mapMeta;
   currentTiles = data.tiles;
@@ -1288,6 +1349,7 @@ socket.onInit((data: S2C_Init) => {
   tileCache.clear();
   hydrateTileCacheFromMemory(myPlayer.mapId, tileCache);
   cacheTiles(myPlayer.mapId, currentTiles, tileOriginX, tileOriginY);
+  syncSenseQiOverlay();
 
   camera.snap(myPlayer);
   viewCenterX = myPlayer.x;
@@ -1344,6 +1406,7 @@ socket.onTick((data: S2C_Tick) => {
       currentTiles = [];
       tileCache.clear();
       currentVisibleTiles.clear();
+      hoveredMapTile = null;
       hideObserveModal();
       cancelTargeting();
     }
@@ -1386,6 +1449,7 @@ socket.onTick((data: S2C_Tick) => {
     tileOriginX = myPlayer.x - getViewRadius();
     tileOriginY = myPlayer.y - getViewRadius();
     cacheTiles(myPlayer.mapId, currentTiles, tileOriginX, tileOriginY);
+    syncSenseQiOverlay();
   }
   camera.follow(myPlayer);
 

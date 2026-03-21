@@ -135,6 +135,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       mapId: DEFAULT_MAP,
       x: spawn.x,
       y: spawn.y,
+      senseQiActive: false,
       facing: Direction.South,
       viewRange: VIEW_RADIUS,
       hp: initMaxHp,
