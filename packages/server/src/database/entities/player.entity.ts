@@ -50,6 +50,9 @@ export class PlayerEntity {
   @Column({ type: 'jsonb', default: () => `'[]'` })
   bonuses!: unknown[];
 
+  @Column({ type: 'jsonb', default: () => `'[]'` })
+  temporaryBuffs!: unknown[];
+
   @Column({ type: 'jsonb', default: () => `'{"items":[],"capacity":${DEFAULT_INVENTORY_CAPACITY}}'` })
   inventory!: Record<string, unknown>;
 

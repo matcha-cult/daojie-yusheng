@@ -8,6 +8,7 @@ import {
   Inventory,
   EquipmentSlots,
   TechniqueState,
+  TemporaryBuffState,
   ActionDef,
   AutoBattleSkillConfig,
   QuestState,
@@ -106,7 +107,7 @@ export class PlayerService {
       dead: entity.dead,
       baseAttrs: (entity.baseAttrs ?? { ...DEFAULT_BASE_ATTRS }) as Attributes,
       bonuses: (entity.bonuses ?? []) as AttrBonus[],
-      temporaryBuffs: [],
+      temporaryBuffs: this.normalizeTemporaryBuffs(entity.temporaryBuffs),
       inventory: (entity.inventory as unknown ?? { items: [], capacity: DEFAULT_INVENTORY_CAPACITY }) as Inventory,
       equipment: (entity.equipment ?? { weapon: null, head: null, body: null, legs: null, accessory: null }) as EquipmentSlots,
       techniques: (entity.techniques ?? []) as TechniqueState[],
@@ -173,6 +174,7 @@ export class PlayerService {
       dead: state.dead,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
+      temporaryBuffs: this.normalizeTemporaryBuffs(state.temporaryBuffs) as any,
       inventory: state.inventory as any,
       equipment: state.equipment as any,
       techniques: state.techniques as any,
@@ -205,6 +207,7 @@ export class PlayerService {
       dead: state.dead,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
+      temporaryBuffs: this.normalizeTemporaryBuffs(state.temporaryBuffs) as any,
       inventory: state.inventory as any,
       equipment: state.equipment as any,
       techniques: state.techniques as any,
@@ -238,6 +241,7 @@ export class PlayerService {
       dead: s.dead,
       baseAttrs: s.baseAttrs as any,
       bonuses: s.bonuses as any,
+      temporaryBuffs: this.normalizeTemporaryBuffs(s.temporaryBuffs) as any,
       inventory: s.inventory as any,
       equipment: s.equipment as any,
       techniques: s.techniques as any,
@@ -427,5 +431,36 @@ export class PlayerService {
       giverX: quest.giverX,
       giverY: quest.giverY,
     }));
+  }
+
+  private normalizeTemporaryBuffs(value: unknown): TemporaryBuffState[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((entry) => this.cloneJson<TemporaryBuffState>(entry))
+      .filter((buff): buff is TemporaryBuffState => (
+        Boolean(buff)
+        && typeof buff.buffId === 'string'
+        && buff.buffId.length > 0
+        && typeof buff.name === 'string'
+        && buff.name.length > 0
+        && typeof buff.shortMark === 'string'
+        && buff.shortMark.length > 0
+        && typeof buff.sourceSkillId === 'string'
+        && buff.sourceSkillId.length > 0
+        && Number.isFinite(buff.remainingTicks)
+        && Number.isFinite(buff.duration)
+        && Number.isFinite(buff.stacks)
+        && Number.isFinite(buff.maxStacks)
+        && buff.remainingTicks > 0
+        && buff.stacks > 0
+        && buff.maxStacks > 0
+      ));
+  }
+
+  private cloneJson<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
   }
 }
