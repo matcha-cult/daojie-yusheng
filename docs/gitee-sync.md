@@ -70,6 +70,7 @@ cat ~/.ssh/gitee_mirror_ed25519
 
 - 当前工作流通过 HTTPS 凭证直接推送到 `https://gitee.com/<owner>/<repo>.git`
 - `GITEE_PRIVATE_KEY` 不是这版工作流的必需项；如果你已经配了，可以保留，不影响运行
+- 当前仓库的工作流已内置 `YuoHira` 作为默认 owner；即使 `GITEE_OWNER` 变量为空，也会回退到这个值
 
 ## 第三步：提交同步工作流
 
