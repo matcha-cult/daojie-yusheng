@@ -20,8 +20,54 @@ export const TILE_TRAVERSAL_COST: Record<TileType, number> = {
   [TileType.Stone]: 400,
 };
 
+export const TILE_TYPE_TO_MAP_CHAR: Record<TileType, string> = {
+  [TileType.Floor]: '.',
+  [TileType.Road]: '=',
+  [TileType.Trail]: ':',
+  [TileType.Wall]: '#',
+  [TileType.Door]: '+',
+  [TileType.Portal]: 'P',
+  [TileType.Grass]: ',',
+  [TileType.Hill]: '^',
+  [TileType.Mud]: ';',
+  [TileType.Swamp]: '%',
+  [TileType.Water]: '~',
+  [TileType.Tree]: 'T',
+  [TileType.Stone]: 'o',
+};
+
+export const MAP_CHAR_TO_TILE_TYPE: Record<string, TileType> = Object.fromEntries(
+  Object.entries(TILE_TYPE_TO_MAP_CHAR).map(([type, char]) => [char, type]),
+) as Record<string, TileType>;
+
 export function getTileTraversalCost(type: TileType): number {
   return TILE_TRAVERSAL_COST[type] ?? 400;
+}
+
+export function getTileTypeFromMapChar(char: string): TileType {
+  return MAP_CHAR_TO_TILE_TYPE[char] ?? TileType.Floor;
+}
+
+export function getMapCharFromTileType(type: TileType): string {
+  return TILE_TYPE_TO_MAP_CHAR[type] ?? TILE_TYPE_TO_MAP_CHAR[TileType.Floor];
+}
+
+export function isTileTypeWalkable(type: TileType): boolean {
+  return (
+    type === TileType.Floor ||
+    type === TileType.Road ||
+    type === TileType.Trail ||
+    type === TileType.Door ||
+    type === TileType.Portal ||
+    type === TileType.Grass ||
+    type === TileType.Hill ||
+    type === TileType.Mud ||
+    type === TileType.Swamp
+  );
+}
+
+export function doesTileTypeBlockSight(type: TileType): boolean {
+  return type === TileType.Wall || type === TileType.Tree || type === TileType.Stone;
 }
 
 export function getMovePointsPerTick(moveSpeed: number): number {
