@@ -1,4 +1,4 @@
-import { Inventory, ItemStack, ItemType, PlayerState } from '@mud/shared';
+import { Inventory, ItemStack, ItemType, PlayerState, createItemStackSignature } from '@mud/shared';
 import { detailModalHost } from '../detail-modal-host';
 import { FloatingTooltip } from '../floating-tooltip';
 import { preserveSelection } from '../selection-preserver';
@@ -452,15 +452,7 @@ export class InventoryPanel {
   }
 
   private getItemIdentity(item: ItemStack): string {
-    return JSON.stringify({
-      itemId: item.itemId,
-      name: item.name,
-      type: item.type,
-      desc: item.desc,
-      equipSlot: item.equipSlot ?? null,
-      equipAttrs: item.equipAttrs ?? null,
-      equipStats: item.equipStats ?? null,
-    });
+    return createItemStackSignature(item);
   }
 
   private closeModal(): void {

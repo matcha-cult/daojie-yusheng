@@ -25,19 +25,20 @@ export class EquipmentService {
     const slot = item.equipSlot;
     const current = player.equipment[slot];
 
-    // 从背包取出
-    player.inventory.items.splice(slotIndex, 1);
+    const removed = this.inventoryService.removeItem(player, slotIndex, 1);
+    if (!removed) {
+      return '物品不存在';
+    }
 
     // 旧装备放回背包
     if (current) {
       if (!this.inventoryService.addItem(player, current)) {
-        // 背包满，放回原物品并恢复装备
-        player.inventory.items.splice(slotIndex, 0, item);
+        this.inventoryService.addItem(player, removed);
         return '背包已满，无法卸下当前装备';
       }
     }
 
-    player.equipment[slot] = item;
+    player.equipment[slot] = { ...removed, count: 1 };
     this.refreshBonuses(player);
     return null;
   }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PlayerState, ItemStack, ItemType, EquipSlot } from '@mud/shared';
+import { PlayerState, ItemStack, ItemType, EquipSlot, createItemStackSignature } from '@mud/shared';
 
 const ITEM_TYPE_ORDER: Record<ItemType, number> = {
   equipment: 0,
@@ -25,10 +25,8 @@ export class InventoryService {
 
   /** 添加物品到背包，返回是否成功 */
   addItem(player: PlayerState, item: ItemStack): boolean {
-    // 尝试堆叠到已有同类物品
-    const existing = player.inventory.items.find(
-      i => i.itemId === item.itemId && i.type !== 'equipment',
-    );
+    const signature = createItemStackSignature(item);
+    const existing = player.inventory.items.find((entry) => createItemStackSignature(entry) === signature);
     if (existing) {
       existing.count += item.count;
       return true;
@@ -76,29 +74,25 @@ export class InventoryService {
     return player.inventory.items.findIndex(i => i.itemId === itemId);
   }
 
-  /** 整理背包：合并可堆叠物品，并按类型与名称稳定排序 */
+  /** 整理背包：合并完全相同的物品，并按类型与名称稳定排序 */
   sortInventory(player: PlayerState): void {
-    const stackableItems = new Map<string, ItemStack>();
-    const equipmentItems: ItemStack[] = [];
+    const mergedItems = new Map<string, ItemStack>();
 
     for (const item of player.inventory.items) {
       if (item.count <= 0) {
         continue;
       }
-      if (item.type === 'equipment') {
-        equipmentItems.push({ ...item });
-        continue;
-      }
 
-      const existing = stackableItems.get(item.itemId);
+      const signature = createItemStackSignature(item);
+      const existing = mergedItems.get(signature);
       if (existing) {
         existing.count += item.count;
         continue;
       }
-      stackableItems.set(item.itemId, { ...item });
+      mergedItems.set(signature, { ...item });
     }
 
-    player.inventory.items = [...equipmentItems, ...stackableItems.values()].sort((left, right) => {
+    player.inventory.items = [...mergedItems.values()].sort((left, right) => {
       const typeDiff = ITEM_TYPE_ORDER[left.type] - ITEM_TYPE_ORDER[right.type];
       if (typeDiff !== 0) {
         return typeDiff;

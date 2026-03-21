@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  createItemStackSignature,
   GroundItemEntryView,
   GroundItemPileView,
   GROUND_ITEM_EXPIRE_TICKS,
@@ -184,7 +185,7 @@ export class LootService {
         continue;
       }
 
-      const target = state.entries.find((entry) => !entry.visible && this.getItemKey(entry.item) === state.activeSearch?.itemKey);
+      const target = state.entries.find((entry) => !entry.visible && createItemStackSignature(entry.item) === state.activeSearch?.itemKey);
       if (target) {
         target.visible = true;
       }
@@ -491,7 +492,7 @@ export class LootService {
 
     const sorted = [...entries].sort((left, right) => left.createdTick - right.createdTick);
     for (const entry of sorted) {
-      const itemKey = this.getItemKey(entry.item);
+      const itemKey = createItemStackSignature(entry.item);
       const existing = index.get(itemKey);
       if (existing) {
         existing.item.count += entry.item.count;
@@ -513,12 +514,11 @@ export class LootService {
   private canAddItems(player: PlayerState, items: ItemStack[]): boolean {
     const simulated = player.inventory.items.map((item) => ({ ...item }));
     for (const item of items) {
-      if (item.type !== 'equipment') {
-        const existing = simulated.find((entry) => entry.itemId === item.itemId && entry.type !== 'equipment');
-        if (existing) {
-          existing.count += item.count;
-          continue;
-        }
+      const signature = createItemStackSignature(item);
+      const existing = simulated.find((entry) => createItemStackSignature(entry) === signature);
+      if (existing) {
+        existing.count += item.count;
+        continue;
       }
       if (simulated.length >= player.inventory.capacity) {
         return false;
@@ -657,17 +657,5 @@ export class LootService {
       result.push(session.playerId);
     }
     return result;
-  }
-
-  private getItemKey(item: ItemStack): string {
-    return JSON.stringify({
-      itemId: item.itemId,
-      name: item.name,
-      type: item.type,
-      desc: item.desc,
-      equipSlot: item.equipSlot ?? null,
-      equipAttrs: item.equipAttrs ?? null,
-      equipStats: item.equipStats ?? null,
-    });
   }
 }

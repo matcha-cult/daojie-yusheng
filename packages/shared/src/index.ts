@@ -10,3 +10,4 @@ export * from './target-ref';
 export * from './terrain';
 export * from './value';
 export * from './combat';
+export * from './item-stack';

@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  createItemStackSignature,
   AttrKey,
   DEFAULT_INVENTORY_CAPACITY,
   EquipmentSlots,
@@ -338,12 +339,12 @@ export class ContentService implements OnModuleInit {
   }
 
   getStarterInventory(): Inventory {
-    return {
+    return this.normalizeInventory({
       capacity: DEFAULT_INVENTORY_CAPACITY,
       items: this.starterInventoryEntries
         .map((entry) => this.createItem(entry.itemId, entry.count ?? 1))
         .filter((item): item is ItemStack => item !== null),
-    };
+    });
   }
 
   createItem(itemId: string, count = 1): ItemStack | null {
@@ -366,13 +367,34 @@ export class ContentService implements OnModuleInit {
     if (!normalized) {
       return { ...item };
     }
-    return normalized;
+    return {
+      ...item,
+      ...normalized,
+      count: normalized.count,
+    };
   }
 
   normalizeInventory(inventory: Inventory): Inventory {
+    const mergedItems: ItemStack[] = [];
+    const mergedIndex = new Map<string, ItemStack>();
+    for (const item of inventory.items.map((entry) => this.normalizeItemStack(entry))) {
+      if (item.count <= 0) {
+        continue;
+      }
+      const signature = createItemStackSignature(item);
+      const existing = mergedIndex.get(signature);
+      if (existing) {
+        existing.count += item.count;
+        continue;
+      }
+      const created = { ...item };
+      mergedIndex.set(signature, created);
+      mergedItems.push(created);
+    }
+
     return {
       capacity: Math.max(DEFAULT_INVENTORY_CAPACITY, Number.isFinite(inventory.capacity) ? inventory.capacity : 0),
-      items: inventory.items.map((item) => this.normalizeItemStack(item)),
+      items: mergedItems,
     };
   }
 
@@ -380,7 +402,7 @@ export class ContentService implements OnModuleInit {
     const normalized = { weapon: null, head: null, body: null, legs: null, accessory: null } as EquipmentSlots;
     for (const slot of EQUIP_SLOTS) {
       const item = equipment[slot];
-      normalized[slot] = item ? this.normalizeItemStack(item) : null;
+      normalized[slot] = item ? { ...this.normalizeItemStack(item), count: 1 } : null;
     }
     return normalized;
   }

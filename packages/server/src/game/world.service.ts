@@ -5,6 +5,7 @@ import {
   calcQiCostWithOutputLimit,
   CombatEffect,
   computeAffectedCellsFromAnchor,
+  createItemStackSignature,
   createNumericStats,
   DEFAULT_RATIO_DIVISOR,
   distanceSquared,
@@ -2471,7 +2472,8 @@ export class WorldService {
   private canReceiveItems(player: PlayerState, items: ItemStack[]): boolean {
     const simulated = player.inventory.items.map((item) => ({ ...item }));
     for (const item of items) {
-      const existing = simulated.find((entry) => entry.itemId === item.itemId && entry.type !== 'equipment');
+      const signature = createItemStackSignature(item);
+      const existing = simulated.find((entry) => createItemStackSignature(entry) === signature);
       if (existing) {
         existing.count += item.count;
         continue;
