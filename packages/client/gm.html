@@ -442,8 +442,173 @@
       margin-bottom: 12px;
     }
 
+    .editor-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .editor-section {
+      border: 1px solid var(--wash-ink);
+      background: rgba(255,255,255,0.48);
+      padding: 12px;
+    }
+
+    .editor-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .editor-section-title {
+      font-family: var(--font-heading-sub);
+      font-size: 15px;
+      color: var(--ink-black);
+    }
+
+    .editor-section-note {
+      font-size: 11px;
+      color: var(--ink-grey);
+      line-height: 1.5;
+    }
+
+    .editor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .editor-grid.compact {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .editor-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .editor-field.wide {
+      grid-column: 1 / -1;
+    }
+
+    .editor-field span {
+      font-size: 12px;
+      color: var(--ink-grey);
+    }
+
+    .editor-field input,
+    .editor-field select,
+    .editor-field textarea {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--ink-light);
+      background: rgba(255,255,255,0.88);
+      color: var(--ink-dark);
+      font-family: var(--font-body);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .editor-field textarea {
+      min-height: 92px;
+      resize: vertical;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      line-height: 1.45;
+    }
+
+    .editor-field input:focus,
+    .editor-field select:focus,
+    .editor-field textarea:focus {
+      border-color: var(--ink-black);
+    }
+
+    .editor-toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+    }
+
+    .editor-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--ink-dark);
+    }
+
+    .editor-toggle input {
+      width: 16px;
+      height: 16px;
+    }
+
+    .editor-card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .editor-card {
+      padding: 10px;
+      border: 1px solid var(--wash-ink);
+      background: rgba(248,248,245,0.94);
+    }
+
+    .editor-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .editor-card-title {
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      color: var(--ink-black);
+    }
+
+    .editor-card-meta {
+      font-size: 11px;
+      color: var(--ink-grey);
+    }
+
+    .editor-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .editor-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .editor-code {
+      margin-top: 8px;
+      padding: 10px;
+      border: 1px dashed var(--ink-light);
+      background: rgba(255,255,255,0.72);
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-grey);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .editor-advanced {
+      border-top: 1px solid var(--wash-ink);
+      padding-top: 8px;
+    }
+
     .editor-textarea {
-      min-height: 480px;
+      min-height: 260px;
       resize: vertical;
       font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
       line-height: 1.5;
@@ -458,6 +623,11 @@
 
     @media (max-width: 1200px) {
       #gm-shell {
+        grid-template-columns: 1fr;
+      }
+      .editor-grid,
+      .editor-grid.compact,
+      .editor-stat-grid {
         grid-template-columns: 1fr;
       }
       .editor-textarea {
@@ -553,7 +723,7 @@
     <section class="layout-section">
       <div class="section-head">
         <div class="section-title">全量数据编辑</div>
-        <div class="section-subtitle">完整 JSON 视图，保存即写回服务端</div>
+        <div class="section-subtitle">可视化分区编辑，原始 JSON 退到高级区</div>
       </div>
       <div class="section-body">
         <div id="editor-empty" class="empty-hint">从左侧选择一个角色后，可查看并修改其完整数据。</div>
@@ -570,8 +740,16 @@
             <button id="reset-player" class="small-btn" type="button">回出生点</button>
             <button id="remove-bot" class="small-btn danger" type="button">移除该机器人</button>
           </div>
-          <div class="editor-note">保存前请保证 JSON 可被解析。在线玩家通常会在下一次 tick 后反映到客户端。</div>
-          <textarea id="player-json" class="editor-textarea" spellcheck="false"></textarea>
+          <div class="editor-note">常用数据可直接在下方分区编辑。在线玩家通常会在下一次 tick 后反映到客户端。</div>
+          <div id="editor-content" class="editor-stack"></div>
+          <details class="editor-section editor-advanced">
+            <summary class="editor-section-title">高级模式 · 原始 JSON</summary>
+            <div class="editor-note" style="margin-top:8px;">这里用于导入、兜底修改或核对完整快照。改完后需要点击“应用原始 JSON 到可视化”。</div>
+            <div class="button-row" style="margin: 10px 0;">
+              <button id="apply-raw-json" class="small-btn" type="button">应用原始 JSON 到可视化</button>
+            </div>
+            <textarea id="player-json" class="editor-textarea" spellcheck="false"></textarea>
+          </details>
         </div>
       </div>
     </section>

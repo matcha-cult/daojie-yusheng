@@ -1,17 +1,61 @@
-import type {
-  GmLoginReq,
-  GmLoginRes,
-  GmManagedPlayerRecord,
-  GmRemoveBotsReq,
-  GmSpawnBotsReq,
-  GmStateRes,
-  GmUpdatePlayerReq,
-  PlayerState,
+import {
+  Direction,
+  TechniqueRealm,
+  type AttrKey,
+  type AutoBattleSkillConfig,
+  type EquipmentSlots,
+  type GmLoginReq,
+  type GmLoginRes,
+  type GmManagedPlayerRecord,
+  type GmRemoveBotsReq,
+  type GmSpawnBotsReq,
+  type GmStateRes,
+  type GmUpdatePlayerReq,
+  type ItemStack,
+  type PlayerState,
+  type QuestState,
+  type TechniqueState,
+  type TemporaryBuffState,
 } from '@mud/shared';
 
 const TOKEN_KEY = 'mud:gm-access-token';
 const POLL_INTERVAL_MS = 5000;
 const APPLY_DELAY_MS = 1200;
+
+const ATTR_KEYS: AttrKey[] = ['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'];
+const ATTR_LABELS: Record<AttrKey, string> = {
+  constitution: '体魄',
+  spirit: '神识',
+  perception: '身法',
+  talent: '根骨',
+  comprehension: '悟性',
+  luck: '气运',
+};
+const EQUIP_SLOTS = ['weapon', 'head', 'body', 'legs', 'accessory'] as const;
+const EQUIP_SLOT_LABELS: Record<(typeof EQUIP_SLOTS)[number], string> = {
+  weapon: '武器',
+  head: '头部',
+  body: '身体',
+  legs: '腿部',
+  accessory: '饰品',
+};
+const ITEM_TYPES = ['consumable', 'equipment', 'material', 'quest_item', 'skill_book'] as const;
+const QUEST_LINES = ['main', 'side', 'daily', 'encounter'] as const;
+const QUEST_STATUSES = ['available', 'active', 'ready', 'completed'] as const;
+const QUEST_OBJECTIVE_TYPES = ['kill', 'learn_technique', 'realm_progress', 'realm_stage'] as const;
+const FACING_OPTIONS = [
+  { value: Direction.North, label: '北' },
+  { value: Direction.South, label: '南' },
+  { value: Direction.East, label: '东' },
+  { value: Direction.West, label: '西' },
+];
+const TECHNIQUE_REALM_OPTIONS = [
+  { value: TechniqueRealm.Entry, label: '入门' },
+  { value: TechniqueRealm.Minor, label: '小成' },
+  { value: TechniqueRealm.Major, label: '大成' },
+  { value: TechniqueRealm.Perfection, label: '圆满' },
+];
+const TECHNIQUE_GRADE_OPTIONS = ['mortal', 'yellow', 'mystic', 'earth', 'heaven', 'spirit', 'saint', 'emperor'] as const;
 
 const loginOverlay = document.getElementById('login-overlay') as HTMLDivElement;
 const gmShell = document.getElementById('gm-shell') as HTMLDivElement;
@@ -27,7 +71,9 @@ const editorPanelEl = document.getElementById('editor-panel') as HTMLDivElement;
 const editorTitleEl = document.getElementById('editor-title') as HTMLDivElement;
 const editorSubtitleEl = document.getElementById('editor-subtitle') as HTMLDivElement;
 const editorMetaEl = document.getElementById('editor-meta') as HTMLDivElement;
+const editorContentEl = document.getElementById('editor-content') as HTMLDivElement;
 const playerJsonEl = document.getElementById('player-json') as HTMLTextAreaElement;
+const applyRawJsonBtn = document.getElementById('apply-raw-json') as HTMLButtonElement;
 const savePlayerBtn = document.getElementById('save-player') as HTMLButtonElement;
 const resetPlayerBtn = document.getElementById('reset-player') as HTMLButtonElement;
 const removeBotBtn = document.getElementById('remove-bot') as HTMLButtonElement;
@@ -42,9 +88,14 @@ const summaryMemoryEl = document.getElementById('summary-memory') as HTMLDivElem
 let token = sessionStorage.getItem(TOKEN_KEY) ?? '';
 let state: GmStateRes | null = null;
 let selectedPlayerId: string | null = null;
+let draftSnapshot: PlayerState | null = null;
 let editorDirty = false;
-let lastEditorPlayerId: string | null = null;
+let draftSourcePlayerId: string | null = null;
 let pollTimer: number | null = null;
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
 function escapeHtml(input: string): string {
   return input
@@ -53,6 +104,15 @@ function escapeHtml(input: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value ?? null, null, 2);
+}
+
+function setStatus(message: string, isError = false): void {
+  statusBarEl.textContent = message;
+  statusBarEl.style.color = isError ? 'var(--stamp-red)' : 'var(--ink-grey)';
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -81,14 +141,591 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-function setStatus(message: string, isError = false): void {
-  statusBarEl.textContent = message;
-  statusBarEl.style.color = isError ? 'var(--stamp-red)' : 'var(--ink-grey)';
-}
-
 function getSelectedPlayer(): GmManagedPlayerRecord | null {
   if (!state || !selectedPlayerId) return null;
   return state.players.find((player) => player.id === selectedPlayerId) ?? null;
+}
+
+function createDefaultItem(equipSlot?: string): ItemStack {
+  return {
+    itemId: '',
+    name: '',
+    type: equipSlot ? 'equipment' : 'material',
+    count: 1,
+    desc: '',
+    equipSlot: equipSlot as ItemStack['equipSlot'],
+    equipAttrs: equipSlot ? {} : undefined,
+    equipStats: equipSlot ? {} : undefined,
+  };
+}
+
+function createDefaultTechnique(): TechniqueState {
+  return {
+    techId: '',
+    name: '',
+    level: 1,
+    exp: 0,
+    expToNext: 0,
+    realm: TechniqueRealm.Entry,
+    skills: [],
+    grade: 'mortal',
+    layers: [],
+    attrCurves: {},
+  };
+}
+
+function createDefaultQuest(): QuestState {
+  return {
+    id: '',
+    title: '',
+    desc: '',
+    line: 'side',
+    status: 'active',
+    objectiveType: 'kill',
+    progress: 0,
+    required: 1,
+    targetName: '',
+    rewardText: '',
+    targetMonsterId: '',
+    rewardItemId: '',
+    rewardItemIds: [],
+    rewards: [],
+    giverId: '',
+    giverName: '',
+  };
+}
+
+function createDefaultBuff(): TemporaryBuffState {
+  return {
+    buffId: '',
+    name: '',
+    shortMark: '',
+    category: 'buff',
+    visibility: 'public',
+    remainingTicks: 1,
+    duration: 1,
+    stacks: 1,
+    maxStacks: 1,
+    sourceSkillId: '',
+    attrs: {},
+    stats: {},
+  };
+}
+
+function createDefaultPlayerSnapshot(source?: PlayerState): PlayerState {
+  if (source) return clone(source);
+  return {
+    id: '',
+    name: '',
+    mapId: 'spawn',
+    x: 0,
+    y: 0,
+    facing: Direction.South,
+    viewRange: 8,
+    hp: 1,
+    maxHp: 1,
+    qi: 0,
+    dead: false,
+    baseAttrs: {
+      constitution: 1,
+      spirit: 1,
+      perception: 1,
+      talent: 1,
+      comprehension: 1,
+      luck: 1,
+    },
+    bonuses: [],
+    temporaryBuffs: [],
+    inventory: { items: [], capacity: 24 },
+    equipment: {
+      weapon: null,
+      head: null,
+      body: null,
+      legs: null,
+      accessory: null,
+    },
+    techniques: [],
+    actions: [],
+    quests: [],
+    autoBattle: false,
+    autoBattleSkills: [],
+    autoRetaliate: true,
+    revealedBreakthroughRequirementIds: [],
+  };
+}
+
+function pathSegments(path: string): string[] {
+  return path.split('.');
+}
+
+function setValueByPath(target: unknown, path: string, value: unknown): void {
+  const segments = pathSegments(path);
+  let cursor = target as Record<string, unknown>;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const key = segments[index]!;
+    const next = cursor[key];
+    if (next === undefined || next === null) {
+      cursor[key] = /^\d+$/.test(segments[index + 1] ?? '') ? [] : {};
+    }
+    cursor = cursor[key] as Record<string, unknown>;
+  }
+  cursor[segments[segments.length - 1]!] = value;
+}
+
+function getValueByPath(target: unknown, path: string): unknown {
+  let cursor = target as Record<string, unknown> | undefined;
+  for (const segment of pathSegments(path)) {
+    if (cursor === undefined || cursor === null) return undefined;
+    cursor = cursor[segment] as Record<string, unknown> | undefined;
+  }
+  return cursor;
+}
+
+function removeArrayIndex(target: unknown, path: string, index: number): void {
+  const value = getValueByPath(target, path);
+  if (!Array.isArray(value)) return;
+  value.splice(index, 1);
+}
+
+function ensureArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function optionsMarkup<T extends string | number>(options: Array<{ value: T; label: string }>, selected: T | undefined): string {
+  return options.map((option) => `
+    <option value="${escapeHtml(String(option.value))}" ${selected === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>
+  `).join('');
+}
+
+function textField(label: string, path: string, value: string | undefined, extraClass = ''): string {
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}</span>
+      <input data-bind="${escapeHtml(path)}" data-kind="string" value="${escapeHtml(value ?? '')}" />
+    </label>
+  `;
+}
+
+function nullableTextField(label: string, path: string, value: string | undefined, emptyMode: 'undefined' | 'null' = 'undefined', extraClass = ''): string {
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}</span>
+      <input data-bind="${escapeHtml(path)}" data-kind="nullable-string" data-empty-mode="${emptyMode}" value="${escapeHtml(value ?? '')}" />
+    </label>
+  `;
+}
+
+function numberField(label: string, path: string, value: number | undefined, extraClass = ''): string {
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}</span>
+      <input type="number" data-bind="${escapeHtml(path)}" data-kind="number" value="${Number.isFinite(value) ? String(value) : '0'}" />
+    </label>
+  `;
+}
+
+function checkboxField(label: string, path: string, checked: boolean | undefined): string {
+  return `
+    <label class="editor-toggle">
+      <input type="checkbox" data-bind="${escapeHtml(path)}" data-kind="boolean" ${checked ? 'checked' : ''} />
+      <span>${escapeHtml(label)}</span>
+    </label>
+  `;
+}
+
+function selectField(
+  label: string,
+  path: string,
+  value: string | number | undefined,
+  options: Array<{ value: string | number; label: string }>,
+  extraClass = '',
+): string {
+  const selected = value ?? '';
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}</span>
+      <select data-bind="${escapeHtml(path)}" data-kind="${typeof selected === 'number' ? 'number' : 'string'}">
+        ${optionsMarkup(options, selected)}
+      </select>
+    </label>
+  `;
+}
+
+function jsonField(label: string, path: string, value: unknown, emptyValue: 'null' | 'object' | 'array' = 'object', extraClass = ''): string {
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}</span>
+      <textarea data-bind="${escapeHtml(path)}" data-kind="json" data-empty-json="${emptyValue}">${escapeHtml(formatJson(value ?? (emptyValue === 'array' ? [] : emptyValue === 'null' ? null : {})))}</textarea>
+    </label>
+  `;
+}
+
+function stringArrayField(label: string, path: string, value: string[] | undefined, extraClass = ''): string {
+  return `
+    <label class="editor-field ${extraClass}">
+      <span>${escapeHtml(label)}<span class="editor-section-note"> 每行一项</span></span>
+      <textarea data-bind="${escapeHtml(path)}" data-kind="string-array">${escapeHtml((value ?? []).join('\n'))}</textarea>
+    </label>
+  `;
+}
+
+function readonlyCodeBlock(title: string, value: unknown): string {
+  return `
+    <div class="editor-field wide">
+      <span>${escapeHtml(title)}</span>
+      <div class="editor-code">${escapeHtml(formatJson(value))}</div>
+    </div>
+  `;
+}
+
+function renderItemFields(basePath: string, item: ItemStack): string {
+  return `
+    <div class="editor-grid compact">
+      ${textField('物品 ID', `${basePath}.itemId`, item.itemId)}
+      ${textField('名称', `${basePath}.name`, item.name)}
+      ${selectField('类型', `${basePath}.type`, item.type, ITEM_TYPES.map((value) => ({ value, label: value })))}
+      ${numberField('数量', `${basePath}.count`, item.count)}
+      ${nullableTextField('装备槽', `${basePath}.equipSlot`, item.equipSlot, 'undefined')}
+      ${textField('描述', `${basePath}.desc`, item.desc, 'wide')}
+      ${jsonField('装备属性', `${basePath}.equipAttrs`, item.equipAttrs ?? {}, 'object')}
+      ${jsonField('装备数值', `${basePath}.equipStats`, item.equipStats ?? {}, 'object')}
+    </div>
+  `;
+}
+
+function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): string {
+  const mapIds = Array.from(new Set([...(state?.mapIds ?? []), draft.mapId])).sort();
+  const equipment = draft.equipment as EquipmentSlots;
+  const bonuses = ensureArray(draft.bonuses);
+  const buffs = ensureArray(draft.temporaryBuffs);
+  const autoBattleSkills = ensureArray(draft.autoBattleSkills);
+  const techniques = ensureArray(draft.techniques);
+  const quests = ensureArray(draft.quests);
+  const inventoryItems = ensureArray(draft.inventory.items);
+
+  const equipmentMarkup = EQUIP_SLOTS.map((slot) => {
+    const item = equipment[slot];
+    return `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(EQUIP_SLOT_LABELS[slot])}</div>
+            <div class="editor-card-meta">${item ? `${item.name || '未命名装备'} · ${item.itemId || '空 ID'}` : '当前为空'}</div>
+          </div>
+          <div class="button-row">
+            ${item
+              ? `<button class="small-btn danger" type="button" data-action="clear-equip" data-slot="${slot}">清空槽位</button>`
+              : `<button class="small-btn" type="button" data-action="create-equip" data-slot="${slot}">创建装备</button>`}
+          </div>
+        </div>
+        ${item ? renderItemFields(`equipment.${slot}`, item) : '<div class="editor-note">点击“创建装备”后可填写该槽位的详细数据。</div>'}
+      </div>
+    `;
+  }).join('');
+
+  const bonusMarkup = bonuses.length > 0
+    ? bonuses.map((bonus, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(bonus.label || bonus.source || `加成 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${escapeHtml(bonus.source || '未填写来源')}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-bonus" data-index="${index}">删除</button>
+        </div>
+        <div class="editor-grid compact">
+          ${textField('来源', `bonuses.${index}.source`, bonus.source)}
+          ${nullableTextField('标签', `bonuses.${index}.label`, bonus.label, 'undefined')}
+          ${jsonField('属性加成', `bonuses.${index}.attrs`, bonus.attrs ?? {}, 'object', 'wide')}
+          ${jsonField('数值加成', `bonuses.${index}.stats`, bonus.stats ?? {}, 'object')}
+          ${jsonField('附加元数据', `bonuses.${index}.meta`, bonus.meta ?? {}, 'object')}
+        </div>
+      </div>
+    `).join('')
+    : '<div class="editor-note">当前没有额外属性加成。</div>';
+
+  const buffMarkup = buffs.length > 0
+    ? buffs.map((buff, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(buff.name || buff.buffId || `临时效果 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${escapeHtml(buff.buffId || '未填写 buffId')} · ${escapeHtml(buff.category)} · ${escapeHtml(buff.visibility)}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-buff" data-index="${index}">删除</button>
+        </div>
+        <div class="editor-grid compact">
+          ${textField('Buff ID', `temporaryBuffs.${index}.buffId`, buff.buffId)}
+          ${textField('名称', `temporaryBuffs.${index}.name`, buff.name)}
+          ${nullableTextField('短标记', `temporaryBuffs.${index}.shortMark`, buff.shortMark, 'undefined')}
+          ${selectField('类别', `temporaryBuffs.${index}.category`, buff.category, [{ value: 'buff', label: 'buff' }, { value: 'debuff', label: 'debuff' }])}
+          ${selectField('可见性', `temporaryBuffs.${index}.visibility`, buff.visibility, [{ value: 'public', label: 'public' }, { value: 'observe_only', label: 'observe_only' }, { value: 'hidden', label: 'hidden' }])}
+          ${numberField('剩余 tick', `temporaryBuffs.${index}.remainingTicks`, buff.remainingTicks)}
+          ${numberField('总时长', `temporaryBuffs.${index}.duration`, buff.duration)}
+          ${numberField('层数', `temporaryBuffs.${index}.stacks`, buff.stacks)}
+          ${numberField('最大层数', `temporaryBuffs.${index}.maxStacks`, buff.maxStacks)}
+          ${textField('来源技能 ID', `temporaryBuffs.${index}.sourceSkillId`, buff.sourceSkillId)}
+          ${nullableTextField('来源技能名', `temporaryBuffs.${index}.sourceSkillName`, buff.sourceSkillName, 'undefined')}
+          ${nullableTextField('颜色', `temporaryBuffs.${index}.color`, buff.color, 'undefined')}
+          ${nullableTextField('描述', `temporaryBuffs.${index}.desc`, buff.desc, 'undefined', 'wide')}
+          ${jsonField('属性修正', `temporaryBuffs.${index}.attrs`, buff.attrs ?? {}, 'object')}
+          ${jsonField('数值修正', `temporaryBuffs.${index}.stats`, buff.stats ?? {}, 'object')}
+        </div>
+      </div>
+    `).join('')
+    : '<div class="editor-note">当前没有临时效果。</div>';
+
+  const inventoryMarkup = inventoryItems.length > 0
+    ? inventoryItems.map((item, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(item.name || item.itemId || `物品 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${escapeHtml(item.itemId || '未填写 ID')} · ${escapeHtml(item.type)} · 数量 ${item.count}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-inventory-item" data-index="${index}">删除</button>
+        </div>
+        ${renderItemFields(`inventory.items.${index}`, item)}
+      </div>
+    `).join('')
+    : '<div class="editor-note">背包为空。</div>';
+
+  const autoBattleMarkup = autoBattleSkills.length > 0
+    ? autoBattleSkills.map((entry, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(entry.skillId || `技能槽 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${entry.enabled ? '启用' : '禁用'}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-auto-skill" data-index="${index}">删除</button>
+        </div>
+        <div class="editor-grid compact">
+          ${textField('技能 ID', `autoBattleSkills.${index}.skillId`, entry.skillId)}
+          <div class="editor-field">
+            <span>启用状态</span>
+            <label class="editor-toggle">
+              <input type="checkbox" data-bind="autoBattleSkills.${index}.enabled" data-kind="boolean" ${entry.enabled ? 'checked' : ''} />
+              <span>自动战斗时允许使用</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `).join('')
+    : '<div class="editor-note">当前没有自动战斗技能配置。</div>';
+
+  const techniqueMarkup = techniques.length > 0
+    ? techniques.map((technique, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(technique.name || technique.techId || `功法 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${escapeHtml(technique.techId || '未填写功法 ID')} · 等级 ${technique.level} · ${TECHNIQUE_REALM_OPTIONS.find((option) => option.value === technique.realm)?.label ?? technique.realm}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-technique" data-index="${index}">删除</button>
+        </div>
+        <div class="editor-grid compact">
+          ${textField('功法 ID', `techniques.${index}.techId`, technique.techId)}
+          ${textField('名称', `techniques.${index}.name`, technique.name)}
+          ${numberField('等级', `techniques.${index}.level`, technique.level)}
+          ${numberField('经验', `techniques.${index}.exp`, technique.exp)}
+          ${numberField('升级所需经验', `techniques.${index}.expToNext`, technique.expToNext)}
+          ${selectField('功法境界', `techniques.${index}.realm`, technique.realm, TECHNIQUE_REALM_OPTIONS)}
+          ${nullableTextField('品阶', `techniques.${index}.grade`, technique.grade, 'undefined')}
+          ${jsonField('技能列表', `techniques.${index}.skills`, technique.skills ?? [], 'array', 'wide')}
+          ${jsonField('层级配置', `techniques.${index}.layers`, technique.layers ?? [], 'array')}
+          ${jsonField('属性曲线', `techniques.${index}.attrCurves`, technique.attrCurves ?? {}, 'object')}
+        </div>
+      </div>
+    `).join('')
+    : '<div class="editor-note">当前没有已学会功法。</div>';
+
+  const questMarkup = quests.length > 0
+    ? quests.map((quest, index) => `
+      <div class="editor-card">
+        <div class="editor-card-head">
+          <div>
+            <div class="editor-card-title">${escapeHtml(quest.title || quest.id || `任务 ${index + 1}`)}</div>
+            <div class="editor-card-meta">${escapeHtml(quest.id || '未填写任务 ID')} · ${escapeHtml(quest.line)} · ${escapeHtml(quest.status)}</div>
+          </div>
+          <button class="small-btn danger" type="button" data-action="remove-quest" data-index="${index}">删除</button>
+        </div>
+        <div class="editor-grid compact">
+          ${textField('任务 ID', `quests.${index}.id`, quest.id)}
+          ${textField('标题', `quests.${index}.title`, quest.title)}
+          ${selectField('任务线', `quests.${index}.line`, quest.line, QUEST_LINES.map((value) => ({ value, label: value })))}
+          ${selectField('状态', `quests.${index}.status`, quest.status, QUEST_STATUSES.map((value) => ({ value, label: value })))}
+          ${selectField('目标类型', `quests.${index}.objectiveType`, quest.objectiveType, QUEST_OBJECTIVE_TYPES.map((value) => ({ value, label: value })))}
+          ${nullableTextField('章节', `quests.${index}.chapter`, quest.chapter, 'undefined')}
+          ${nullableTextField('剧情段落', `quests.${index}.story`, quest.story, 'undefined')}
+          ${numberField('当前进度', `quests.${index}.progress`, quest.progress)}
+          ${numberField('需求进度', `quests.${index}.required`, quest.required)}
+          ${textField('目标名称', `quests.${index}.targetName`, quest.targetName)}
+          ${nullableTextField('目标文本', `quests.${index}.objectiveText`, quest.objectiveText, 'undefined', 'wide')}
+          ${textField('奖励文本', `quests.${index}.rewardText`, quest.rewardText, 'wide')}
+          ${textField('目标怪物 ID', `quests.${index}.targetMonsterId`, quest.targetMonsterId)}
+          ${nullableTextField('目标功法 ID', `quests.${index}.targetTechniqueId`, quest.targetTechniqueId, 'undefined')}
+          ${numberField('目标境界阶段', `quests.${index}.targetRealmStage`, typeof quest.targetRealmStage === 'number' ? quest.targetRealmStage : 0)}
+          ${textField('发放者 ID', `quests.${index}.giverId`, quest.giverId)}
+          ${textField('发放者名称', `quests.${index}.giverName`, quest.giverName)}
+          ${nullableTextField('发放地图 ID', `quests.${index}.giverMapId`, quest.giverMapId, 'undefined')}
+          ${nullableTextField('发放地图名', `quests.${index}.giverMapName`, quest.giverMapName, 'undefined')}
+          ${numberField('发放者 X', `quests.${index}.giverX`, typeof quest.giverX === 'number' ? quest.giverX : 0)}
+          ${numberField('发放者 Y', `quests.${index}.giverY`, typeof quest.giverY === 'number' ? quest.giverY : 0)}
+          ${nullableTextField('下一任务 ID', `quests.${index}.nextQuestId`, quest.nextQuestId, 'undefined')}
+          ${textField('奖励物品 ID（旧字段）', `quests.${index}.rewardItemId`, quest.rewardItemId)}
+          ${stringArrayField('奖励物品 ID 列表', `quests.${index}.rewardItemIds`, quest.rewardItemIds, 'wide')}
+          ${jsonField('奖励物品详情', `quests.${index}.rewards`, quest.rewards ?? [], 'array', 'wide')}
+          ${textField('任务描述', `quests.${index}.desc`, quest.desc, 'wide')}
+        </div>
+      </div>
+    `).join('')
+    : '<div class="editor-note">当前没有任务数据。</div>';
+
+  return `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">基础资料</div>
+          <div class="editor-section-note">人物本体、坐标、资源与运行时开关。</div>
+        </div>
+        <div class="editor-chip-list">
+          <span class="pill ${player.meta.online ? 'online' : 'offline'}">${player.meta.online ? '在线' : '离线'}</span>
+          <span class="pill ${player.meta.isBot ? 'bot' : ''}">${player.meta.isBot ? '机器人' : '玩家'}</span>
+          ${editorDirty ? '<span class="pill">有未保存修改</span>' : ''}
+        </div>
+      </div>
+      <div class="editor-grid">
+        ${textField('角色名', 'name', draft.name)}
+        ${textField('角色 ID', 'id', draft.id)}
+        ${nullableTextField('战斗目标 ID', 'combatTargetId', draft.combatTargetId, 'undefined')}
+        ${selectField('地图', 'mapId', draft.mapId, mapIds.map((mapId) => ({ value: mapId, label: mapId })))}
+        ${numberField('X', 'x', draft.x)}
+        ${numberField('Y', 'y', draft.y)}
+        ${selectField('朝向', 'facing', draft.facing, FACING_OPTIONS)}
+        ${numberField('视野', 'viewRange', draft.viewRange)}
+        ${nullableTextField('主修功法 ID', 'cultivatingTechId', draft.cultivatingTechId, 'undefined')}
+        ${numberField('HP', 'hp', draft.hp)}
+        ${numberField('最大 HP', 'maxHp', draft.maxHp)}
+        ${numberField('QI', 'qi', draft.qi)}
+        ${numberField('境界等级', 'realmLv', typeof draft.realmLv === 'number' ? draft.realmLv : 0)}
+        ${nullableTextField('境界名', 'realmName', draft.realmName, 'undefined')}
+        ${nullableTextField('境界阶段标签', 'realmStage', draft.realmStage, 'undefined')}
+        ${nullableTextField('境界评语', 'realmReview', draft.realmReview, 'undefined', 'wide')}
+      </div>
+      <div class="editor-toggle-row" style="margin-top: 10px;">
+        ${checkboxField('机器人', 'isBot', draft.isBot)}
+        ${checkboxField('死亡', 'dead', draft.dead)}
+        ${checkboxField('自动战斗', 'autoBattle', draft.autoBattle)}
+        ${checkboxField('自动反击', 'autoRetaliate', draft.autoRetaliate !== false)}
+        ${checkboxField('锁定战斗目标', 'combatTargetLocked', draft.combatTargetLocked)}
+        ${checkboxField('可突破', 'breakthroughReady', draft.breakthroughReady)}
+      </div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">基础属性</div>
+          <div class="editor-section-note">六维基础属性与突破线索。</div>
+        </div>
+      </div>
+      <div class="editor-stat-grid">
+        ${ATTR_KEYS.map((key) => numberField(ATTR_LABELS[key], `baseAttrs.${key}`, draft.baseAttrs[key])).join('')}
+      </div>
+      <div class="editor-grid compact" style="margin-top: 10px;">
+        ${stringArrayField('已揭示突破条件 ID', 'revealedBreakthroughRequirementIds', draft.revealedBreakthroughRequirementIds, 'wide')}
+      </div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">属性加成与临时效果</div>
+          <div class="editor-section-note">适合直接调试被动、装备外加成与 Buff。</div>
+        </div>
+        <div class="button-row">
+          <button class="small-btn" type="button" data-action="add-bonus">新增加成</button>
+          <button class="small-btn" type="button" data-action="add-buff">新增临时效果</button>
+        </div>
+      </div>
+      <div class="editor-card-list">${bonusMarkup}</div>
+      <div class="editor-card-list" style="margin-top: 10px;">${buffMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">自动战斗</div>
+          <div class="editor-section-note">编辑自动技能列表。</div>
+        </div>
+        <button class="small-btn" type="button" data-action="add-auto-skill">新增自动技能</button>
+      </div>
+      <div class="editor-card-list">${autoBattleMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">背包</div>
+          <div class="editor-section-note">容量与物品堆叠。</div>
+        </div>
+        <div class="button-row">
+          ${numberField('容量', 'inventory.capacity', draft.inventory.capacity)}
+          <button class="small-btn" type="button" data-action="add-inventory-item">新增物品</button>
+        </div>
+      </div>
+      <div class="editor-card-list">${inventoryMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">装备</div>
+          <div class="editor-section-note">五个装备槽独立编辑。</div>
+        </div>
+      </div>
+      <div class="editor-card-list">${equipmentMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">功法</div>
+          <div class="editor-section-note">等级、经验、技能与层级结构。</div>
+        </div>
+        <button class="small-btn" type="button" data-action="add-technique">新增功法</button>
+      </div>
+      <div class="editor-card-list">${techniqueMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">任务</div>
+          <div class="editor-section-note">任务链、奖励和发放者数据。</div>
+        </div>
+        <button class="small-btn" type="button" data-action="add-quest">新增任务</button>
+      </div>
+      <div class="editor-card-list">${questMarkup}</div>
+    </section>
+
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">派生只读快照</div>
+          <div class="editor-section-note">这些通常由服务端重算，不建议直接改。若确实需要，去高级 JSON 区导入。</div>
+        </div>
+      </div>
+      <div class="editor-grid compact">
+        ${readonlyCodeBlock('最终属性', draft.finalAttrs ?? {})}
+        ${readonlyCodeBlock('数值属性', draft.numericStats ?? {})}
+        ${readonlyCodeBlock('比率分母', draft.ratioDivisors ?? {})}
+        ${readonlyCodeBlock('境界状态', draft.realm ?? {})}
+        ${readonlyCodeBlock('动作列表', draft.actions ?? [])}
+      </div>
+    </section>
+  `;
 }
 
 function renderSummary(data: GmStateRes): void {
@@ -105,12 +742,8 @@ function renderPlayerList(data: GmStateRes): void {
   const keyword = playerSearchInput.value.trim().toLowerCase();
   const filtered = data.players.filter((player) => {
     if (!keyword) return true;
-    return [
-      player.id,
-      player.name,
-      player.mapId,
-      player.meta.userId ?? '',
-    ].some((value) => value.toLowerCase().includes(keyword));
+    return [player.id, player.name, player.mapId, player.meta.userId ?? '']
+      .some((value) => value.toLowerCase().includes(keyword));
   });
 
   if (!selectedPlayerId || !filtered.some((player) => player.id === selectedPlayerId)) {
@@ -140,7 +773,15 @@ function renderEditor(data: GmStateRes): void {
   if (!selected) {
     editorEmptyEl.classList.remove('hidden');
     editorPanelEl.classList.add('hidden');
+    draftSnapshot = null;
+    draftSourcePlayerId = null;
     return;
+  }
+
+  if (!draftSnapshot || draftSourcePlayerId !== selected.id || !editorDirty) {
+    draftSnapshot = createDefaultPlayerSnapshot(selected.snapshot);
+    draftSourcePlayerId = selected.id;
+    editorDirty = false;
   }
 
   editorEmptyEl.classList.add('hidden');
@@ -164,13 +805,13 @@ function renderEditor(data: GmStateRes): void {
   if (selected.meta.dirtyFlags.length > 0) {
     pills.push(`<span class="pill">脏标记: ${escapeHtml(selected.meta.dirtyFlags.join(', '))}</span>`);
   }
+  if (editorDirty) {
+    pills.push('<span class="pill">编辑中</span>');
+  }
   editorMetaEl.innerHTML = pills.join('');
 
-  if (!editorDirty || lastEditorPlayerId !== selected.id) {
-    playerJsonEl.value = JSON.stringify(selected.snapshot, null, 2);
-    editorDirty = false;
-    lastEditorPlayerId = selected.id;
-  }
+  editorContentEl.innerHTML = renderVisualEditor(selected, draftSnapshot);
+  playerJsonEl.value = formatJson(draftSnapshot);
 
   removeBotBtn.style.display = selected.meta.isBot ? '' : 'none';
   removeBotBtn.disabled = !selected.meta.isBot;
@@ -181,6 +822,74 @@ function render(): void {
   renderSummary(state);
   renderPlayerList(state);
   renderEditor(state);
+}
+
+function syncVisualEditorToDraft(): { ok: true } | { ok: false; message: string } {
+  if (!draftSnapshot) {
+    return { ok: false, message: '当前没有可编辑角色' };
+  }
+
+  const next = clone(draftSnapshot);
+  const fields = editorContentEl.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('[data-bind]');
+
+  for (const field of fields) {
+    const path = field.dataset.bind;
+    const kind = field.dataset.kind;
+    if (!path || !kind) continue;
+
+    let value: unknown;
+    if (kind === 'boolean' && field instanceof HTMLInputElement) {
+      value = field.checked;
+    } else if (kind === 'number') {
+      value = Math.floor(Number(field.value || '0'));
+      if (!Number.isFinite(value)) {
+        return { ok: false, message: `${path} 不是合法数字` };
+      }
+    } else if (kind === 'nullable-string') {
+      const text = field.value.trim();
+      const emptyMode = field.dataset.emptyMode;
+      value = text.length > 0 ? text : emptyMode === 'null' ? null : undefined;
+    } else if (kind === 'string-array') {
+      value = field.value
+        .split(/\r?\n|,/)
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+    } else if (kind === 'json') {
+      const text = field.value.trim();
+      if (!text) {
+        const emptyJson = field.dataset.emptyJson;
+        value = emptyJson === 'array' ? [] : emptyJson === 'null' ? null : {};
+      } else {
+        try {
+          value = JSON.parse(text);
+        } catch {
+          return { ok: false, message: `${path} 的 JSON 解析失败` };
+        }
+      }
+    } else {
+      value = field.value;
+    }
+
+    setValueByPath(next, path, value);
+  }
+
+  draftSnapshot = next;
+  editorDirty = true;
+  playerJsonEl.value = formatJson(draftSnapshot);
+  return { ok: true };
+}
+
+function mutateDraft(mutator: (draft: PlayerState) => void): boolean {
+  const synced = syncVisualEditorToDraft();
+  if (!synced.ok) {
+    setStatus(synced.message, true);
+    return false;
+  }
+  if (!draftSnapshot || !state) return false;
+  mutator(draftSnapshot);
+  editorDirty = true;
+  renderEditor(state);
+  return true;
 }
 
 async function loadState(silent = false): Promise<void> {
@@ -218,14 +927,16 @@ function logout(message?: string): void {
   token = '';
   state = null;
   selectedPlayerId = null;
+  draftSnapshot = null;
   editorDirty = false;
-  lastEditorPlayerId = null;
+  draftSourcePlayerId = null;
   sessionStorage.removeItem(TOKEN_KEY);
   if (pollTimer !== null) {
     window.clearInterval(pollTimer);
     pollTimer = null;
   }
   playerListEl.innerHTML = '';
+  editorContentEl.innerHTML = '';
   playerJsonEl.value = '';
   loginErrorEl.textContent = message ?? '';
   setStatus('');
@@ -268,6 +979,24 @@ async function login(): Promise<void> {
   }
 }
 
+async function applyRawJson(): Promise<void> {
+  const selected = getSelectedPlayer();
+  if (!selected) {
+    setStatus('请先选择角色', true);
+    return;
+  }
+
+  try {
+    draftSnapshot = JSON.parse(playerJsonEl.value) as PlayerState;
+    draftSourcePlayerId = selected.id;
+    editorDirty = true;
+    renderEditor(state!);
+    setStatus('原始 JSON 已应用到可视化编辑区');
+  } catch {
+    setStatus('原始 JSON 解析失败', true);
+  }
+}
+
 async function saveSelectedPlayer(): Promise<void> {
   const selected = getSelectedPlayer();
   if (!selected) {
@@ -275,11 +1004,9 @@ async function saveSelectedPlayer(): Promise<void> {
     return;
   }
 
-  let snapshot: PlayerState;
-  try {
-    snapshot = JSON.parse(playerJsonEl.value) as PlayerState;
-  } catch {
-    setStatus('JSON 解析失败，请先修正编辑内容', true);
+  const synced = syncVisualEditorToDraft();
+  if (!synced.ok || !draftSnapshot) {
+    setStatus(synced.ok ? '当前没有可保存内容' : synced.message, true);
     return;
   }
 
@@ -287,7 +1014,7 @@ async function saveSelectedPlayer(): Promise<void> {
   try {
     await request<{ ok: true }>(`/gm/players/${encodeURIComponent(selected.id)}`, {
       method: 'PUT',
-      body: JSON.stringify({ snapshot } satisfies GmUpdatePlayerReq),
+      body: JSON.stringify({ snapshot: draftSnapshot } satisfies GmUpdatePlayerReq),
     });
     editorDirty = false;
     await delayRefresh(`已提交 ${selected.name} 的修改`);
@@ -310,6 +1037,7 @@ async function resetSelectedPlayer(): Promise<void> {
     await request<{ ok: true }>(`/gm/players/${encodeURIComponent(selected.id)}/reset`, {
       method: 'POST',
     });
+    editorDirty = false;
     await delayRefresh(`已让 ${selected.name} 返回出生点`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '重置失败', true);
@@ -331,6 +1059,7 @@ async function removeSelectedBot(): Promise<void> {
       method: 'POST',
       body: JSON.stringify({ playerIds: [selected.id] } satisfies GmRemoveBotsReq),
     });
+    editorDirty = false;
     await delayRefresh(`已移除机器人 ${selected.name}`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '移除机器人失败', true);
@@ -372,9 +1101,78 @@ async function removeAllBots(): Promise<void> {
       method: 'POST',
       body: JSON.stringify({ all: true } satisfies GmRemoveBotsReq),
     });
+    editorDirty = false;
     await delayRefresh('已提交移除全部机器人');
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '移除机器人失败', true);
+  }
+}
+
+function handleEditorAction(action: string, trigger: HTMLElement): void {
+  if (!draftSnapshot) return;
+
+  const index = Number(trigger.dataset.index ?? '-1');
+  const slot = trigger.dataset.slot as (typeof EQUIP_SLOTS)[number] | undefined;
+
+  switch (action) {
+    case 'add-bonus':
+      mutateDraft((draft) => {
+        draft.bonuses.push({ source: '', attrs: {}, stats: {}, meta: {} });
+      });
+      break;
+    case 'remove-bonus':
+      mutateDraft((draft) => removeArrayIndex(draft, 'bonuses', index));
+      break;
+    case 'add-buff':
+      mutateDraft((draft) => {
+        draft.temporaryBuffs = ensureArray(draft.temporaryBuffs);
+        draft.temporaryBuffs.push(createDefaultBuff());
+      });
+      break;
+    case 'remove-buff':
+      mutateDraft((draft) => {
+        draft.temporaryBuffs = ensureArray(draft.temporaryBuffs);
+        draft.temporaryBuffs.splice(index, 1);
+      });
+      break;
+    case 'add-inventory-item':
+      mutateDraft((draft) => draft.inventory.items.push(createDefaultItem()));
+      break;
+    case 'remove-inventory-item':
+      mutateDraft((draft) => draft.inventory.items.splice(index, 1));
+      break;
+    case 'create-equip':
+      if (!slot) return;
+      mutateDraft((draft) => {
+        draft.equipment[slot] = createDefaultItem(slot);
+      });
+      break;
+    case 'clear-equip':
+      if (!slot) return;
+      mutateDraft((draft) => {
+        draft.equipment[slot] = null;
+      });
+      break;
+    case 'add-auto-skill':
+      mutateDraft((draft) => {
+        draft.autoBattleSkills.push({ skillId: '', enabled: true } satisfies AutoBattleSkillConfig);
+      });
+      break;
+    case 'remove-auto-skill':
+      mutateDraft((draft) => draft.autoBattleSkills.splice(index, 1));
+      break;
+    case 'add-technique':
+      mutateDraft((draft) => draft.techniques.push(createDefaultTechnique()));
+      break;
+    case 'remove-technique':
+      mutateDraft((draft) => draft.techniques.splice(index, 1));
+      break;
+    case 'add-quest':
+      mutateDraft((draft) => draft.quests.push(createDefaultQuest()));
+      break;
+    case 'remove-quest':
+      mutateDraft((draft) => draft.quests.splice(index, 1));
+      break;
   }
 }
 
@@ -382,15 +1180,33 @@ playerListEl.addEventListener('click', (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-player-id]');
   const playerId = button?.dataset.playerId;
   if (!playerId || playerId === selectedPlayerId) return;
+  if (editorDirty && !window.confirm('当前角色有未保存修改，切换后会丢失这些修改。继续吗？')) {
+    return;
+  }
   selectedPlayerId = playerId;
+  draftSnapshot = null;
+  draftSourcePlayerId = null;
   editorDirty = false;
   render();
 });
 
-playerSearchInput.addEventListener('input', () => render());
-playerJsonEl.addEventListener('input', () => {
-  editorDirty = true;
+editorContentEl.addEventListener('click', (event) => {
+  const trigger = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
+  const action = trigger?.dataset.action;
+  if (!action || !trigger) return;
+  handleEditorAction(action, trigger);
 });
+
+editorContentEl.addEventListener('change', () => {
+  const synced = syncVisualEditorToDraft();
+  if (!synced.ok) {
+    setStatus(synced.message, true);
+    return;
+  }
+  renderEditor(state!);
+});
+
+playerSearchInput.addEventListener('input', () => render());
 passwordInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
@@ -401,6 +1217,11 @@ passwordInput.addEventListener('keydown', (event) => {
 loginSubmitBtn.addEventListener('click', () => {
   login().catch(() => {});
 });
+
+applyRawJsonBtn.addEventListener('click', () => {
+  applyRawJson().catch(() => {});
+});
+
 document.getElementById('refresh-state')?.addEventListener('click', () => {
   loadState().catch((error: unknown) => {
     setStatus(error instanceof Error ? error.message : '刷新失败', true);
