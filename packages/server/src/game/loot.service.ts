@@ -358,6 +358,31 @@ export class LootService {
     return result;
   }
 
+  getProjectedVisibleGroundPiles(
+    sourceMapId: string,
+    visibleKeys: Set<string>,
+    projectPoint: (x: number, y: number) => { x: number; y: number } | null,
+  ): GroundItemPileView[] {
+    const result: GroundItemPileView[] = [];
+    for (const pile of this.groundPiles.values()) {
+      if (pile.mapId !== sourceMapId || pile.entries.length === 0) {
+        continue;
+      }
+      const projected = projectPoint(pile.x, pile.y);
+      if (!projected || !visibleKeys.has(`${projected.x},${projected.y}`)) {
+        continue;
+      }
+      result.push({
+        sourceId: pile.sourceId,
+        x: projected.x,
+        y: projected.y,
+        items: this.buildGroundItemEntries(pile.entries),
+      });
+    }
+    result.sort((left, right) => (left.y - right.y) || (left.x - right.x));
+    return result;
+  }
+
   private takeFromGround(player: PlayerState, session: LootSession, sourceId: string, itemKey: string): LootActionResult {
     const expectedSourceId = this.buildGroundSourceId(session.mapId, session.tileX, session.tileY);
     if (sourceId !== expectedSourceId) {

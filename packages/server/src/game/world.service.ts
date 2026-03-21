@@ -196,35 +196,91 @@ export class WorldService {
   ) {}
 
   getVisibleEntities(player: PlayerState, visibleKeys: Set<string>): RenderEntity[] {
-    this.ensureMapInitialized(player.mapId);
+    return this.getVisibleEntitiesForMap(player, player.mapId, visibleKeys);
+  }
 
-    const containers = this.mapService.getContainers(player.mapId)
-      .filter((container) => visibleKeys.has(`${container.x},${container.y}`))
-      .map<RenderEntity>((container) => ({
-        id: `container:${player.mapId}:${container.id}`,
-        x: container.x,
-        y: container.y,
-        char: '箱',
-        color: '#c18b46',
-        name: container.name,
-        kind: 'container',
-        observation: {
-          clarity: 'clear',
-          verdict: '这是一口可搜索的箱具，翻找后或许会有收获。',
-          lines: [
-            { label: '类别', value: '可搜索容器' },
-            { label: '搜索阶次', value: `${container.grade}` },
-          ],
-        },
-      }));
+  getProjectedVisibleEntities(player: PlayerState, sourceMapId: string, visibleKeys: Set<string>): RenderEntity[] {
+    return this.getVisibleEntitiesForMap(player, sourceMapId, visibleKeys, (x, y) => {
+      const projected = this.mapService.projectPointToMap(player.mapId, sourceMapId, x, y);
+      if (!projected) {
+        return null;
+      }
+      if (this.mapService.isPointInMapBounds(player.mapId, projected.x, projected.y)) {
+        return null;
+      }
+      return projected;
+    });
+  }
 
-    const npcs = this.mapService.getNpcs(player.mapId)
-      .filter((npc) => visibleKeys.has(`${npc.x},${npc.y}`))
-      .map<RenderEntity>((npc) => this.buildNpcRenderEntity(player, npc, player.mapId));
+  private getVisibleEntitiesForMap(
+    viewer: PlayerState,
+    sourceMapId: string,
+    visibleKeys: Set<string>,
+    projectPoint?: (x: number, y: number) => { x: number; y: number } | null,
+  ): RenderEntity[] {
+    this.ensureMapInitialized(sourceMapId);
 
-    const monsters = (this.monstersByMap.get(player.mapId) ?? [])
-      .filter((monster) => monster.alive && visibleKeys.has(`${monster.x},${monster.y}`))
-      .map<RenderEntity>((monster) => this.buildMonsterRenderEntity(player, monster));
+    const resolvePoint = (x: number, y: number): { x: number; y: number } | null => {
+      const projected = projectPoint ? projectPoint(x, y) : { x, y };
+      if (!projected) {
+        return null;
+      }
+      return visibleKeys.has(`${projected.x},${projected.y}`) ? projected : null;
+    };
+
+    const containers = this.mapService.getContainers(sourceMapId)
+      .flatMap<RenderEntity>((container) => {
+        const projected = resolvePoint(container.x, container.y);
+        if (!projected) {
+          return [];
+        }
+        return [{
+          id: `container:${sourceMapId}:${container.id}`,
+          x: projected.x,
+          y: projected.y,
+          char: '箱',
+          color: '#c18b46',
+          name: container.name,
+          kind: 'container',
+          observation: {
+            clarity: 'clear',
+            verdict: '这是一口可搜索的箱具，翻找后或许会有收获。',
+            lines: [
+              { label: '类别', value: '可搜索容器' },
+              { label: '搜索阶次', value: `${container.grade}` },
+            ],
+          },
+        }];
+      });
+
+    const npcs = this.mapService.getNpcs(sourceMapId)
+      .flatMap<RenderEntity>((npc) => {
+        const projected = resolvePoint(npc.x, npc.y);
+        if (!projected) {
+          return [];
+        }
+        return [{
+          ...this.buildNpcRenderEntity(viewer, npc, sourceMapId),
+          x: projected.x,
+          y: projected.y,
+        }];
+      });
+
+    const monsters = (this.monstersByMap.get(sourceMapId) ?? [])
+      .flatMap<RenderEntity>((monster) => {
+        if (!monster.alive) {
+          return [];
+        }
+        const projected = resolvePoint(monster.x, monster.y);
+        if (!projected) {
+          return [];
+        }
+        return [{
+          ...this.buildMonsterRenderEntity(viewer, monster),
+          x: projected.x,
+          y: projected.y,
+        }];
+      });
 
     return [...containers, ...npcs, ...monsters];
   }

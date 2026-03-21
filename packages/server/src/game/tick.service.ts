@@ -668,6 +668,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       if (!socket) continue;
       const time = this.timeService.buildPlayerTimeState(viewer);
       const visibility = this.aoiService.getVisibility(viewer, time.effectiveViewRange);
+      const overlayParentMapId = this.mapService.getOverlayParentMapId(viewer.mapId);
 
       const visiblePlayers = players
         .filter((player) => visibility.visibleKeys.has(`${player.x},${player.y}`))
@@ -676,13 +677,53 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           player,
           player.id === viewer.id ? '#ff0' : player.isBot ? '#6bb8ff' : '#0f0',
         ));
+      if (overlayParentMapId) {
+        const projectedParentPlayers = this.playerService.getPlayersByMap(overlayParentMapId)
+          .flatMap((player) => {
+            const projected = this.mapService.projectPointToMap(viewer.mapId, overlayParentMapId, player.x, player.y);
+            if (!projected || this.mapService.isPointInMapBounds(viewer.mapId, projected.x, projected.y)) {
+              return [];
+            }
+            if (!visibility.visibleKeys.has(`${projected.x},${projected.y}`)) {
+              return [];
+            }
+            return [{
+              ...this.worldService.buildPlayerRenderEntity(
+                viewer,
+                player,
+                player.id === viewer.id ? '#ff0' : player.isBot ? '#6bb8ff' : '#0f0',
+              ),
+              x: projected.x,
+              y: projected.y,
+            }];
+          });
+        visiblePlayers.push(...projectedParentPlayers);
+      }
+
       const visibleEntities = this.worldService.getVisibleEntities(viewer, visibility.visibleKeys);
+      if (overlayParentMapId) {
+        visibleEntities.push(...this.worldService.getProjectedVisibleEntities(viewer, overlayParentMapId, visibility.visibleKeys));
+      }
+      const visibleGroundPiles = this.lootService.getVisibleGroundPiles(viewer, visibility.visibleKeys);
+      if (overlayParentMapId) {
+        visibleGroundPiles.push(...this.lootService.getProjectedVisibleGroundPiles(
+          overlayParentMapId,
+          visibility.visibleKeys,
+          (x, y) => {
+            const projected = this.mapService.projectPointToMap(viewer.mapId, overlayParentMapId, x, y);
+            if (!projected || this.mapService.isPointInMapBounds(viewer.mapId, projected.x, projected.y)) {
+              return null;
+            }
+            return projected;
+          },
+        ));
+      }
 
       const tickData: S2C_Tick = {
         p: visiblePlayers,
         t: [],
         e: visibleEntities,
-        g: this.lootService.getVisibleGroundPiles(viewer, visibility.visibleKeys),
+        g: visibleGroundPiles,
         fx: this.filterEffectsForViewer(effects, visibility.visibleKeys),
         v: visibility.tiles,
         dt,

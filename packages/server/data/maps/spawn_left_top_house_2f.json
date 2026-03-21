@@ -4,18 +4,21 @@
   "width": 12,
   "height": 8,
   "parentMapId": "spawn",
+  "parentOriginX": 5,
+  "parentOriginY": 10,
   "floorLevel": 2,
   "floorName": "二楼",
+  "spaceVisionMode": "parent_overlay",
   "description": "云来镇左上角民居的二层木楼，临窗处放着一只旧木宝箱。",
   "tiles": [
-    "############",
+    "WWW######WWW",
     "#..........#",
     "#..........#",
     "#....oo....#",
     "#..........#",
     "#.S........#",
     "#..........#",
-    "############"
+    "WWW######WWW"
   ],
   "portals": [
     {

@@ -488,8 +488,11 @@ export interface GmMapDocument {
   width: number;
   height: number;
   parentMapId?: string;
+  parentOriginX?: number;
+  parentOriginY?: number;
   floorLevel?: number;
   floorName?: string;
+  spaceVisionMode?: 'isolated' | 'parent_overlay';
   description?: string;
   dangerLevel?: number;
   recommendedRealm?: string;

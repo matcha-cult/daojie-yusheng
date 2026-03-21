@@ -147,6 +147,8 @@ const TILE_TYPE_NAMES: Record<TileType, string> = {
   [TileType.Trail]: '小路',
   [TileType.Wall]: '墙体',
   [TileType.Door]: '门扉',
+  [TileType.Window]: '窗户',
+  [TileType.BrokenWindow]: '破窗',
   [TileType.Portal]: '传送阵',
   [TileType.Stairs]: '楼梯',
   [TileType.Grass]: '草地',
@@ -449,6 +451,11 @@ function getVisibleTileAt(x: number, y: number): Tile | null {
 
 function getKnownTileAt(x: number, y: number): Tile | null {
   return tileCache.get(getTileKey(x, y)) ?? null;
+}
+
+function isPointInsideCurrentMap(x: number, y: number): boolean {
+  if (!currentMapMeta) return true;
+  return x >= 0 && y >= 0 && x < currentMapMeta.width && y < currentMapMeta.height;
 }
 
 function getVisibleGroundPileAt(x: number, y: number): GroundItemPileView | null {
@@ -1337,6 +1344,10 @@ mouseInput.init(
   () => currentMapMeta,
   (target) => {
     if (pendingTargetedAction) {
+      if (pendingTargetedAction.actionId !== 'client:observe' && !isPointInsideCurrentMap(target.x, target.y)) {
+        showToast('窗外投影当前仅支持观察');
+        return;
+      }
       if (pendingTargetedAction.actionId === 'client:observe') {
         if (!getVisibleTileAt(target.x, target.y)) {
           showToast('只能观察当前视野内的格子');
@@ -1370,6 +1381,10 @@ mouseInput.init(
       }
       socket.sendAction(pendingTargetedAction.actionId, targetRef);
       cancelTargeting();
+      return;
+    }
+    if (!isPointInsideCurrentMap(target.x, target.y)) {
+      showToast('窗外投影当前仅支持观察');
       return;
     }
     if (target.entityKind === 'monster' && target.entityId) {

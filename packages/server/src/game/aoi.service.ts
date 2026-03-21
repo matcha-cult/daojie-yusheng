@@ -84,7 +84,7 @@ export class AoiService {
   private buildCacheKey(mapId: string, x: number, y: number, range: number): string {
     return [
       mapId,
-      this.mapService.getMapRevision(mapId),
+      this.mapService.getVisibilityRevision(mapId),
       x,
       y,
       range,

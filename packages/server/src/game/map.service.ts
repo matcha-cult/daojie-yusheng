@@ -18,6 +18,7 @@ import {
   Tile,
   TileType,
   MapMeta,
+  MapSpaceVisionMode,
   MapTimeConfig,
   MonsterAggroMode,
   Portal,
@@ -142,6 +143,7 @@ const DEFAULT_TERRAIN_DURABILITY_BY_TILE: Partial<Record<TileType, TerrainDurabi
   [TileType.Tree]: { grade: 'mortal', material: 'wood' },
   [TileType.Stone]: { grade: 'mortal', material: 'stone' },
   [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
+  [TileType.Window]: { grade: 'mortal', material: 'wood' },
 };
 
 // 现有地图按区域主题与进度分配材质与品阶，统一走“品阶基础血量 × 材质倍率”。
@@ -151,6 +153,7 @@ const MAP_TERRAIN_DURABILITY_OVERRIDES: Partial<Record<string, Partial<Record<Ti
     [TileType.Tree]: { grade: 'mortal', material: 'wood' },
     [TileType.Stone]: { grade: 'mortal', material: 'stone' },
     [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
+    [TileType.Window]: { grade: 'mortal', material: 'wood' },
   },
   wildlands: {
     [TileType.Wall]: { grade: 'yellow', material: 'stone' },
@@ -203,6 +206,11 @@ export interface NpcLocation {
 interface PortalQueryOptions {
   trigger?: PortalTrigger;
   kind?: PortalKind;
+}
+
+interface ProjectedPoint {
+  x: number;
+  y: number;
 }
 
 @Injectable()
@@ -289,10 +297,13 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       parentMapId: typeof document.parentMapId === 'string' && document.parentMapId.trim()
         ? document.parentMapId
         : undefined,
+      parentOriginX: Number.isInteger(document.parentOriginX) ? Number(document.parentOriginX) : undefined,
+      parentOriginY: Number.isInteger(document.parentOriginY) ? Number(document.parentOriginY) : undefined,
       floorLevel: Number.isInteger(document.floorLevel) ? Number(document.floorLevel) : undefined,
       floorName: typeof document.floorName === 'string' && document.floorName.trim()
         ? document.floorName
         : undefined,
+      spaceVisionMode: this.normalizeMapSpaceVisionMode(document.spaceVisionMode, document.parentMapId),
       dangerLevel: Number.isFinite(document.dangerLevel) ? Number(document.dangerLevel) : undefined,
       recommendedRealm: typeof document.recommendedRealm === 'string' ? document.recommendedRealm : undefined,
       description: typeof document.description === 'string' ? document.description : undefined,
@@ -465,6 +476,13 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       return trigger;
     }
     return kind === 'stairs' ? 'auto' : 'manual';
+  }
+
+  private normalizeMapSpaceVisionMode(mode: unknown, parentMapId?: unknown): MapSpaceVisionMode {
+    if (mode === 'parent_overlay' && typeof parentMapId === 'string' && parentMapId.trim()) {
+      return 'parent_overlay';
+    }
+    return 'isolated';
   }
 
   private normalizeNpcs(rawNpcs: unknown, meta: MapMeta): NpcConfig[] {
@@ -801,12 +819,73 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return this.revisions.get(mapId) ?? 0;
   }
 
+  getVisibilityRevision(mapId: string): string {
+    const meta = this.getMapMeta(mapId);
+    const current = this.getMapRevision(mapId);
+    if (meta?.spaceVisionMode === 'parent_overlay' && meta.parentMapId) {
+      return `${current}:${this.getMapRevision(meta.parentMapId)}`;
+    }
+    return String(current);
+  }
+
   private bumpMapRevision(mapId: string) {
     this.revisions.set(mapId, (this.revisions.get(mapId) ?? 0) + 1);
   }
 
   getSpawnPoint(mapId: string): { x: number; y: number } | undefined {
     return this.maps.get(mapId)?.spawnPoint;
+  }
+
+  isPointInMapBounds(mapId: string, x: number, y: number): boolean {
+    const map = this.maps.get(mapId);
+    if (!map) return false;
+    return x >= 0 && y >= 0 && x < map.meta.width && y < map.meta.height;
+  }
+
+  getOverlayParentMapId(mapId: string): string | undefined {
+    const meta = this.getMapMeta(mapId);
+    if (meta?.spaceVisionMode !== 'parent_overlay' || !meta.parentMapId) {
+      return undefined;
+    }
+    return this.maps.has(meta.parentMapId) ? meta.parentMapId : undefined;
+  }
+
+  projectPointToMap(targetMapId: string, sourceMapId: string, x: number, y: number): ProjectedPoint | null {
+    if (targetMapId === sourceMapId) {
+      return { x, y };
+    }
+
+    const targetMeta = this.getMapMeta(targetMapId);
+    const sourceMeta = this.getMapMeta(sourceMapId);
+    if (!targetMeta || !sourceMeta) {
+      return null;
+    }
+
+    if (
+      targetMeta.parentMapId === sourceMapId &&
+      targetMeta.spaceVisionMode === 'parent_overlay' &&
+      Number.isInteger(targetMeta.parentOriginX) &&
+      Number.isInteger(targetMeta.parentOriginY)
+    ) {
+      return {
+        x: x - targetMeta.parentOriginX!,
+        y: y - targetMeta.parentOriginY!,
+      };
+    }
+
+    if (
+      sourceMeta.parentMapId === targetMapId &&
+      sourceMeta.spaceVisionMode === 'parent_overlay' &&
+      Number.isInteger(sourceMeta.parentOriginX) &&
+      Number.isInteger(sourceMeta.parentOriginY)
+    ) {
+      return {
+        x: x + sourceMeta.parentOriginX!,
+        y: y + sourceMeta.parentOriginY!,
+      };
+    }
+
+    return null;
   }
 
   getPortalAt(mapId: string, x: number, y: number, options?: PortalQueryOptions): Portal | undefined {
@@ -879,6 +958,24 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return map.tiles[y]?.[x] ?? null;
   }
 
+  getCompositeTile(mapId: string, x: number, y: number): Tile | null {
+    const local = this.getTile(mapId, x, y);
+    if (local) {
+      return local;
+    }
+
+    const parentMapId = this.getOverlayParentMapId(mapId);
+    if (!parentMapId) {
+      return null;
+    }
+
+    const projected = this.projectPointToMap(parentMapId, mapId, x, y);
+    if (!projected) {
+      return null;
+    }
+    return this.getTile(parentMapId, projected.x, projected.y);
+  }
+
   getTileAura(mapId: string, x: number, y: number): number {
     return Math.max(0, this.getTile(mapId, x, y)?.aura ?? 0);
   }
@@ -907,7 +1004,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   blocksSight(mapId: string, x: number, y: number): boolean {
-    const tile = this.getTile(mapId, x, y);
+    const tile = this.getCompositeTile(mapId, x, y);
     return tile === null ? true : tile.blocksSight;
   }
 
@@ -962,8 +1059,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   getViewTiles(mapId: string, cx: number, cy: number, radius = VIEW_RADIUS, visibleKeys?: Set<string>): VisibleTile[][] {
-    const map = this.maps.get(mapId);
-    if (!map) return [];
+    if (!this.maps.has(mapId)) return [];
     const result: VisibleTile[][] = [];
     const size = radius * 2 + 1;
     for (let dy = 0; dy < size; dy++) {
@@ -976,7 +1072,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           row.push(null);
           continue;
         }
-        row.push(map.tiles[wy]?.[wx] ?? {
+        row.push(this.getCompositeTile(mapId, wx, wy) ?? {
           type: TileType.Wall,
           walkable: false,
           blocksSight: true,
@@ -1021,8 +1117,11 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       width: Number.isInteger(source.width) ? Number(source.width) : 0,
       height: Number.isInteger(source.height) ? Number(source.height) : 0,
       parentMapId: typeof source.parentMapId === 'string' ? source.parentMapId : undefined,
+      parentOriginX: Number.isInteger(source.parentOriginX) ? Number(source.parentOriginX) : undefined,
+      parentOriginY: Number.isInteger(source.parentOriginY) ? Number(source.parentOriginY) : undefined,
       floorLevel: Number.isInteger(source.floorLevel) ? Number(source.floorLevel) : undefined,
       floorName: typeof source.floorName === 'string' ? source.floorName : undefined,
+      spaceVisionMode: this.normalizeMapSpaceVisionMode(source.spaceVisionMode, source.parentMapId),
       description: typeof source.description === 'string' ? source.description : undefined,
       dangerLevel: Number.isFinite(source.dangerLevel) ? Number(source.dangerLevel) : undefined,
       recommendedRealm: typeof source.recommendedRealm === 'string' ? source.recommendedRealm : undefined,
@@ -1235,6 +1334,14 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     if (!document.id.trim()) return '地图 ID 不能为空';
     if (!document.name.trim()) return '地图名称不能为空';
     if (document.parentMapId?.trim() === document.id.trim()) return '子地图的父地图不能指向自己';
+    if (document.spaceVisionMode === 'parent_overlay' && !document.parentMapId?.trim()) {
+      return '启用父地图透视时必须填写父地图 ID';
+    }
+    if (document.spaceVisionMode === 'parent_overlay') {
+      if (!Number.isInteger(document.parentOriginX) || !Number.isInteger(document.parentOriginY)) {
+        return '启用父地图透视时必须填写父地图对齐坐标';
+      }
+    }
     if (!Number.isInteger(document.width) || document.width <= 0) return '地图宽度必须为正整数';
     if (!Number.isInteger(document.height) || document.height <= 0) return '地图高度必须为正整数';
     if (document.tiles.length !== document.height) return '地图行数必须与高度一致';
@@ -1345,6 +1452,8 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     switch (type) {
       case TileType.Tree:
         return TileType.Grass;
+      case TileType.Window:
+        return TileType.BrokenWindow;
       case TileType.Wall:
       case TileType.Stone:
       case TileType.Door:

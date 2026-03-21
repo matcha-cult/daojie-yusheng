@@ -71,21 +71,30 @@ export class MouseInput {
     const worldGX = Math.floor(worldPX / cellSize);
     const worldGY = Math.floor(worldPY / cellSize);
 
+    const tile = this.getTileAt(worldGX, worldGY);
+    const entity = this.getEntities().find((entry) => entry.wx === worldGX && entry.wy === worldGY);
     const mapMeta = this.getMapMeta();
-    if (!mapMeta) return null;
-    if (worldGX < 0 || worldGX >= mapMeta.width || worldGY < 0 || worldGY >= mapMeta.height) {
+    const inCurrentMapBounds = mapMeta
+      ? worldGX >= 0 && worldGX < mapMeta.width && worldGY >= 0 && worldGY < mapMeta.height
+      : false;
+
+    if (!inCurrentMapBounds && !tile && !entity) {
       return null;
     }
-
-    const tile = this.getTileAt(worldGX, worldGY);
-    return this.buildTarget(worldGX, worldGY, tile?.walkable ?? false, e.clientX, e.clientY);
+    return this.buildTarget(worldGX, worldGY, tile?.walkable ?? false, e.clientX, e.clientY, entity);
   }
 
-  private buildTarget(x: number, y: number, walkable: boolean, clientX?: number, clientY?: number): ClickTarget {
+  private buildTarget(
+    x: number,
+    y: number,
+    walkable: boolean,
+    clientX?: number,
+    clientY?: number,
+    entity?: { id: string; wx: number; wy: number; kind?: string },
+  ): ClickTarget {
     if (!this.getEntities) {
       return { x, y, clientX, clientY, walkable };
     }
-    const entity = this.getEntities().find((entry) => entry.wx === x && entry.wy === y);
     return {
       x,
       y,

@@ -8,6 +8,8 @@ export enum TileType {
   Trail = 'trail',
   Wall = 'wall',
   Door = 'door',
+  Window = 'window',
+  BrokenWindow = 'broken_window',
   Portal = 'portal',
   Stairs = 'stairs',
   Grass = 'grass',
@@ -44,14 +46,19 @@ export interface Tile {
 export type VisibleTile = Tile | null;
 
 /** 地图元数据 */
+export type MapSpaceVisionMode = 'isolated' | 'parent_overlay';
+
 export interface MapMeta {
   id: string;
   name: string;
   width: number;
   height: number;
   parentMapId?: string;
+  parentOriginX?: number;
+  parentOriginY?: number;
   floorLevel?: number;
   floorName?: string;
+  spaceVisionMode?: MapSpaceVisionMode;
   dangerLevel?: number;
   recommendedRealm?: string;
   description?: string;
