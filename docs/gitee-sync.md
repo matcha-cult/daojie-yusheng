@@ -77,8 +77,9 @@ cat ~/.ssh/gitee_mirror_ed25519
 仓库已提供 [`.github/workflows/sync.yml`](../.github/workflows/sync.yml)，默认行为如下：
 
 - 只在 `push main` 和手动触发时运行
-- 将当前 GitHub 仓库的 `main` 分支通过 HTTPS 直接推送到 Gitee 同名仓库
+- 将当前 GitHub 仓库的 `main` 分支通过 HTTPS 强制推送到 Gitee 同名仓库
 - 不影响现有 [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) 的生产部署
+- Gitee 作为镜像端会被 GitHub 覆盖，不要在 Gitee 上直接提交仅存在于 Gitee 的改动
 
 如果你在 Gitee 导入时改了仓库名，需要把工作流里的目标地址从 `${GITHUB_REPOSITORY#*/}.git` 改成实际仓库名。
 

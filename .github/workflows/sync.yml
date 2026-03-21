@@ -32,4 +32,4 @@ jobs:
           EOF
           chmod 600 ~/.netrc
           git remote add gitee "https://gitee.com/${GITEE_OWNER}/${GITHUB_REPOSITORY#*/}.git"
-          git push gitee main
+          git push --force gitee main:main
