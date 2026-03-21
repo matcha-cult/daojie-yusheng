@@ -137,12 +137,18 @@ export class NavigationService {
     let targetX = x;
     let targetY = y;
 
-    if ((player.x !== targetX || player.y !== targetY) && !this.mapService.canOccupy(player.mapId, targetX, targetY, player.id)) {
+    if ((player.x !== targetX || player.y !== targetY) && !this.mapService.canOccupy(player.mapId, targetX, targetY, {
+      occupancyId: player.id,
+      actorType: 'player',
+    })) {
       if (!options?.allowNearestReachable) {
         this.clearMoveTarget(player.id);
         return '无法到达该位置';
       }
-      const fallback = this.mapService.findNearbyWalkable(player.mapId, targetX, targetY, 8);
+      const fallback = this.mapService.findNearbyWalkable(player.mapId, targetX, targetY, 8, {
+        occupancyId: player.id,
+        actorType: 'player',
+      });
       if (!fallback) {
         this.clearMoveTarget(player.id);
         return '无法到达该位置';
@@ -151,7 +157,10 @@ export class NavigationService {
       targetY = fallback.y;
     }
 
-    if ((player.x !== targetX || player.y !== targetY) && !this.mapService.canOccupy(player.mapId, targetX, targetY, player.id)) {
+    if ((player.x !== targetX || player.y !== targetY) && !this.mapService.canOccupy(player.mapId, targetX, targetY, {
+      occupancyId: player.id,
+      actorType: 'player',
+    })) {
       this.clearMoveTarget(player.id);
       return '无法到达该位置';
     }
@@ -281,12 +290,12 @@ export class NavigationService {
   }
 
   private tryMovePlayer(player: PlayerState, x: number, y: number): boolean {
-    if (!this.mapService.canOccupy(player.mapId, x, y, player.id)) return false;
-    this.mapService.setOccupied(player.mapId, player.x, player.y, null);
+    if (!this.mapService.canOccupy(player.mapId, x, y, { occupancyId: player.id, actorType: 'player' })) return false;
+    this.mapService.removeOccupant(player.mapId, player.x, player.y, player.id);
     player.facing = directionFromTo(player.x, player.y, x, y);
     player.x = x;
     player.y = y;
-    this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
+    this.mapService.addOccupant(player.mapId, player.x, player.y, player.id, 'player');
     return true;
   }
 
@@ -424,7 +433,7 @@ export class NavigationService {
     y: number,
     selfOccupancyId: string,
   ): number {
-    if (this.mapService.canOccupy(mapId, x, y, selfOccupancyId)) return 0;
+    if (this.mapService.canOccupy(mapId, x, y, { occupancyId: selfOccupancyId, actorType: 'player' })) return 0;
     return Number.POSITIVE_INFINITY;
   }
 

@@ -66,7 +66,7 @@ export class BotService {
       bot.qi = Math.round(bot.numericStats?.maxQi ?? 0);
 
       this.playerService.addRuntimePlayer(bot);
-      this.mapService.setOccupied(bot.mapId, bot.x, bot.y, bot.id);
+      this.mapService.addOccupant(bot.mapId, bot.x, bot.y, bot.id, 'player');
       this.botIds.add(bot.id);
       created += 1;
     }
@@ -96,7 +96,7 @@ export class BotService {
       const bot = this.playerService.getPlayer(playerId);
       if (!bot?.isBot) continue;
       this.navigationService.clearMoveTarget(bot.id);
-      this.mapService.setOccupied(bot.mapId, bot.x, bot.y, null);
+      this.mapService.removeOccupant(bot.mapId, bot.x, bot.y, bot.id);
       this.playerService.removeRuntimePlayer(bot.id);
       this.botIds.delete(bot.id);
       removed += 1;
@@ -117,7 +117,7 @@ export class BotService {
           if (Math.abs(dx) + Math.abs(dy) > radius) continue;
           const x = centerX + dx;
           const y = centerY + dy;
-          if (!this.mapService.isWalkable(mapId, x, y)) continue;
+          if (!this.mapService.isWalkable(mapId, x, y, { actorType: 'player' })) continue;
           candidates.push({ x, y });
         }
       }

@@ -159,6 +159,13 @@ interface PersistedDynamicTileSnapshot {
   maps: Record<string, PersistedDynamicTileRecord[]>;
 }
 
+type OccupantKind = 'player' | 'monster';
+
+interface OccupancyCheckOptions {
+  occupancyId?: string | null;
+  actorType?: OccupantKind;
+}
+
 type TerrainDurabilityProfile = {
   grade: TechniqueGrade;
   material: TerrainDurabilityMaterial;
@@ -251,6 +258,8 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   private quests: Map<string, QuestConfig> = new Map();
   private monsters: Map<string, MonsterSpawnConfig> = new Map();
   private revisions: Map<string, number> = new Map();
+  private occupantsByMap: Map<string, Map<string, Map<string, OccupantKind>>> = new Map();
+  private playerOverlapPointsByMap: Map<string, Set<string>> = new Map();
   private dynamicTileStates: Map<string, Map<string, DynamicTileState>> = new Map();
   private persistedDynamicTileStates: Map<string, Map<string, PersistedDynamicTileRecord>> = new Map();
   private dynamicTileStatesDirty = false;
@@ -366,7 +375,6 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
 
   private loadMap(raw: any) {
     const document = this.normalizeEditableMapDocument(raw);
-    const previousMap = this.maps.get(document.id);
     const tileRows = document.tiles;
     const tiles: Tile[][] = tileRows.map((row, y) =>
       [...row].map((char, x) => {
@@ -377,7 +385,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           walkable: isTileTypeWalkable(type),
           blocksSight: doesTileTypeBlockSight(type),
           aura: 0,
-          occupiedBy: isTileTypeWalkable(type) ? (previousMap?.tiles[y]?.[x]?.occupiedBy ?? null) : null,
+          occupiedBy: null,
           modifiedAt: null,
           hp: durability > 0 ? durability : undefined,
           maxHp: durability > 0 ? durability : undefined,
@@ -450,6 +458,8 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       spawnPoint: { ...document.spawnPoint },
       source: document,
     });
+    this.rebuildPlayerOverlapPointIndex();
+    this.syncOccupancyDisplay(document.id);
     this.revisions.set(document.id, (this.revisions.get(document.id) ?? 0) + 1);
   }
 
@@ -700,11 +710,63 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   private hasBlockingEntityAt(mapId: string, x: number, y: number): boolean {
-    const tile = this.getTile(mapId, x, y);
-    if (!tile) {
-      return false;
+    const occupants = this.getOccupantsAt(mapId, x, y);
+    return (occupants?.size ?? 0) > 0 || this.hasNpcAt(mapId, x, y);
+  }
+
+  private rebuildPlayerOverlapPointIndex(): void {
+    const next = new Map<string, Set<string>>();
+    for (const [mapId, map] of this.maps.entries()) {
+      for (const portal of map.portals) {
+        if (!portal.allowPlayerOverlap) continue;
+        this.addOverlapPoint(next, mapId, portal.x, portal.y);
+        this.addOverlapPoint(next, portal.targetMapId, portal.targetX, portal.targetY);
+      }
     }
-    return tile.occupiedBy !== null || this.hasNpcAt(mapId, x, y);
+    this.playerOverlapPointsByMap = next;
+  }
+
+  private addOverlapPoint(index: Map<string, Set<string>>, mapId: string, x: number, y: number): void {
+    const key = this.tileStateKey(x, y);
+    const points = index.get(mapId) ?? new Set<string>();
+    points.add(key);
+    index.set(mapId, points);
+  }
+
+  private supportsPlayerOverlap(mapId: string, x: number, y: number): boolean {
+    return this.playerOverlapPointsByMap.get(mapId)?.has(this.tileStateKey(x, y)) === true;
+  }
+
+  private getOccupantsAt(mapId: string, x: number, y: number): Map<string, OccupantKind> | undefined {
+    return this.occupantsByMap.get(mapId)?.get(this.tileStateKey(x, y));
+  }
+
+  hasOccupant(mapId: string, x: number, y: number, occupancyId: string): boolean {
+    return this.getOccupantsAt(mapId, x, y)?.has(occupancyId) === true;
+  }
+
+  private syncOccupancyDisplay(mapId: string, x?: number, y?: number): void {
+    const map = this.maps.get(mapId);
+    if (!map) return;
+
+    if (x !== undefined && y !== undefined) {
+      const tile = map.tiles[y]?.[x];
+      if (!tile) return;
+      const occupants = this.getOccupantsAt(mapId, x, y);
+      tile.occupiedBy = occupants ? [...occupants.keys()][0] ?? null : null;
+      return;
+    }
+
+    for (let rowIndex = 0; rowIndex < map.tiles.length; rowIndex += 1) {
+      const row = map.tiles[rowIndex];
+      if (!row) continue;
+      for (let colIndex = 0; colIndex < row.length; colIndex += 1) {
+        const tile = row[colIndex];
+        if (!tile) continue;
+        const occupants = this.getOccupantsAt(mapId, colIndex, rowIndex);
+        tile.occupiedBy = occupants ? [...occupants.keys()][0] ?? null : null;
+      }
+    }
   }
 
   private calculateTileRegen(maxHp: number): number {
@@ -784,6 +846,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         targetY: portal.targetY!,
         kind: this.normalizePortalKind(portal.kind),
         trigger: this.normalizePortalTrigger(portal.trigger, portal.kind),
+        allowPlayerOverlap: portal.allowPlayerOverlap === true,
         hidden: portal.hidden === true,
         observeTitle: typeof portal.observeTitle === 'string' ? portal.observeTitle.trim() || undefined : undefined,
         observeDesc: typeof portal.observeDesc === 'string' ? portal.observeDesc.trim() || undefined : undefined,
@@ -1316,6 +1379,11 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return map.tiles[y]?.[x] ?? null;
   }
 
+  isTileDestroyed(mapId: string, x: number, y: number): boolean {
+    const key = this.tileStateKey(x, y);
+    return this.dynamicTileStates.get(mapId)?.get(key)?.destroyed === true;
+  }
+
   getCompositeTile(mapId: string, x: number, y: number): Tile | null {
     const local = this.getTile(mapId, x, y);
     if (local) {
@@ -1349,16 +1417,35 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return tile !== null && tile.walkable;
   }
 
-  isWalkable(mapId: string, x: number, y: number): boolean {
+  isWalkable(mapId: string, x: number, y: number, options: OccupancyCheckOptions = {}): boolean {
     const tile = this.getTile(mapId, x, y);
-    return tile !== null && tile.walkable && tile.occupiedBy === null && !this.hasNpcAt(mapId, x, y);
+    if (tile === null || !tile.walkable || this.hasNpcAt(mapId, x, y)) {
+      return false;
+    }
+    return this.canOccupy(mapId, x, y, options);
   }
 
-  canOccupy(mapId: string, x: number, y: number, occupancyId?: string | null): boolean {
+  canOccupy(mapId: string, x: number, y: number, options: OccupancyCheckOptions = {}): boolean {
     const tile = this.getTile(mapId, x, y);
     if (!tile || !tile.walkable) return false;
     if (this.hasNpcAt(mapId, x, y)) return false;
-    return tile.occupiedBy === null || tile.occupiedBy === occupancyId;
+
+    const { occupancyId, actorType = 'player' } = options;
+    const occupants = this.getOccupantsAt(mapId, x, y);
+    if (!occupants || occupants.size === 0) {
+      return true;
+    }
+
+    const blockingOccupants = [...occupants.entries()].filter(([id]) => id !== occupancyId);
+    if (blockingOccupants.length === 0) {
+      return true;
+    }
+
+    if (actorType !== 'player' || !this.supportsPlayerOverlap(mapId, x, y)) {
+      return false;
+    }
+
+    return blockingOccupants.every(([, kind]) => kind === 'player');
   }
 
   blocksSight(mapId: string, x: number, y: number): boolean {
@@ -1372,9 +1459,35 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return getTileTraversalCost(tile.type);
   }
 
-  setOccupied(mapId: string, x: number, y: number, playerId: string | null) {
+  addOccupant(mapId: string, x: number, y: number, occupancyId: string, kind: OccupantKind = 'player'): void {
     const tile = this.getTile(mapId, x, y);
-    if (tile) tile.occupiedBy = playerId;
+    if (!tile) return;
+
+    const mapOccupants = this.occupantsByMap.get(mapId) ?? new Map<string, Map<string, OccupantKind>>();
+    const key = this.tileStateKey(x, y);
+    const occupants = mapOccupants.get(key) ?? new Map<string, OccupantKind>();
+    occupants.set(occupancyId, kind);
+    mapOccupants.set(key, occupants);
+    this.occupantsByMap.set(mapId, mapOccupants);
+    this.syncOccupancyDisplay(mapId, x, y);
+  }
+
+  removeOccupant(mapId: string, x: number, y: number, occupancyId: string): void {
+    const mapOccupants = this.occupantsByMap.get(mapId);
+    if (!mapOccupants) return;
+
+    const key = this.tileStateKey(x, y);
+    const occupants = mapOccupants.get(key);
+    if (!occupants) return;
+
+    occupants.delete(occupancyId);
+    if (occupants.size === 0) {
+      mapOccupants.delete(key);
+    }
+    if (mapOccupants.size === 0) {
+      this.occupantsByMap.delete(mapId);
+    }
+    this.syncOccupancyDisplay(mapId, x, y);
   }
 
   damageTile(mapId: string, x: number, y: number, damage: number): { destroyed: boolean; hp: number; maxHp: number } | null {
@@ -1428,14 +1541,20 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return { destroyed: false, hp: state.hp, maxHp: state.maxHp };
   }
 
-  findNearbyWalkable(mapId: string, x: number, y: number, maxRadius = 6): { x: number; y: number } | null {
+  findNearbyWalkable(
+    mapId: string,
+    x: number,
+    y: number,
+    maxRadius = 6,
+    options: OccupancyCheckOptions = {},
+  ): { x: number; y: number } | null {
     for (let radius = 0; radius <= maxRadius; radius++) {
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
           if (Math.abs(dx) + Math.abs(dy) > radius) continue;
           const nx = x + dx;
           const ny = y + dy;
-          if (this.isWalkable(mapId, nx, ny)) {
+          if (this.isWalkable(mapId, nx, ny, options)) {
             return { x: nx, y: ny };
           }
         }
@@ -1522,6 +1641,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         targetY: Number((portal as GmMapPortalRecord).targetY ?? 0),
         kind: this.normalizePortalKind((portal as GmMapPortalRecord).kind),
         trigger: this.normalizePortalTrigger((portal as GmMapPortalRecord).trigger, (portal as GmMapPortalRecord).kind),
+        allowPlayerOverlap: (portal as GmMapPortalRecord).allowPlayerOverlap === true,
         hidden: (portal as GmMapPortalRecord).hidden === true,
         observeTitle: typeof (portal as GmMapPortalRecord).observeTitle === 'string'
           ? (portal as GmMapPortalRecord).observeTitle

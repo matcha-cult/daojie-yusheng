@@ -82,6 +82,7 @@ export interface Portal {
   targetY: number;
   kind: PortalKind;
   trigger: PortalTrigger;
+  allowPlayerOverlap?: boolean;
   hidden?: boolean;
   observeTitle?: string;
   observeDesc?: string;

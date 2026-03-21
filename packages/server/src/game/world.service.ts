@@ -289,9 +289,8 @@ export class WorldService {
   reloadMapRuntime(mapId: string): void {
     const monsters = this.monstersByMap.get(mapId) ?? [];
     for (const monster of monsters) {
-      const tile = this.mapService.getTile(mapId, monster.x, monster.y);
-      if (tile?.occupiedBy === monster.runtimeId) {
-        this.mapService.setOccupied(mapId, monster.x, monster.y, null);
+      if (this.mapService.hasOccupant(mapId, monster.x, monster.y, monster.runtimeId)) {
+        this.mapService.removeOccupant(mapId, monster.x, monster.y, monster.runtimeId);
       }
     }
     this.monstersByMap.delete(mapId);
@@ -1157,7 +1156,7 @@ export class WorldService {
     const spawn = this.mapService.getSpawnPoint('spawn') ?? { x: player.x, y: player.y };
     const pos = this.findNearbyWalkable('spawn', spawn.x, spawn.y, 4) ?? spawn;
     this.navigationService.clearMoveTarget(player.id);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, null);
+    this.mapService.removeOccupant(player.mapId, player.x, player.y, player.id);
     player.mapId = 'spawn';
     player.x = pos.x;
     player.y = pos.y;
@@ -1169,7 +1168,7 @@ export class WorldService {
     player.dead = false;
     player.autoBattle = false;
     this.clearCombatTarget(player);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
+    this.mapService.addOccupant(player.mapId, player.x, player.y, player.id, 'player');
 
     return {
       messages: [{
@@ -1192,7 +1191,7 @@ export class WorldService {
         monster.respawnLeft -= 1;
         if (monster.respawnLeft <= 0) {
           const pos = this.findSpawnPosition(mapId, monster);
-          if (pos && this.mapService.isWalkable(mapId, pos.x, pos.y)) {
+          if (pos && this.mapService.isWalkable(mapId, pos.x, pos.y, { actorType: 'monster' })) {
             monster.x = pos.x;
             monster.y = pos.y;
             monster.hp = monster.maxHp;
@@ -1200,7 +1199,7 @@ export class WorldService {
             monster.temporaryBuffs = [];
             monster.damageContributors.clear();
             monster.targetPlayerId = undefined;
-            this.mapService.setOccupied(mapId, monster.x, monster.y, monster.runtimeId);
+            this.mapService.addOccupant(mapId, monster.x, monster.y, monster.runtimeId, 'monster');
           } else {
             monster.respawnLeft = 1;
           }
@@ -1423,7 +1422,10 @@ export class WorldService {
         error: portal.kind === 'stairs' ? '楼梯通往的目标地图不存在' : '传送失败：目标地图不存在',
       };
     }
-    if (!this.mapService.isWalkable(portal.targetMapId, portal.targetX, portal.targetY)) {
+    if (!this.mapService.isWalkable(portal.targetMapId, portal.targetX, portal.targetY, {
+      occupancyId: player.id,
+      actorType: 'player',
+    })) {
       return {
         ...EMPTY_UPDATE,
         error: portal.kind === 'stairs' ? '楼梯落点被占用或不可到达' : '传送失败：目标传送阵被占用或不可到达',
@@ -1431,13 +1433,13 @@ export class WorldService {
     }
 
     this.navigationService.clearMoveTarget(player.id);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, null);
+    this.mapService.removeOccupant(player.mapId, player.x, player.y, player.id);
     player.mapId = portal.targetMapId;
     player.x = portal.targetX;
     player.y = portal.targetY;
     player.autoBattle = false;
     this.clearCombatTarget(player);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
+    this.mapService.addOccupant(player.mapId, player.x, player.y, player.id, 'player');
 
     const text = portal.kind === 'stairs'
       ? `你踏上楼梯，来到 ${targetMapMeta.name}。`
@@ -1497,7 +1499,7 @@ export class WorldService {
       monster.temporaryBuffs = [];
       monster.damageContributors.clear();
       monster.targetPlayerId = undefined;
-      this.mapService.setOccupied(monster.mapId, monster.x, monster.y, null);
+      this.mapService.removeOccupant(monster.mapId, monster.x, monster.y, monster.runtimeId);
       messages.push({
         playerId: player.id,
         text: `${monster.name} 被你斩杀。`,
@@ -2386,10 +2388,10 @@ export class WorldService {
           targetPlayerId: undefined,
         };
         const pos = this.findSpawnPosition(mapId, runtime);
-        if (pos && this.mapService.isWalkable(mapId, pos.x, pos.y)) {
+        if (pos && this.mapService.isWalkable(mapId, pos.x, pos.y, { actorType: 'monster' })) {
           runtime.x = pos.x;
           runtime.y = pos.y;
-          this.mapService.setOccupied(mapId, runtime.x, runtime.y, runtime.runtimeId);
+          this.mapService.addOccupant(mapId, runtime.x, runtime.y, runtime.runtimeId, 'monster');
         } else {
           runtime.x = spawn.x;
           runtime.y = spawn.y;
@@ -2630,7 +2632,7 @@ export class WorldService {
     const spawn = this.mapService.getSpawnPoint(player.mapId) ?? { x: player.x, y: player.y };
     const pos = this.findNearbyWalkable(player.mapId, spawn.x, spawn.y, 4) ?? spawn;
     this.navigationService.clearMoveTarget(player.id);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, null);
+    this.mapService.removeOccupant(player.mapId, player.x, player.y, player.id);
     player.x = pos.x;
     player.y = pos.y;
     player.facing = Direction.South;
@@ -2639,7 +2641,7 @@ export class WorldService {
     player.dead = false;
     player.autoBattle = false;
     this.clearCombatTarget(player);
-    this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
+    this.mapService.addOccupant(player.mapId, player.x, player.y, player.id, 'player');
   }
 
   private stepToward(
@@ -2663,11 +2665,11 @@ export class WorldService {
 
     for (const option of options) {
       if (option.x === actor.x && option.y === actor.y) continue;
-      if (!this.mapService.isWalkable(mapId, option.x, option.y)) continue;
-      this.mapService.setOccupied(mapId, actor.x, actor.y, null);
+      if (!this.mapService.isWalkable(mapId, option.x, option.y, { actorType: 'monster' })) continue;
+      this.mapService.removeOccupant(mapId, actor.x, actor.y, occupancyId);
       actor.x = option.x;
       actor.y = option.y;
-      this.mapService.setOccupied(mapId, actor.x, actor.y, occupancyId);
+      this.mapService.addOccupant(mapId, actor.x, actor.y, occupancyId, 'monster');
       return option.facing;
     }
     return null;
@@ -2686,12 +2688,12 @@ export class WorldService {
         const nx = monster.spawnX + dx;
         const ny = monster.spawnY + dy;
         if (Math.abs(dx) + Math.abs(dy) > radius) continue;
-        if (this.mapService.isWalkable(mapId, nx, ny)) {
+        if (this.mapService.isWalkable(mapId, nx, ny, { actorType: 'monster' })) {
           candidates.push({ x: nx, y: ny });
         }
       }
     }
-    if (candidates.length === 0 && this.mapService.isWalkable(mapId, monster.spawnX, monster.spawnY)) {
+    if (candidates.length === 0 && this.mapService.isWalkable(mapId, monster.spawnX, monster.spawnY, { actorType: 'monster' })) {
       return { x: monster.spawnX, y: monster.spawnY };
     }
     if (candidates.length === 0) return null;
@@ -2704,7 +2706,7 @@ export class WorldService {
         for (let dx = -radius; dx <= radius; dx++) {
           const nx = x + dx;
           const ny = y + dy;
-          if (this.mapService.isWalkable(mapId, nx, ny)) {
+          if (this.mapService.isWalkable(mapId, nx, ny, { actorType: 'player' })) {
             return { x: nx, y: ny };
           }
         }
@@ -2753,7 +2755,7 @@ export class WorldService {
     if (tileTarget) {
       const { x, y } = tileTarget;
       const tile = this.mapService.getTile(player.mapId, x, y);
-      if (!tile) return null;
+      if (!tile || this.mapService.isTileDestroyed(player.mapId, x, y)) return null;
       return { kind: 'tile', x, y, tileType: tile.type };
     }
 

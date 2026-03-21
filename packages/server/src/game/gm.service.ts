@@ -410,8 +410,8 @@ export class GmService {
     if (runtime) {
       this.navigationService.clearMoveTarget(player.id);
       if (previousMapId !== player.mapId || previousX !== player.x || previousY !== player.y) {
-        this.mapService.setOccupied(previousMapId, previousX, previousY, null);
-        this.mapService.setOccupied(player.mapId, player.x, player.y, player.id);
+        this.mapService.removeOccupant(previousMapId, previousX, previousY, player.id);
+        this.mapService.addOccupant(player.mapId, player.x, player.y, player.id, 'player');
       }
     }
 
@@ -420,7 +420,7 @@ export class GmService {
 
   private resetStoredPlayerToSpawn(player: PlayerState): void {
     const spawn = this.mapService.getSpawnPoint('spawn') ?? { x: player.x, y: player.y };
-    const pos = this.mapService.findNearbyWalkable('spawn', spawn.x, spawn.y, 4) ?? spawn;
+    const pos = this.mapService.findNearbyWalkable('spawn', spawn.x, spawn.y, 4, { actorType: 'player' }) ?? spawn;
     player.mapId = 'spawn';
     player.x = pos.x;
     player.y = pos.y;
@@ -442,7 +442,7 @@ export class GmService {
       return true;
     }
 
-    return tile.occupiedBy === null || tile.occupiedBy === playerId;
+    return this.mapService.canOccupy(mapId, x, y, { occupancyId: playerId, actorType: 'player' });
   }
 
   private async persistOfflinePlayer(entity: PlayerEntity, player: PlayerState): Promise<void> {
@@ -488,7 +488,10 @@ export class GmService {
       player.x < mapMeta.width &&
       player.y < mapMeta.height;
 
-    if (inBounds && this.mapService.canOccupy(player.mapId, player.x, player.y, player.id)) {
+    if (inBounds && this.mapService.canOccupy(player.mapId, player.x, player.y, {
+      occupancyId: player.id,
+      actorType: 'player',
+    })) {
       return null;
     }
 
@@ -499,16 +502,25 @@ export class GmService {
           y: Math.min(mapMeta.height - 1, Math.max(0, player.y)),
         };
 
-    const nearby = this.mapService.findNearbyWalkable(player.mapId, origin.x, origin.y, 10);
+    const nearby = this.mapService.findNearbyWalkable(player.mapId, origin.x, origin.y, 10, {
+      occupancyId: player.id,
+      actorType: 'player',
+    });
     if (nearby) return nearby;
 
     const spawn = this.mapService.getSpawnPoint(player.mapId);
-    if (spawn && this.mapService.canOccupy(player.mapId, spawn.x, spawn.y, player.id)) {
+    if (spawn && this.mapService.canOccupy(player.mapId, spawn.x, spawn.y, {
+      occupancyId: player.id,
+      actorType: 'player',
+    })) {
       return spawn;
     }
 
     if (spawn) {
-      const nearSpawn = this.mapService.findNearbyWalkable(player.mapId, spawn.x, spawn.y, 12);
+      const nearSpawn = this.mapService.findNearbyWalkable(player.mapId, spawn.x, spawn.y, 12, {
+        occupancyId: player.id,
+        actorType: 'player',
+      });
       if (nearSpawn) return nearSpawn;
     }
 

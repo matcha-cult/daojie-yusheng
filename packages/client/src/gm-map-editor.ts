@@ -743,6 +743,7 @@ export class GmMapEditor {
               { value: 'manual', label: '手动' },
               { value: 'auto', label: '自动' },
             ])}
+            ${booleanField('允许玩家重叠', `portals.${this.selectedEntity.index}.allowPlayerOverlap`, portal.allowPlayerOverlap, 'wide')}
             ${booleanField('隐藏入口', `portals.${this.selectedEntity.index}.hidden`, portal.hidden, 'wide')}
             ${textField('目标地图', `portals.${this.selectedEntity.index}.targetMapId`, portal.targetMapId)}
             ${numberField('目标 X', `portals.${this.selectedEntity.index}.targetX`, portal.targetX)}
@@ -983,6 +984,7 @@ export class GmMapEditor {
       targetY: 0,
       kind: 'portal',
       trigger: 'manual',
+      allowPlayerOverlap: false,
       hidden: false,
       observeTitle: '',
       observeDesc: '',

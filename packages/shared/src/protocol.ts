@@ -393,6 +393,7 @@ export interface GmMapPortalRecord {
   targetY: number;
   kind?: 'portal' | 'stairs';
   trigger?: 'manual' | 'auto';
+  allowPlayerOverlap?: boolean;
   hidden?: boolean;
   observeTitle?: string;
   observeDesc?: string;

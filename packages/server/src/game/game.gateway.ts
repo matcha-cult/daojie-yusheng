@@ -105,7 +105,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       retained.y = pos.y;
       this.playerService.setSocket(retained.id, client);
       this.playerService.setUserMapping(userId, retained.id);
-      this.mapService.setOccupied(retained.mapId, retained.x, retained.y, retained.id);
+      this.mapService.addOccupant(retained.mapId, retained.x, retained.y, retained.id, 'player');
       client.data = { userId, playerId: retained.id };
       this.sendInit(client, retained);
       this.logger.log(`玩家恢复(断线保留): ${username} (${retained.id})`);
@@ -120,7 +120,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       saved.y = pos.y;
       this.playerService.setSocket(saved.id, client);
       this.playerService.setUserMapping(userId, saved.id);
-      this.mapService.setOccupied(saved.mapId, saved.x, saved.y, saved.id);
+      this.mapService.addOccupant(saved.mapId, saved.x, saved.y, saved.id, 'player');
       client.data = { userId, playerId: saved.id };
       this.sendInit(client, saved);
       this.logger.log(`玩家上线(存档恢复): ${username} (${saved.id})`);
@@ -165,7 +165,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await this.playerService.createPlayer(playerState, userId);
     this.playerService.setSocket(playerId, client);
     this.playerService.setUserMapping(userId, playerId);
-    this.mapService.setOccupied(playerState.mapId, playerState.x, playerState.y, playerId);
+    this.mapService.addOccupant(playerState.mapId, playerState.x, playerState.y, playerId, 'player');
 
     client.data = { userId, playerId };
     this.sendInit(client, playerState);
@@ -180,7 +180,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const player = this.playerService.getPlayer(playerId);
     if (player) {
       await this.playerService.savePlayer(playerId);
-      this.mapService.setOccupied(player.mapId, player.x, player.y, null);
+      this.mapService.removeOccupant(player.mapId, player.x, player.y, player.id);
       const userId = client.data?.userId as string;
       if (userId) {
         this.playerService.removeUserMapping(userId);
@@ -406,9 +406,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private resolveLoginPosition(mapId: string, x: number, y: number): { x: number; y: number } {
-    if (this.mapService.isWalkable(mapId, x, y)) {
+    if (this.mapService.isWalkable(mapId, x, y, { actorType: 'player' })) {
       return { x, y };
     }
-    return this.mapService.findNearbyWalkable(mapId, x, y, 8) ?? { x, y };
+    return this.mapService.findNearbyWalkable(mapId, x, y, 8, { actorType: 'player' }) ?? { x, y };
   }
 }
