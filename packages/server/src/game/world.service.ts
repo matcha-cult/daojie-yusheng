@@ -11,6 +11,7 @@ import {
   Direction,
   ElementKey,
   getDamageTrailColor,
+  getRealmGapDamageMultiplier,
   isPointInRange,
   ItemStack,
   NumericRatioDivisors,
@@ -52,6 +53,7 @@ interface RuntimeMonster extends MonsterSpawnConfig {
   alive: boolean;
   respawnLeft: number;
   temporaryBuffs: TemporaryBuffState[];
+  damageContributors: Map<string, number>;
 }
 
 interface NpcInteractionState {
@@ -136,6 +138,7 @@ const NPC_ROLE_PROFILES: Record<string, { title: string; spirit: number; hp: num
 interface CombatSnapshot {
   stats: NumericStats;
   ratios: NumericRatioDivisors;
+  realmLv: number;
 }
 
 interface ResolvedHit {
@@ -199,11 +202,12 @@ export class WorldService {
 
   buildPlayerRenderEntity(viewer: PlayerState, target: PlayerState, color: string): RenderEntity {
     const snapshot = this.createPlayerObservationSnapshot(target);
+    const displayName = target.displayName ?? [...target.name][0] ?? '@';
     return {
       id: target.id,
       x: target.x,
       y: target.y,
-      char: [...target.name][0] ?? '@',
+      char: displayName,
       color,
       name: target.name,
       kind: 'player',
@@ -1067,6 +1071,7 @@ export class WorldService {
             monster.hp = monster.maxHp;
             monster.alive = true;
             monster.temporaryBuffs = [];
+            monster.damageContributors.clear();
             this.mapService.setOccupied(mapId, monster.x, monster.y, monster.runtimeId);
           } else {
             monster.respawnLeft = 1;
@@ -1332,11 +1337,14 @@ export class WorldService {
       this.buildPlayerAttackMessage(player, monster, prefix, resolved, effectColor),
     ];
     const dirty = new Set<WorldDirtyFlag>(cultivation.dirty as WorldDirtyFlag[]);
+    this.recordMonsterDamage(monster, player.id, resolved.damage);
 
     if (monster.hp <= 0) {
+      const expRecipients = this.resolveMonsterExpRecipients(monster, player);
       monster.alive = false;
       monster.respawnLeft = Math.max(1, monster.respawnTicks);
       monster.temporaryBuffs = [];
+      monster.damageContributors.clear();
       this.mapService.setOccupied(monster.mapId, monster.x, monster.y, null);
       messages.push({
         playerId: player.id,
@@ -1348,17 +1356,7 @@ export class WorldService {
         dirty.add(flag);
       }
 
-      const combatExp = this.techniqueService.grantCombatExpFromMonsterKill(player, monster.level, monster.name);
-      if (combatExp.changed) {
-        for (const flag of combatExp.dirty) {
-          dirty.add(flag as WorldDirtyFlag);
-        }
-        messages.push(...combatExp.messages.map((message) => ({
-          playerId: player.id,
-          text: message.text,
-          kind: message.kind,
-        })));
-      }
+      this.distributeMonsterKillExp(monster, player, expRecipients, dirty, messages);
 
       for (const drop of monster.drops) {
         if (Math.random() > this.getEffectiveDropChance(player, drop)) continue;
@@ -1387,6 +1385,65 @@ export class WorldService {
     }
 
     return { messages, dirty: [...dirty] };
+  }
+
+  private recordMonsterDamage(monster: RuntimeMonster, playerId: string, damage: number): void {
+    if (damage <= 0) {
+      return;
+    }
+    monster.damageContributors.set(playerId, (monster.damageContributors.get(playerId) ?? 0) + damage);
+  }
+
+  private resolveMonsterExpRecipients(monster: RuntimeMonster, killer: PlayerState): PlayerState[] {
+    const recipients: PlayerState[] = [];
+    for (const [playerId, damage] of monster.damageContributors.entries()) {
+      if (damage <= 0) {
+        continue;
+      }
+      const participant = this.playerService.getPlayer(playerId);
+      if (participant) {
+        recipients.push(participant);
+      }
+    }
+    if (recipients.length > 0) {
+      return recipients;
+    }
+    return [killer];
+  }
+
+  private distributeMonsterKillExp(
+    monster: RuntimeMonster,
+    killer: PlayerState,
+    recipients: PlayerState[],
+    killerDirty: Set<WorldDirtyFlag>,
+    messages: WorldMessage[],
+  ): void {
+    const participantCount = Math.max(1, recipients.length);
+    for (const participant of recipients) {
+      const combatExp = this.techniqueService.grantCombatExpFromMonsterKill(participant, {
+        monsterLevel: monster.level,
+        monsterName: monster.name,
+        expMultiplier: monster.expMultiplier,
+        participantCount,
+        isKiller: participant.id === killer.id,
+      });
+      if (combatExp.changed) {
+        for (const flag of combatExp.dirty) {
+          if (participant.id === killer.id) {
+            killerDirty.add(flag as WorldDirtyFlag);
+          } else {
+            this.playerService.markDirty(participant.id, flag as WorldDirtyFlag);
+          }
+        }
+      }
+      for (const message of combatExp.messages) {
+        messages.push({
+          playerId: participant.id,
+          text: message.text,
+          kind: message.kind,
+        });
+      }
+    }
   }
 
   private attackPlayer(
@@ -1568,6 +1625,7 @@ export class WorldService {
     if (crit) {
       damage = Math.max(1, Math.round(damage * ((200 + Math.max(0, attacker.stats.critDamage) / 10) / 100)));
     }
+    damage = Math.max(1, Math.round(damage * getRealmGapDamageMultiplier(attacker.realmLv, defender.realmLv)));
 
     applyDamage(damage);
     return {
@@ -1695,6 +1753,7 @@ export class WorldService {
     return {
       stats: this.attrService.getPlayerNumericStats(player),
       ratios: this.attrService.getPlayerRatioDivisors(player),
+      realmLv: Math.max(1, Math.floor(player.realm?.realmLv ?? player.realmLv ?? 1)),
     };
   }
 
@@ -1767,6 +1826,7 @@ export class WorldService {
     return {
       stats,
       ratios: DEFAULT_MONSTER_RATIO_DIVISORS,
+      realmLv: level,
     };
   }
 
@@ -2167,6 +2227,7 @@ export class WorldService {
           alive: true,
           respawnLeft: 0,
           temporaryBuffs: [],
+          damageContributors: new Map(),
         };
         const pos = this.findSpawnPosition(mapId, runtime);
         if (pos && this.mapService.isWalkable(mapId, pos.x, pos.y)) {
@@ -2582,14 +2643,18 @@ export class WorldService {
   }
 
   private performBasicAttack(player: PlayerState, target: ResolvedTarget): WorldUpdate {
-    this.pushActionLabelEffect(player.mapId, player.x, player.y, '挥剑');
+    const combat = this.getPlayerCombatSnapshot(player);
+    const useSpellAttack = combat.stats.spellAtk > combat.stats.physAtk;
+    const damageKind: SkillDamageKind = useSpellAttack ? 'spell' : 'physical';
+    const baseDamage = Math.max(1, Math.round(useSpellAttack ? combat.stats.spellAtk : combat.stats.physAtk));
+    this.pushActionLabelEffect(player.mapId, player.x, player.y, '攻击');
     if (target.kind === 'monster') {
-      return this.attackMonster(player, target.monster, 6, '你挥剑斩中', 'physical', undefined, 0, true);
+      return this.attackMonster(player, target.monster, baseDamage, '你攻击命中', damageKind, undefined, 0, true);
     }
     if (target.kind === 'player') {
-      return this.attackPlayer(player, target.player, 6, '你挥剑斩中', 'physical', undefined, 0, true);
+      return this.attackPlayer(player, target.player, baseDamage, '你攻击命中', damageKind, undefined, 0, true);
     }
-    return this.attackTerrain(player, target.x, target.y, 6, '你挥剑', target.tileType ?? '目标', 'physical', undefined, true);
+    return this.attackTerrain(player, target.x, target.y, baseDamage, '你攻击', target.tileType ?? '目标', damageKind, undefined, true);
   }
 
   private getTargetRef(target: ResolvedTarget): string {

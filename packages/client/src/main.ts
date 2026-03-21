@@ -14,6 +14,7 @@ import { EquipmentPanel } from './ui/panels/equipment-panel';
 import { TechniquePanel } from './ui/panels/technique-panel';
 import { QuestPanel } from './ui/panels/quest-panel';
 import { ActionPanel } from './ui/panels/action-panel';
+import { SettingsPanel } from './ui/panels/settings-panel';
 import { WorldPanel } from './ui/panels/world-panel';
 import { FloatingTooltip } from './ui/floating-tooltip';
 import { detailModalHost } from './ui/detail-modal-host';
@@ -85,6 +86,7 @@ const techniquePanel = new TechniquePanel();
 const questPanel = new QuestPanel();
 const actionPanel = new ActionPanel();
 const worldPanel = new WorldPanel();
+const settingsPanel = new SettingsPanel();
 const targetingBadgeEl = document.getElementById('map-targeting-indicator');
 const observeModalEl = document.getElementById('observe-modal');
 const observeModalBodyEl = document.getElementById('observe-modal-body');
@@ -200,15 +202,18 @@ function openBreakthroughModal() {
     return;
   }
 
+  const hasConsumableRequirements = preview.requirements.some((requirement) => requirement.type === 'item');
   const requirementRows = preview.requirements.length > 0
     ? preview.requirements.map((requirement) => `
       <div class="action-item">
         <div class="action-copy">
           <div>
             <span class="action-name">${escapeHtml(requirement.label)}</span>
-            <span class="action-type">[${requirement.completed ? '已达成' : '未达成'}]</span>
+            <span class="action-type">[${requirement.blocksBreakthrough === false ? (requirement.completed ? '已生效' : '未生效') : (requirement.completed ? '已达成' : '未达成')}]</span>
           </div>
-          <div class="action-desc">${requirement.hidden ? '该要求尚未解锁，只能通过主线或支线任务逐步获知。' : (requirement.completed ? '当前已满足。' : '当前尚未满足。')}</div>
+          <div class="action-desc">${escapeHtml(requirement.hidden
+            ? '该要求尚未解锁，只能通过主线或支线任务逐步获知。'
+            : (requirement.detail ?? (requirement.completed ? '当前已满足。' : '当前尚未满足。')))}</div>
         </div>
       </div>
     `).join('')
@@ -217,15 +222,22 @@ function openBreakthroughModal() {
   detailModalHost.open({
     ownerId: 'realm:breakthrough',
     title: `突破至 ${preview.targetDisplayName}`,
-    subtitle: `${currentRealm.displayName} · 已完成 ${preview.completedRequirements}/${preview.totalRequirements}`,
-    hint: preview.allCompleted ? '点击空白处关闭' : '未达成的隐藏条件需通过任务逐步解锁',
+    subtitle: `${currentRealm.displayName} · 核心要求 ${preview.completedBlockingRequirements}/${preview.blockingRequirements}`,
+    hint: preview.canBreakthrough
+      ? (hasConsumableRequirements ? '含材料减免项，已生效的材料会在突破后消耗' : '点击空白处关闭')
+      : (hasConsumableRequirements ? '材料和功法减免项都是可选的；未生效时会保留更高的基础属性要求' : '未达成的隐藏条件需通过任务逐步解锁'),
     bodyHtml: `
       <div class="panel-section">
         <div class="panel-section-title">突破要求</div>
         ${requirementRows}
       </div>
+      ${hasConsumableRequirements ? `
+        <div class="panel-section">
+          <div class="empty-hint">提示：材料和功法减免项不会卡死突破；只要减免后的属性要求满足即可。已生效的材料会在突破成功后直接消耗。</div>
+        </div>
+      ` : ''}
       <div class="tech-modal-actions">
-        <button class="small-btn" type="button" data-breakthrough-confirm ${preview.allCompleted ? '' : 'disabled'}>确认突破</button>
+        <button class="small-btn" type="button" data-breakthrough-confirm ${preview.canBreakthrough ? '' : 'disabled'}>确认突破</button>
       </div>
     `,
     onAfterRender: (body) => {
@@ -691,6 +703,24 @@ debugPanel.setCallbacks(() => {
   socket.sendDebugResetSpawn();
 });
 chatUI.setCallback((message) => socket.sendChat(message));
+settingsPanel.setOptions({
+  getCurrentDisplayName: () => myPlayer?.displayName ?? '',
+  getCurrentRoleName: () => myPlayer?.name ?? '',
+  onDisplayNameUpdated: (displayName) => {
+    applyLocalDisplayName(displayName);
+    showToast(`显示名称已改为 ${displayName}`);
+  },
+  onRoleNameUpdated: (roleName) => {
+    applyLocalRoleName(roleName);
+    showToast(`角色名称已改为 ${roleName}`);
+  },
+  onLogout: () => {
+    detailModalHost.close('settings-panel');
+    socket.disconnect();
+    resetGameState();
+    loginUI.logout('已退出登录');
+  },
+});
 zoomInBtn?.addEventListener('click', () => {
   const previous = getZoom();
   const zoom = adjustZoom(1);
@@ -1083,6 +1113,42 @@ function resetGameState() {
   document.getElementById('hud')?.classList.add('hidden');
 }
 
+function applyLocalDisplayName(displayName: string) {
+  if (!myPlayer) {
+    return;
+  }
+  myPlayer.displayName = displayName;
+  latestEntities = latestEntities.map((entity) => {
+    if (entity.id !== myPlayer?.id) {
+      return entity;
+    }
+    return {
+      ...entity,
+      char: [...displayName][0] ?? entity.char,
+    };
+  });
+  renderer.updateEntities(latestEntities);
+  refreshHudChrome();
+}
+
+function applyLocalRoleName(roleName: string) {
+  if (!myPlayer) {
+    return;
+  }
+  myPlayer.name = roleName;
+  latestEntities = latestEntities.map((entity) => {
+    if (entity.id !== myPlayer?.id) {
+      return entity;
+    }
+    return {
+      ...entity,
+      name: roleName,
+    };
+  });
+  renderer.updateEntities(latestEntities);
+  refreshHudChrome();
+}
+
 /** 将服务端发来的 tiles 写入缓存 */
 function cacheTiles(mapId: string, tiles: VisibleTile[][], originX: number, originY: number) {
   currentVisibleTiles.clear();
@@ -1306,6 +1372,9 @@ socket.onTick((data: S2C_Tick) => {
 
   for (const entity of data.p) {
     if (entity.id === myPlayer.id) {
+      if (entity.name) {
+        myPlayer.name = entity.name;
+      }
       myPlayer.x = entity.x;
       myPlayer.y = entity.y;
       break;

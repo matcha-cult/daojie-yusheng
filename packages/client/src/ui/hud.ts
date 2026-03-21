@@ -40,7 +40,7 @@ export class HUD {
   }
 
   update(player: PlayerState, meta?: HUDMeta) {
-    this.nameDiv.textContent = player.name;
+    this.nameDiv.textContent = player.displayName ?? player.name;
     this.titleDiv.textContent = meta?.titleLabel ?? '无号散修';
     this.posDiv.textContent = `(${player.x}, ${player.y})`;
     this.mapDiv.textContent = meta?.mapDanger ? `${meta.mapName ?? player.mapId} · ${meta.mapDanger}` : (meta?.mapName ?? player.mapId);

@@ -79,6 +79,7 @@ export interface MonsterSpawnConfig {
   aggroRange: number;
   respawnTicks: number;
   level?: number;
+  expMultiplier: number;
   drops: DropConfig[];
 }
 
@@ -501,6 +502,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       const spawn = candidate as Partial<MonsterSpawnConfig> & {
         respawnSec?: number;
         level?: number;
+        expMultiplier?: number;
         lootItemId?: string;
         lootChance?: number;
         drops?: unknown[];
@@ -574,6 +576,9 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
           ? spawn.respawnTicks!
           : Math.max(1, (spawn as { respawnSec?: number }).respawnSec ?? 15),
         level: Number.isInteger((spawn as { level?: number }).level) ? (spawn as { level: number }).level : undefined,
+        expMultiplier: typeof (spawn as { expMultiplier?: number }).expMultiplier === 'number'
+          ? Math.max(0, (spawn as { expMultiplier: number }).expMultiplier)
+          : 1,
         drops,
       });
     }

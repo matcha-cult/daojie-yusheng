@@ -18,6 +18,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/auth': 'http://localhost:3000',
+      '/account': 'http://localhost:3000',
       '/gm/': 'http://localhost:3000',
       '/socket.io': {
         target: 'http://localhost:3000',

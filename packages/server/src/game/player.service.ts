@@ -19,11 +19,13 @@ import {
 } from '@mud/shared';
 import { Socket } from 'socket.io';
 import { PlayerEntity } from '../database/entities/player.entity';
+import { UserEntity } from '../database/entities/user.entity';
 import { RedisService } from '../database/redis.service';
 import { ContentService } from './content.service';
 import { MapService } from './map.service';
 import { resolveQuestTargetName } from './quest-display';
 import { TechniqueService } from './technique.service';
+import { resolveDisplayName } from '../auth/account-validation';
 
 export interface PlayerCommand {
   playerId: string;
@@ -52,6 +54,8 @@ export class PlayerService {
   constructor(
     @InjectRepository(PlayerEntity)
     private readonly playerRepo: Repository<PlayerEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
     private readonly redisService: RedisService,
     private readonly contentService: ContentService,
     private readonly mapService: MapService,
@@ -78,11 +82,18 @@ export class PlayerService {
 
   /** 从 PG 加载玩家存档，写入内存 + Redis */
   async loadPlayer(userId: string): Promise<PlayerState | null> {
-    const entity = await this.playerRepo.findOne({ where: { userId } });
+    const [entity, user] = await Promise.all([
+      this.playerRepo.findOne({ where: { userId } }),
+      this.userRepo.findOne({ where: { id: userId } }),
+    ]);
     if (!entity) return null;
+    const resolvedName = user
+      ? resolveDisplayName(user.displayName, user.username)
+      : entity.name;
     const state: PlayerState = {
       id: entity.id,
       name: entity.name,
+      displayName: resolvedName,
       mapId: entity.mapId,
       x: entity.x,
       y: entity.y,
@@ -336,6 +347,32 @@ export class PlayerService {
         this.retainedSessions.delete(userId);
       }
     }
+  }
+
+  async updatePlayerDisplayName(userId: string, displayName: string): Promise<void> {
+    const playerId = this.userToPlayer.get(userId);
+    if (!playerId) {
+      return;
+    }
+    const player = this.players.get(playerId);
+    if (!player) {
+      return;
+    }
+    player.displayName = displayName;
+    await this.redisService.setPlayer(player);
+  }
+
+  async updatePlayerRoleName(userId: string, roleName: string): Promise<void> {
+    const playerId = this.userToPlayer.get(userId);
+    if (!playerId) {
+      return;
+    }
+    const player = this.players.get(playerId);
+    if (!player) {
+      return;
+    }
+    player.name = roleName;
+    await this.redisService.setPlayer(player);
   }
 
   enqueueCommand(mapId: string, cmd: PlayerCommand) {

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { GameGateway } from './game.gateway';
+import { AccountController } from './account.controller';
+import { AccountService } from './account.service';
 import { GmController } from './gm.controller';
 import { GmAuthGuard } from './gm-auth.guard';
 import { TickService } from './tick.service';
@@ -20,15 +22,17 @@ import { BotService } from './bot.service';
 import { GmService } from './gm.service';
 import { PerformanceService } from './performance.service';
 import { PlayerEntity } from '../database/entities/player.entity';
+import { UserEntity } from '../database/entities/user.entity';
 
 @Module({
   imports: [
     AuthModule,
-    TypeOrmModule.forFeature([PlayerEntity]),
+    TypeOrmModule.forFeature([PlayerEntity, UserEntity]),
   ],
-  controllers: [GmController],
+  controllers: [GmController, AccountController],
   providers: [
     GameGateway,
+    AccountService,
     GmAuthGuard,
     TickService,
     MapService,

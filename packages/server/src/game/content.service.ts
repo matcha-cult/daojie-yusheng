@@ -99,6 +99,8 @@ type RawBreakthroughItemRequirement = {
   itemId: string;
   count: number;
   label?: string;
+  hidden?: boolean;
+  reduceAttrRequirementPct?: number;
 };
 
 type RawBreakthroughTechniqueRequirement = {
@@ -110,6 +112,8 @@ type RawBreakthroughTechniqueRequirement = {
   minRealm?: keyof typeof TechniqueRealm | TechniqueRealm;
   count?: number;
   label?: string;
+  hidden?: boolean;
+  reduceAttrRequirementPct?: number;
 };
 
 type RawBreakthroughAttributeRequirement = {
@@ -118,6 +122,7 @@ type RawBreakthroughAttributeRequirement = {
   attr: AttrKey;
   minValue: number;
   label?: string;
+  hidden?: boolean;
 };
 
 type RawBreakthroughRequirement =
@@ -269,6 +274,10 @@ export class ContentService implements OnModuleInit {
         itemId: input.itemId,
         count: Math.max(1, Number(input.count)),
         label: typeof input.label === 'string' ? input.label : undefined,
+        hidden: input.hidden === true,
+        reduceAttrRequirementPct: typeof input.reduceAttrRequirementPct === 'number' && Number.isFinite(input.reduceAttrRequirementPct)
+          ? Math.max(0, Math.min(95, Math.floor(input.reduceAttrRequirementPct)))
+          : undefined,
       }];
     }
     if (input.type === 'technique') {
@@ -281,6 +290,10 @@ export class ContentService implements OnModuleInit {
         minRealm: input.minRealm === undefined ? undefined : this.parseTechniqueRealm(input.minRealm),
         count: Number.isInteger(input.count) ? Math.max(1, Number(input.count)) : undefined,
         label: typeof input.label === 'string' ? input.label : undefined,
+        hidden: input.hidden === true,
+        reduceAttrRequirementPct: typeof input.reduceAttrRequirementPct === 'number' && Number.isFinite(input.reduceAttrRequirementPct)
+          ? Math.max(0, Math.min(95, Math.floor(input.reduceAttrRequirementPct)))
+          : undefined,
       }];
     }
     if (input.type === 'attribute') {
@@ -293,6 +306,7 @@ export class ContentService implements OnModuleInit {
         attr: input.attr,
         minValue: Math.max(1, Math.floor(input.minValue)),
         label: typeof input.label === 'string' ? input.label : undefined,
+        hidden: input.hidden === true,
       }];
     }
     return [];

@@ -93,8 +93,8 @@ const NUMERIC_TOOLTIP_LABELS: Partial<Record<NumericCardKey, string>> = {
 const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
   maxHp: '决定你在战斗中的生存上限。',
   maxQi: '决定你可承载的灵力总量。',
-  physAtk: '影响物理系技能与普通攻击伤害。',
-  spellAtk: '影响法术系技能与灵术伤害。',
+  physAtk: '影响物理系技能；普通攻击会取物理攻击与法术攻击中的较高值结算。',
+  spellAtk: '影响法术系技能与灵术伤害；普通攻击会取物理攻击与法术攻击中的较高值结算。',
   physDef: '降低受到的物理伤害，化解触发时会按双倍防御重新计算减伤。',
   spellDef: '降低受到的法术伤害，化解触发时会按双倍防御重新计算减伤。',
   hit: '提高攻击命中目标的能力。',

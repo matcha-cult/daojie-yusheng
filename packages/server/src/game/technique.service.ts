@@ -49,6 +49,21 @@ interface BreakthroughResult {
   messages: TechniqueMessage[];
 }
 
+interface ResolvedBreakthroughRequirement {
+  def: BreakthroughRequirementDef;
+  completed: boolean;
+  blocksBreakthrough: boolean;
+  view: BreakthroughRequirementView;
+}
+
+interface MonsterKillExpInput {
+  monsterLevel?: number;
+  monsterName?: string;
+  expMultiplier?: number;
+  participantCount?: number;
+  isKiller?: boolean;
+}
+
 const EMPTY_CULTIVATION: CultivationResult = { changed: false, dirty: [], messages: [] };
 const REALM_STAGE_SOURCE = 'realm:stage';
 const REALM_STATE_SOURCE = 'realm:state';
@@ -58,6 +73,7 @@ const CULTIVATION_ACTION_ID = 'cultivation:toggle';
 const CULTIVATION_BUFF_DURATION = 1;
 const CULTIVATION_REALM_EXP_PER_TICK = 2;
 const CULTIVATION_TECHNIQUE_EXP_PER_TICK = 10;
+const MONSTER_KILL_TECHNIQUE_EXP_MULTIPLIER = 5;
 
 @Injectable()
 export class TechniqueService {
@@ -231,23 +247,34 @@ export class TechniqueService {
     }
   }
 
-  grantCombatExpFromMonsterKill(player: PlayerState, monsterLevel?: number, monsterName?: string): CultivationResult {
+  grantCombatExpFromMonsterKill(player: PlayerState, input: MonsterKillExpInput = {}): CultivationResult {
     this.initializePlayerProgression(player);
     const numericStats = this.attrService.getPlayerNumericStats(player);
     const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
     const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
-    const normalizedMonsterLevel = Math.max(1, Math.floor(monsterLevel ?? 1));
+    const normalizedMonsterLevel = Math.max(1, Math.floor(input.monsterLevel ?? 1));
+    const participantCount = Math.max(1, Math.floor(input.participantCount ?? 1));
+    const playerRealmLv = this.getPlayerRealmLv(player);
     const dirty = new Set<TechniqueDirtyFlag>();
     const messages: TechniqueMessage[] = [];
+    const realmBaseExp = this.getRealmCombatExp(normalizedMonsterLevel, playerRealmLv, input.expMultiplier, participantCount);
 
-    const realmResult = this.advanceRealmProgress(player, this.getRealmCombatExp(normalizedMonsterLevel), realmExpBonus);
+    const realmResult = this.advanceRealmProgress(
+      player,
+      realmBaseExp,
+      realmExpBonus,
+    );
     if (realmResult.changed) {
       dirty.add('attr');
       dirty.add('actions');
       messages.push(...realmResult.messages);
     }
 
-    const techniqueResult = this.advanceTechniqueCombatExp(player, normalizedMonsterLevel, techniqueExpBonus);
+    const techniqueResult = this.advanceTechniqueCombatExp(
+      player,
+      this.getTechniqueCombatExp(realmBaseExp),
+      techniqueExpBonus,
+    );
     if (techniqueResult.changed) {
       for (const flag of techniqueResult.dirty) {
         dirty.add(flag);
@@ -264,7 +291,7 @@ export class TechniqueService {
         segments.push(`${techniqueResult.techniqueName} 获得 ${techniqueResult.gained} 点功法经验`);
       }
       messages.unshift({
-        text: `${monsterName ? `斩杀 ${monsterName}` : '击败敌人'}，${segments.join('，')}。`,
+        text: `${input.monsterName ? `${input.isKiller === false ? '参与击杀' : '斩杀'} ${input.monsterName}` : '击败敌人'}，${segments.join('，')}。`,
         kind: 'quest',
       });
     }
@@ -326,14 +353,14 @@ export class TechniqueService {
       return { error: '你的境界火候未到，尚不能突破', dirty: [], messages: [] };
     }
 
-    const requirements = this.getResolvedBreakthroughRequirements(player, realm.realmLv);
-    const unmet = requirements.filter((entry) => !entry.completed);
+    const breakthrough = this.resolveBreakthroughRequirements(player, realm.realmLv);
+    const unmet = breakthrough.requirements.filter((entry) => entry.blocksBreakthrough && !entry.completed);
     if (unmet.length > 0) {
       return { error: '突破条件尚未满足', dirty: [], messages: [] };
     }
 
-    for (const requirement of requirements) {
-      if (requirement.def.type !== 'item') continue;
+    for (const requirement of breakthrough.requirements) {
+      if (requirement.def.type !== 'item' || !requirement.completed) continue;
       this.consumeItem(player, requirement.def.itemId, requirement.def.count);
     }
 
@@ -356,13 +383,13 @@ export class TechniqueService {
     };
   }
 
-  private advanceRealmProgress(player: PlayerState, baseGain: number, expBonus = 0): { changed: boolean; gained: number; messages: TechniqueMessage[] } {
+  private advanceRealmProgress(player: PlayerState, baseGain: number, expBonus = 0, minimumGain = 1): { changed: boolean; gained: number; messages: TechniqueMessage[] } {
     const realm = player.realm;
     if (!realm || realm.progressToNext <= 0 || realm.breakthroughReady || baseGain <= 0) {
       return { changed: false, gained: 0, messages: [] };
     }
 
-    const gain = this.applyRateBonus(baseGain, expBonus);
+    const gain = this.applyRateBonus(baseGain, expBonus, minimumGain);
     const previousProgress = realm.progress;
     const nextState = this.normalizeRealmState(realm.realmLv, realm.progress + gain);
     const actualGain = Math.max(0, nextState.progress - previousProgress);
@@ -384,8 +411,8 @@ export class TechniqueService {
     return { changed: true, gained: actualGain, messages };
   }
 
-  private applyRateBonus(base: number, bonusRate: number): number {
-    const exactGain = Math.max(1, base * (1 + Math.max(0, bonusRate)));
+  private applyRateBonus(base: number, bonusRate: number, minimumGain = 1): number {
+    const exactGain = Math.max(minimumGain, base * (1 + Math.max(0, bonusRate)));
     const guaranteed = Math.floor(exactGain);
     const remainder = exactGain - guaranteed;
     if (remainder <= 0) {
@@ -394,11 +421,11 @@ export class TechniqueService {
     return guaranteed + (Math.random() < remainder ? 1 : 0);
   }
 
-  private advanceTechniqueCombatExp(player: PlayerState, monsterLevel: number, expBonus = 0): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
-    return this.advanceTechniqueProgress(player, this.getTechniqueCombatExp(monsterLevel), expBonus);
+  private advanceTechniqueCombatExp(player: PlayerState, baseGain: number, expBonus = 0): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
+    return this.advanceTechniqueProgress(player, baseGain, expBonus);
   }
 
-  private advanceTechniqueProgress(player: PlayerState, baseGain: number, expBonus = 0): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
+  private advanceTechniqueProgress(player: PlayerState, baseGain: number, expBonus = 0, minimumGain = 1): { changed: boolean; gained: number; techniqueName?: string; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
     if (!player.cultivatingTechId) {
       return { changed: false, gained: 0, dirty: [], messages: [] };
     }
@@ -419,7 +446,7 @@ export class TechniqueService {
       return { changed: false, gained: 0, techniqueName: technique.name, dirty: [], messages: [] };
     }
 
-    const gain = this.applyRateBonus(baseGain, expBonus);
+    const gain = this.applyRateBonus(baseGain, expBonus, minimumGain);
     const previousLevel = technique.level;
     const previousExp = technique.exp;
     const messages: TechniqueMessage[] = [];
@@ -535,14 +562,42 @@ export class TechniqueService {
     };
   }
 
-  private getRealmCombatExp(monsterLevel: number): number {
+  private getRealmCombatExp(
+    monsterLevel: number,
+    playerRealmLv: number,
+    expMultiplier = 1,
+    participantCount = 1,
+  ): number {
     const level = Math.max(1, Math.floor(monsterLevel));
-    return Math.max(1, level * level * level * 10);
+    const expToNext = Math.max(0, this.contentService.getRealmLevelEntry(level)?.expToNext ?? 0);
+    if (expToNext <= 0) {
+      return 0;
+    }
+
+    const normalizedMultiplier = Number.isFinite(expMultiplier) ? Math.max(0, expMultiplier) : 1;
+    const normalizedParticipantCount = Math.max(1, Math.floor(participantCount));
+    const levelAdjustment = this.getMonsterKillRealmExpAdjustment(playerRealmLv, level);
+    return (expToNext * normalizedMultiplier * levelAdjustment) / (1000 * normalizedParticipantCount);
   }
 
-  private getTechniqueCombatExp(monsterLevel: number): number {
-    const level = Math.max(1, Math.floor(monsterLevel));
-    return Math.max(1, level * level * 300);
+  private getTechniqueCombatExp(realmCombatExp: number): number {
+    return realmCombatExp * MONSTER_KILL_TECHNIQUE_EXP_MULTIPLIER;
+  }
+
+  private getMonsterKillRealmExpAdjustment(playerRealmLv: number, monsterLevel: number): number {
+    const normalizedPlayerLevel = Math.max(1, Math.floor(playerRealmLv));
+    const normalizedMonsterLevel = Math.max(1, Math.floor(monsterLevel));
+    if (normalizedPlayerLevel < normalizedMonsterLevel) {
+      return 1.5 ** (normalizedMonsterLevel - normalizedPlayerLevel);
+    }
+    if (normalizedPlayerLevel > normalizedMonsterLevel) {
+      return 0.5 ** (normalizedPlayerLevel - normalizedMonsterLevel);
+    }
+    return 1;
+  }
+
+  private getPlayerRealmLv(player: PlayerState): number {
+    return Math.max(1, Math.floor(player.realm?.realmLv ?? player.realmLv ?? 1));
   }
 
   private createRealmStateFromLevel(realmLv: number, progress = 0): PlayerRealmState {
@@ -683,34 +738,60 @@ export class TechniqueService {
   private buildBreakthroughPreview(player: PlayerState, realm: PlayerRealmState): BreakthroughPreviewState | undefined {
     if (!realm.breakthroughReady) return undefined;
     const config = this.getBreakthroughConfig(realm.realmLv);
-    const requirements = this.getResolvedBreakthroughRequirements(player, realm.realmLv).map((entry) => entry.view);
-    const completedRequirements = requirements.filter((entry) => entry.completed).length;
+    const resolved = this.resolveBreakthroughRequirements(player, realm.realmLv);
+    const requirements = resolved.requirements.map((entry) => entry.view);
     const targetEntry = this.contentService.getRealmLevelEntry(config.toRealmLv);
     return {
       targetRealmLv: config.toRealmLv,
       targetDisplayName: targetEntry?.displayName ?? `realmLv ${config.toRealmLv}`,
-      totalRequirements: requirements.length,
-      completedRequirements,
-      allCompleted: completedRequirements === requirements.length,
+      totalRequirements: resolved.blockingRequirements,
+      completedRequirements: resolved.completedBlockingRequirements,
+      allCompleted: resolved.canBreakthrough,
+      canBreakthrough: resolved.canBreakthrough,
+      blockingRequirements: resolved.blockingRequirements,
+      completedBlockingRequirements: resolved.completedBlockingRequirements,
       requirements,
     };
   }
 
-  private getResolvedBreakthroughRequirements(player: PlayerState, fromRealmLv: number): Array<{ def: BreakthroughRequirementDef; completed: boolean; view: BreakthroughRequirementView }> {
+  private resolveBreakthroughRequirements(
+    player: PlayerState,
+    fromRealmLv: number,
+  ): {
+    requirements: ResolvedBreakthroughRequirement[];
+    canBreakthrough: boolean;
+    blockingRequirements: number;
+    completedBlockingRequirements: number;
+  } {
     const config = this.getBreakthroughConfig(fromRealmLv);
     const revealed = new Set(player.revealedBreakthroughRequirementIds ?? []);
-    return config.requirements.map((def) => {
-      const completed = this.isBreakthroughRequirementCompleted(player, def);
-      const hidden = !completed && !revealed.has(def.id);
-      const view: BreakthroughRequirementView = {
-        id: def.id,
-        type: def.type,
-        label: hidden ? '???' : this.formatBreakthroughRequirementLabel(def),
-        completed,
+    const reductionMultiplier = config.requirements.reduce((multiplier, def) => {
+      if (!this.isOptionalBreakthroughReducer(def) || !this.isBreakthroughRequirementCompleted(player, def)) {
+        return multiplier;
+      }
+      const reductionRate = this.getRequirementReductionRate(def);
+      return multiplier * (1 - reductionRate);
+    }, 1);
+    const requirements = config.requirements.map((def) => {
+      const blocksBreakthrough = this.doesRequirementBlockBreakthrough(def);
+      const completed = this.isBreakthroughRequirementCompleted(player, def, reductionMultiplier);
+      const hidden = def.hidden === true && !completed && !revealed.has(def.id);
+      const view = this.buildBreakthroughRequirementView(player, def, {
         hidden,
-      };
-      return { def, completed, view };
+        completed,
+        reductionMultiplier,
+        blocksBreakthrough,
+      });
+      return { def, completed, blocksBreakthrough, view };
     });
+    const blockingRequirements = requirements.filter((entry) => entry.blocksBreakthrough).length;
+    const completedBlockingRequirements = requirements.filter((entry) => entry.blocksBreakthrough && entry.completed).length;
+    return {
+      requirements,
+      canBreakthrough: blockingRequirements === completedBlockingRequirements,
+      blockingRequirements,
+      completedBlockingRequirements,
+    };
   }
 
   private getBreakthroughConfig(fromRealmLv: number): BreakthroughConfigEntry {
@@ -722,7 +803,11 @@ export class TechniqueService {
     };
   }
 
-  private isBreakthroughRequirementCompleted(player: PlayerState, requirement: BreakthroughRequirementDef): boolean {
+  private isBreakthroughRequirementCompleted(
+    player: PlayerState,
+    requirement: BreakthroughRequirementDef,
+    reductionMultiplier = 1,
+  ): boolean {
     switch (requirement.type) {
       case 'item':
         return this.getInventoryCount(player, requirement.itemId) >= requirement.count;
@@ -736,19 +821,83 @@ export class TechniqueService {
         });
         return qualified.length >= (requirement.count ?? 1);
       }
-      case 'attribute':
-        return (player.finalAttrs?.[requirement.attr] ?? player.baseAttrs[requirement.attr] ?? 0) >= requirement.minValue;
+      case 'attribute': {
+        const currentValue = player.finalAttrs?.[requirement.attr] ?? player.baseAttrs[requirement.attr] ?? 0;
+        return currentValue >= this.getEffectiveAttributeRequirement(requirement.minValue, reductionMultiplier);
+      }
       default:
         return false;
     }
   }
 
-  private formatBreakthroughRequirementLabel(requirement: BreakthroughRequirementDef): string {
+  private doesRequirementBlockBreakthrough(requirement: BreakthroughRequirementDef): boolean {
+    if (requirement.type === 'attribute') {
+      return true;
+    }
+    return !this.isOptionalBreakthroughReducer(requirement);
+  }
+
+  private isOptionalBreakthroughReducer(requirement: BreakthroughRequirementDef): boolean {
+    return (requirement.type === 'item' || requirement.type === 'technique')
+      && this.getRequirementReductionPct(requirement) > 0;
+  }
+
+  private getRequirementReductionPct(requirement: BreakthroughRequirementDef): number {
+    if (requirement.type !== 'item' && requirement.type !== 'technique') {
+      return 0;
+    }
+    return Math.max(0, Math.min(95, Math.floor(requirement.reduceAttrRequirementPct ?? 0)));
+  }
+
+  private getRequirementReductionRate(requirement: BreakthroughRequirementDef): number {
+    return this.getRequirementReductionPct(requirement) / 100;
+  }
+
+  private getEffectiveAttributeRequirement(baseValue: number, reductionMultiplier: number): number {
+    return Math.max(1, Math.ceil(baseValue * Math.max(0.05, reductionMultiplier)));
+  }
+
+  private buildBreakthroughRequirementView(
+    player: PlayerState,
+    requirement: BreakthroughRequirementDef,
+    options: {
+      hidden: boolean;
+      completed: boolean;
+      reductionMultiplier: number;
+      blocksBreakthrough: boolean;
+    },
+  ): BreakthroughRequirementView {
+    const { hidden, completed, reductionMultiplier, blocksBreakthrough } = options;
+    if (hidden) {
+      return {
+        id: requirement.id,
+        type: requirement.type,
+        label: '???',
+        completed,
+        hidden,
+      };
+    }
+    return {
+      id: requirement.id,
+      type: requirement.type,
+      label: this.formatBreakthroughRequirementLabel(requirement, reductionMultiplier),
+      completed,
+      hidden,
+      optional: !blocksBreakthrough,
+      blocksBreakthrough,
+      detail: this.formatBreakthroughRequirementDetail(player, requirement, completed, reductionMultiplier, blocksBreakthrough),
+    };
+  }
+
+  private formatBreakthroughRequirementLabel(requirement: BreakthroughRequirementDef, reductionMultiplier = 1): string {
     if (requirement.label) return requirement.label;
     switch (requirement.type) {
       case 'item': {
         const itemName = this.contentService.getItem(requirement.itemId)?.name ?? requirement.itemId;
-        return `${itemName} x${requirement.count}`;
+        const reductionPct = this.getRequirementReductionPct(requirement);
+        return reductionPct > 0
+          ? `${itemName} x${requirement.count}`
+          : `${itemName} x${requirement.count}`;
       }
       case 'technique': {
         const parts: string[] = ['至少掌握'];
@@ -769,11 +918,48 @@ export class TechniqueService {
         }
         return parts.join('');
       }
-      case 'attribute':
-        return `${this.attrLabel(requirement.attr)}达到 ${requirement.minValue}`;
+      case 'attribute': {
+        const effectiveValue = this.getEffectiveAttributeRequirement(requirement.minValue, reductionMultiplier);
+        if (effectiveValue === requirement.minValue) {
+          return `${this.attrLabel(requirement.attr)}达到 ${requirement.minValue}`;
+        }
+        return `${this.attrLabel(requirement.attr)}基础要求 ${requirement.minValue}，当前减免后需 ${effectiveValue}`;
+      }
       default:
         return '???';
     }
+  }
+
+  private formatBreakthroughRequirementDetail(
+    player: PlayerState,
+    requirement: BreakthroughRequirementDef,
+    completed: boolean,
+    reductionMultiplier: number,
+    blocksBreakthrough: boolean,
+  ): string {
+    if (requirement.type === 'attribute') {
+      const currentValue = player.finalAttrs?.[requirement.attr] ?? player.baseAttrs[requirement.attr] ?? 0;
+      const effectiveValue = this.getEffectiveAttributeRequirement(requirement.minValue, reductionMultiplier);
+      const reducedPercent = Math.max(0, Math.round((1 - reductionMultiplier) * 100));
+      return reducedPercent > 0
+        ? `当前 ${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}，基础要求 ${requirement.minValue}，已乘算减免 ${reducedPercent}%`
+        : `当前 ${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}`;
+    }
+    if (this.isOptionalBreakthroughReducer(requirement)) {
+      const reductionPct = this.getRequirementReductionPct(requirement);
+      if (requirement.type === 'item') {
+        return completed
+          ? `当前已生效，突破成功后会消耗该材料，并将全部属性要求按乘算降低 ${reductionPct}%`
+          : `当前未生效；若备齐该材料，突破时会消耗，并将全部属性要求按乘算降低 ${reductionPct}%`;
+      }
+      return completed
+        ? `当前已生效，已将全部属性要求按乘算降低 ${reductionPct}%`
+        : `当前未生效；若满足该功法条件，可将全部属性要求按乘算降低 ${reductionPct}%`;
+    }
+    if (requirement.type === 'item') {
+      return completed ? '当前已满足，确认突破后会消耗对应材料。' : '当前尚未满足。';
+    }
+    return completed ? '当前已满足。' : (blocksBreakthrough ? '当前尚未满足。' : '当前未生效。');
   }
 
   private isTechniqueGradeAtLeast(current: TechniqueGrade | undefined, expected: TechniqueGrade): boolean {

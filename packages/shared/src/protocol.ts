@@ -259,6 +259,7 @@ export interface S2C_SystemMsg {
 export interface AuthRegisterReq {
   username: string;
   password: string;
+  displayName: string;
 }
 
 export interface AuthLoginReq {
@@ -273,6 +274,36 @@ export interface AuthRefreshReq {
 export interface AuthTokenRes {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface DisplayNameAvailabilityRes {
+  available: boolean;
+  message?: string;
+}
+
+export interface AccountUpdatePasswordReq {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface AccountUpdateDisplayNameReq {
+  displayName: string;
+}
+
+export interface AccountUpdateDisplayNameRes {
+  displayName: string;
+}
+
+export interface AccountUpdateRoleNameReq {
+  roleName: string;
+}
+
+export interface AccountUpdateRoleNameRes {
+  roleName: string;
+}
+
+export interface BasicOkRes {
+  ok: true;
 }
 
 export interface GmLoginReq {

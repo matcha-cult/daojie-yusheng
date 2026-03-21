@@ -72,7 +72,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const { userId, username } = payload;
+    const { userId, username, displayName } = payload;
     this.playerService.clearExpiredRetainedSessions();
 
     // 顶号检测
@@ -85,6 +85,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       const existing = this.playerService.getPlayer(existingPlayerId);
       if (existing) {
+        existing.displayName = displayName;
         this.playerService.setSocket(existingPlayerId, client);
         client.data = { userId, playerId: existingPlayerId };
         this.sendInit(client, existing);
@@ -95,6 +96,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const retained = this.playerService.restoreRetainedPlayer(userId);
     if (retained) {
+      retained.displayName = displayName;
       const pos = this.resolveLoginPosition(retained.mapId, retained.x, retained.y);
       retained.x = pos.x;
       retained.y = pos.y;
@@ -129,6 +131,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const playerState: PlayerState = {
       id: playerId,
       name: username,
+      displayName,
       mapId: DEFAULT_MAP,
       x: spawn.x,
       y: spawn.y,

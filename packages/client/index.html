@@ -154,6 +154,24 @@
       color: var(--light-ink);
       font-size: 14px;
     }
+    .form-help {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--ink-grey);
+      line-height: 1.5;
+    }
+    .field-status {
+      min-height: 18px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--ink-grey);
+    }
+    .field-status.success {
+      color: #2e6d46;
+    }
+    .field-status.error {
+      color: var(--stamp-red);
+    }
 
     .login-actions {
       display: flex;
@@ -386,6 +404,8 @@
       height: 100%;
       min-height: 0;
       padding: 14px;
+      padding-bottom: 64px;
+      position: relative;
     }
     .hud-top-row {
       grid-column: 2;
@@ -718,6 +738,38 @@
       gap: 8px;
       flex: 1 1 auto;
       align-content: start;
+      padding-bottom: 12px;
+    }
+    .hud-corner-actions {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      display: flex;
+      gap: 8px;
+      z-index: 2;
+    }
+    .hud-corner-btn {
+      min-width: 72px;
+      padding: 7px 12px;
+      border: 1px solid rgba(17, 17, 17, 0.2);
+      background: rgba(255,255,255,0.6);
+      color: var(--ink-black);
+      font-family: var(--font-heading-sub);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .hud-corner-btn:hover {
+      background: rgba(255,255,255,0.82);
+      border-color: rgba(17, 17, 17, 0.38);
+    }
+    .hud-corner-btn.danger {
+      color: var(--stamp-red);
+      background: rgba(197, 60, 60, 0.08);
+    }
+    .hud-corner-btn.danger:hover {
+      color: var(--stamp-red-hover);
+      background: rgba(197, 60, 60, 0.14);
     }
     .hud-row {
       display: flex;
@@ -1746,6 +1798,88 @@
     .detail-modal-hint {
       font-size: 11px;
       color: var(--ink-grey);
+    }
+    .account-settings-section + .account-settings-section {
+      margin-top: 14px;
+    }
+    .account-settings-name-grid {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .account-settings-copy {
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: var(--ink-grey);
+      line-height: 1.6;
+    }
+    .account-settings-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .account-settings-field label {
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      color: var(--ink-dark);
+    }
+    .account-settings-field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(17, 17, 17, 0.16);
+      background: rgba(255,255,255,0.86);
+      color: var(--ink-black);
+      font-family: var(--font-body);
+      font-size: 15px;
+      outline: none;
+    }
+    .account-settings-field input:focus {
+      border-color: rgba(17, 17, 17, 0.38);
+    }
+    .account-settings-field--display {
+      max-width: 180px;
+    }
+    .account-settings-display-input {
+      width: 96px;
+      padding: 10px 8px;
+      text-align: center;
+      font-family: var(--font-heading-main);
+      font-size: 38px;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    .account-settings-field--display .account-settings-actions {
+      justify-content: flex-start;
+    }
+    .account-settings-status {
+      min-height: 18px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      color: var(--ink-grey);
+    }
+    .account-settings-status.success {
+      color: #2e6d46;
+    }
+    .account-settings-status.error {
+      color: var(--stamp-red);
+    }
+    .account-settings-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+    @media (max-width: 720px) {
+      .account-settings-name-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .account-settings-field--display {
+        max-width: none;
+      }
+      .account-settings-display-input {
+        width: 100%;
+        max-width: 120px;
+      }
     }
     .tech-modal-summary {
       display: grid;
@@ -2797,6 +2931,12 @@
         <label>口令</label>
         <input id="input-password" type="password" placeholder="输入密码" />
       </div>
+      <div class="form-group">
+        <label>显示名</label>
+        <input id="input-display-name" type="text" maxlength="1" placeholder="注册时必填，仅 1 个字" />
+        <div class="form-help">注册时必须选择 1 个唯一显示字。未设置的旧账号默认取账号首字。</div>
+        <div class="field-status" id="display-name-status">注册时必填</div>
+      </div>
       <div class="login-actions">
         <button class="action-btn primary-btn" id="btn-login">
           <span class="btn-text">登录</span>
@@ -2877,6 +3017,10 @@
                 <span class="hud-label">威胁</span>
                 <span class="hud-value" id="hud-threat">平稳</span>
               </div>
+            </div>
+            <div class="hud-corner-actions">
+              <button id="hud-open-settings" class="hud-corner-btn" type="button">设置</button>
+              <button id="hud-logout" class="hud-corner-btn danger" type="button">登出</button>
             </div>
           </div>
         </div>

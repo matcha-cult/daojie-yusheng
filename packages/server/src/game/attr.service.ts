@@ -7,6 +7,7 @@ import {
   AttrKey,
   DEFAULT_PLAYER_REALM_STAGE,
   ELEMENT_KEYS,
+  getRealmAttributeMultiplier,
   NUMERIC_SCALAR_STAT_KEYS,
   PlayerState,
   PLAYER_REALM_NUMERIC_TEMPLATES,
@@ -24,6 +25,41 @@ import {
 
 const ATTR_KEYS: AttrKey[] = ['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'];
 type PercentBonusAccumulator = Pick<NumericStats, 'maxHp' | 'maxQi' | 'physAtk' | 'spellAtk'>;
+const REALM_SCALING_NUMERIC_KEYS: Array<
+  'maxHp'
+  | 'maxQi'
+  | 'physAtk'
+  | 'spellAtk'
+  | 'physDef'
+  | 'spellDef'
+  | 'hit'
+  | 'dodge'
+  | 'crit'
+  | 'critDamage'
+  | 'breakPower'
+  | 'resolvePower'
+  | 'maxQiOutputPerTick'
+  | 'qiRegenRate'
+  | 'hpRegenRate'
+  | 'cooldownSpeed'
+> = [
+  'maxHp',
+  'maxQi',
+  'physAtk',
+  'spellAtk',
+  'physDef',
+  'spellDef',
+  'hit',
+  'dodge',
+  'crit',
+  'critDamage',
+  'breakPower',
+  'resolvePower',
+  'maxQiOutputPerTick',
+  'qiRegenRate',
+  'hpRegenRate',
+  'cooldownSpeed',
+];
 
 function createAttributeSnapshot(initial = 0): Attributes {
   return {
@@ -130,11 +166,13 @@ export class AttrService {
   recalcPlayer(player: PlayerState): void {
     const previousMaxQi = Math.max(0, Math.round(player.numericStats?.maxQi ?? player.qi ?? 0));
     const effectiveBonuses = this.getEffectiveBonuses(player);
+    const realmLv = this.resolvePlayerRealmLv(player);
     const finalAttrs = this.computeFinal(
       player.baseAttrs,
       effectiveBonuses,
       player.finalAttrs ?? createAttributeSnapshot(),
     );
+    this.applyRealmAttributeScaling(finalAttrs, realmLv);
     const stage = player.realm?.stage ?? DEFAULT_PLAYER_REALM_STAGE;
     const stats = this.computeNumericStats(
       finalAttrs,
@@ -142,6 +180,7 @@ export class AttrService {
       stage,
       player.numericStats ?? createNumericStats(),
     );
+    this.applyRealmNumericScaling(stats, realmLv);
     const ratioDivisors = this.getRatioDivisorsForStage(
       stage,
       player.ratioDivisors,
@@ -289,5 +328,33 @@ export class AttrService {
     if (bonuses.maxQi !== 0) target.maxQi *= 1 + bonuses.maxQi / 100;
     if (bonuses.physAtk !== 0) target.physAtk *= 1 + bonuses.physAtk / 100;
     if (bonuses.spellAtk !== 0) target.spellAtk *= 1 + bonuses.spellAtk / 100;
+  }
+
+  private resolvePlayerRealmLv(player: PlayerState): number {
+    return Math.max(1, Math.floor(player.realm?.realmLv ?? player.realmLv ?? 1));
+  }
+
+  private applyRealmAttributeScaling(target: Attributes, realmLv: number): void {
+    const multiplier = getRealmAttributeMultiplier(realmLv);
+    if (multiplier === 1) {
+      return;
+    }
+    for (const key of ATTR_KEYS) {
+      target[key] = Math.max(0, Math.round(target[key] * multiplier));
+    }
+  }
+
+  private applyRealmNumericScaling(target: NumericStats, realmLv: number): void {
+    const multiplier = getRealmAttributeMultiplier(realmLv);
+    if (multiplier === 1) {
+      return;
+    }
+    for (const key of REALM_SCALING_NUMERIC_KEYS) {
+      target[key] = Math.max(0, Math.round(target[key] * multiplier));
+    }
+    for (const key of ELEMENT_KEYS) {
+      target.elementDamageBonus[key] = Math.max(0, Math.round(target.elementDamageBonus[key] * multiplier));
+      target.elementDamageReduce[key] = Math.max(0, Math.round(target.elementDamageReduce[key] * multiplier));
+    }
   }
 }

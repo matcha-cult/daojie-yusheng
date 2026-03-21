@@ -187,6 +187,9 @@ export interface BreakthroughRequirementView {
   label: string;
   completed: boolean;
   hidden: boolean;
+  optional?: boolean;
+  blocksBreakthrough?: boolean;
+  detail?: string;
 }
 
 export interface BreakthroughPreviewState {
@@ -195,6 +198,9 @@ export interface BreakthroughPreviewState {
   totalRequirements: number;
   completedRequirements: number;
   allCompleted: boolean;
+  canBreakthrough: boolean;
+  blockingRequirements: number;
+  completedBlockingRequirements: number;
   requirements: BreakthroughRequirementView[];
 }
 
@@ -448,6 +454,7 @@ export interface QuestState {
 export interface PlayerState {
   id: string;
   name: string;
+  displayName?: string;
   isBot?: boolean;
   autoRetaliate?: boolean;
   realmLv?: number;

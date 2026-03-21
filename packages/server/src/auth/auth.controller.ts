@@ -1,6 +1,14 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { AuthRegisterReq, AuthLoginReq, AuthRefreshReq, AuthTokenRes, GmLoginReq, GmLoginRes } from '@mud/shared';
+import {
+  AuthRegisterReq,
+  AuthLoginReq,
+  AuthRefreshReq,
+  AuthTokenRes,
+  DisplayNameAvailabilityRes,
+  GmLoginReq,
+  GmLoginRes,
+} from '@mud/shared';
 
 @Controller('auth')
 export class AuthController {
@@ -8,7 +16,7 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() body: AuthRegisterReq): Promise<AuthTokenRes> {
-    return this.authService.register(body.username, body.password);
+    return this.authService.register(body.username, body.password, body.displayName);
   }
 
   @Post('login')
@@ -19,6 +27,11 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body() body: AuthRefreshReq): Promise<AuthTokenRes> {
     return this.authService.refresh(body.refreshToken);
+  }
+
+  @Get('display-name/check')
+  async checkDisplayName(@Query('displayName') displayName = ''): Promise<DisplayNameAvailabilityRes> {
+    return this.authService.checkDisplayNameAvailability(displayName);
   }
 
   @Post('gm/login')
