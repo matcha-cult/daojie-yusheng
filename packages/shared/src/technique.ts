@@ -42,35 +42,28 @@ export const TECHNIQUE_GRADE_LABELS: Record<TechniqueGrade, string> = {
   emperor: '帝阶',
 };
 
-export const TECHNIQUE_GRADE_LOCAL_DECAY: Record<TechniqueGrade, Attributes> = {
-  mortal: { constitution: 0.35, spirit: 0.35, perception: 0.35, talent: 0.35, comprehension: 0.35, luck: 0.35 },
-  yellow: { constitution: 0.45, spirit: 0.45, perception: 0.45, talent: 0.45, comprehension: 0.45, luck: 0.45 },
-  mystic: { constitution: 0.55, spirit: 0.55, perception: 0.55, talent: 0.55, comprehension: 0.55, luck: 0.55 },
-  earth: { constitution: 0.64, spirit: 0.64, perception: 0.64, talent: 0.64, comprehension: 0.64, luck: 0.64 },
-  heaven: { constitution: 0.72, spirit: 0.72, perception: 0.72, talent: 0.72, comprehension: 0.72, luck: 0.72 },
-  spirit: { constitution: 0.79, spirit: 0.79, perception: 0.79, talent: 0.79, comprehension: 0.79, luck: 0.79 },
-  saint: { constitution: 0.85, spirit: 0.85, perception: 0.85, talent: 0.85, comprehension: 0.85, luck: 0.85 },
-  emperor: { constitution: 0.9, spirit: 0.9, perception: 0.9, talent: 0.9, comprehension: 0.9, luck: 0.9 },
+export const TECHNIQUE_GRADE_ATTR_FREE_LIMITS: Record<TechniqueGrade, Attributes> = {
+  mortal: { constitution: 44, spirit: 44, perception: 44, talent: 44, comprehension: 44, luck: 44 },
+  yellow: { constitution: 64, spirit: 64, perception: 64, talent: 64, comprehension: 64, luck: 64 },
+  mystic: { constitution: 140, spirit: 140, perception: 140, talent: 140, comprehension: 140, luck: 140 },
+  earth: { constitution: 220, spirit: 220, perception: 220, talent: 220, comprehension: 220, luck: 220 },
+  heaven: { constitution: 440, spirit: 440, perception: 440, talent: 440, comprehension: 440, luck: 440 },
+  spirit: { constitution: 880, spirit: 880, perception: 880, talent: 880, comprehension: 880, luck: 880 },
+  saint: { constitution: 1760, spirit: 1760, perception: 1760, talent: 1760, comprehension: 1760, luck: 1760 },
+  emperor: { constitution: 3520, spirit: 3520, perception: 3520, talent: 3520, comprehension: 3520, luck: 3520 },
 };
 
-export const TECHNIQUE_GRADE_TOTAL_WEIGHTS: Record<TechniqueGrade, number> = {
-  mortal: 0.6,
-  yellow: 0.85,
-  mystic: 1.1,
-  earth: 1.4,
-  heaven: 1.75,
-  spirit: 2.15,
-  saint: 2.6,
-  emperor: 3.1,
-};
+export const TECHNIQUE_GRADE_ATTR_DECAY_K = 0.8;
 
-export const TECHNIQUE_TOTAL_POOL_CAPS: Attributes = {
-  constitution: 20,
-  spirit: 20,
-  perception: 18,
-  talent: 18,
-  comprehension: 16,
-  luck: 14,
+export const TECHNIQUE_GRADE_ATTR_DECAY_SPANS: Record<TechniqueGrade, Attributes> = {
+  mortal: { constitution: 35.2, spirit: 35.2, perception: 35.2, talent: 35.2, comprehension: 35.2, luck: 35.2 },
+  yellow: { constitution: 51.2, spirit: 51.2, perception: 51.2, talent: 51.2, comprehension: 51.2, luck: 51.2 },
+  mystic: { constitution: 112, spirit: 112, perception: 112, talent: 112, comprehension: 112, luck: 112 },
+  earth: { constitution: 176, spirit: 176, perception: 176, talent: 176, comprehension: 176, luck: 176 },
+  heaven: { constitution: 352, spirit: 352, perception: 352, talent: 352, comprehension: 352, luck: 352 },
+  spirit: { constitution: 704, spirit: 704, perception: 704, talent: 704, comprehension: 704, luck: 704 },
+  saint: { constitution: 1408, spirit: 1408, perception: 1408, talent: 1408, comprehension: 1408, luck: 1408 },
+  emperor: { constitution: 2816, spirit: 2816, perception: 2816, talent: 2816, comprehension: 2816, luck: 2816 },
 };
 
 export function createZeroAttributes(): Attributes {
@@ -203,32 +196,34 @@ export function calcTechniqueNextLevelGains(level: number, layers?: TechniqueLay
   return result;
 }
 
+function calcTechniqueSoftDecayedPool(rawPool: number, freeLimit: number, decaySpan: number): number {
+  if (rawPool <= 0) return 0;
+  if (rawPool <= freeLimit) return rawPool;
+  if (decaySpan <= 0) return freeLimit;
+  const overflow = rawPool - freeLimit;
+  return freeLimit + decaySpan * Math.log1p(overflow / decaySpan);
+}
+
 export function calcTechniqueFinalAttrBonus(techniques: readonly TechniqueState[]): Attributes {
   const result = createZeroAttributes();
 
   for (const key of TECHNIQUE_ATTR_KEYS) {
-    let totalPool = 0;
+    let finalValue = 0;
 
     for (const grade of TECHNIQUE_GRADE_ORDER) {
-      const contributions = techniques
+      const rawPool = techniques
         .filter((technique) => technique.grade === grade)
         .map((technique) => calcTechniqueAttrValues(technique.level, technique.layers, technique.attrCurves)[key] ?? 0)
-        .filter((value) => value > 0)
-        .sort((left, right) => right - left);
-
-      if (contributions.length === 0) continue;
-
-      const decay = TECHNIQUE_GRADE_LOCAL_DECAY[grade][key];
-      let localPool = 0;
-      for (let index = 0; index < contributions.length; index += 1) {
-        localPool += contributions[index] * Math.pow(decay, index);
-      }
-      totalPool += localPool * TECHNIQUE_GRADE_TOTAL_WEIGHTS[grade];
+        .reduce((sum, value) => sum + value, 0);
+      if (rawPool <= 0) continue;
+      finalValue += calcTechniqueSoftDecayedPool(
+        rawPool,
+        TECHNIQUE_GRADE_ATTR_FREE_LIMITS[grade][key],
+        TECHNIQUE_GRADE_ATTR_DECAY_SPANS[grade][key],
+      );
     }
 
-    if (totalPool <= 0) continue;
-    const cap = TECHNIQUE_TOTAL_POOL_CAPS[key];
-    const finalValue = cap > 0 ? cap * Math.log1p(totalPool / cap) : totalPool;
+    if (finalValue <= 0) continue;
     result[key] = Math.floor(finalValue);
   }
 
