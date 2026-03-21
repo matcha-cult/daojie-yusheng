@@ -237,6 +237,13 @@ function openBreakthroughModal() {
   });
 }
 
+
+hud.setCallbacks(() => {
+  cancelTargeting();
+  hideObserveModal();
+  openBreakthroughModal();
+});
+
 function syncTargetingOverlay() {
   if (!myPlayer || !pendingTargetedAction) {
     renderer.setTargetingOverlay(null);

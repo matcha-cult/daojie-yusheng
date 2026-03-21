@@ -126,7 +126,7 @@ export class ActionPanel {
       types: string[];
     }> = [
       { id: 'dialogue', label: '对话', types: ['quest', 'interact', 'travel'] },
-      { id: 'skill', label: '技能', types: ['skill', 'battle', 'gather', 'breakthrough'] },
+      { id: 'skill', label: '技能', types: ['skill', 'battle', 'gather'] },
       { id: 'toggle', label: '行动', types: ['toggle'] },
     ];
     const groups = new Map<string, ActionDef[]>();
@@ -608,6 +608,7 @@ export class ActionPanel {
         action.id === 'toggle:auto_battle'
         || action.id === 'toggle:auto_retaliate'
         || action.id === 'client:observe'
+        || action.type === 'breakthrough'
       ) {
         continue;
       }

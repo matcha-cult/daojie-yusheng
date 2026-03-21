@@ -20,12 +20,24 @@ export class HUD {
   private threatDiv = document.getElementById('hud-threat')!;
   private realmValue = document.getElementById('hud-realm')!;
   private realmSub = document.getElementById('hud-realm-sub')!;
+  private breakthroughButton = document.getElementById('hud-breakthrough') as HTMLButtonElement | null;
   private hpText = document.getElementById('hud-hp-text')!;
   private hpBar = document.getElementById('hud-hp-bar')!;
   private qiText = document.getElementById('hud-qi-text')!;
   private qiBar = document.getElementById('hud-qi-bar')!;
   private cultivateText = document.getElementById('hud-cultivate')!;
   private cultivateBar = document.getElementById('hud-cultivate-bar')!;
+  private onBreakthrough: (() => void) | null = null;
+
+  constructor() {
+    this.breakthroughButton?.addEventListener('click', () => {
+      this.onBreakthrough?.();
+    });
+  }
+
+  setCallbacks(onBreakthrough: () => void): void {
+    this.onBreakthrough = onBreakthrough;
+  }
 
   update(player: PlayerState, meta?: HUDMeta) {
     this.nameDiv.textContent = player.name;
@@ -39,6 +51,13 @@ export class HUD {
     this.realmValue.textContent = realmLabel;
     const realmReviewLabel = meta?.realmReviewLabel ?? player.realm?.review ?? player.realmReview ?? '-';
     this.realmSub.textContent = realmReviewLabel;
+    const breakthroughPreview = player.realm?.breakthrough;
+    if (this.breakthroughButton) {
+      const canBreakthrough = player.realm?.breakthroughReady && breakthroughPreview;
+      this.breakthroughButton.hidden = !canBreakthrough;
+      this.breakthroughButton.textContent = canBreakthrough ? `突破 · ${breakthroughPreview.targetDisplayName}` : '突破';
+      this.breakthroughButton.disabled = !canBreakthrough;
+    }
 
     this.setResource(this.hpBar, this.hpText, player.hp, player.maxHp);
     const qiMax = Math.max(0, Math.round(player.numericStats?.maxQi ?? 0));

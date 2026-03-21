@@ -425,6 +425,26 @@
       line-height: 1;
       pointer-events: none;
     }
+    .hud-realm-action {
+      position: absolute;
+      top: 8px;
+      right: 14px;
+      min-width: 74px;
+      padding: 3px 10px;
+      border: 1px solid rgba(17, 17, 17, 0.2);
+      background: rgba(197, 60, 60, 0.1);
+      color: var(--stamp-red);
+      font-family: var(--font-heading-sub);
+      font-size: 13px;
+      line-height: 1.2;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .hud-realm-action:hover {
+      background: rgba(197, 60, 60, 0.16);
+      border-color: rgba(17, 17, 17, 0.32);
+      color: var(--stamp-red-hover);
+    }
     .hud-realm-main {
       position: absolute;
       top: 50%;
@@ -2807,6 +2827,7 @@
             <div class="hud-top-row">
               <div class="hud-realm-block">
                 <div class="hud-realm-label">境界</div>
+                <button class="hud-realm-action" id="hud-breakthrough" type="button" hidden>突破</button>
                 <div class="hud-realm-main">
                   <div class="hud-realm-value" id="hud-realm">-</div>
                   <div class="hud-realm-sub" id="hud-realm-sub">-</div>
