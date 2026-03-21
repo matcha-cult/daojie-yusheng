@@ -890,14 +890,11 @@ export class TechniqueService {
   }
 
   private formatBreakthroughRequirementLabel(requirement: BreakthroughRequirementDef, reductionMultiplier = 1): string {
-    if (requirement.label) return requirement.label;
+    if (requirement.type !== 'attribute' && requirement.label) return requirement.label;
     switch (requirement.type) {
       case 'item': {
         const itemName = this.contentService.getItem(requirement.itemId)?.name ?? requirement.itemId;
-        const reductionPct = this.getRequirementReductionPct(requirement);
-        return reductionPct > 0
-          ? `${itemName} x${requirement.count}`
-          : `${itemName} x${requirement.count}`;
+        return `${itemName} x${requirement.count}`;
       }
       case 'technique': {
         const parts: string[] = ['至少掌握'];
@@ -920,10 +917,7 @@ export class TechniqueService {
       }
       case 'attribute': {
         const effectiveValue = this.getEffectiveAttributeRequirement(requirement.minValue, reductionMultiplier);
-        if (effectiveValue === requirement.minValue) {
-          return `${this.attrLabel(requirement.attr)}达到 ${requirement.minValue}`;
-        }
-        return `${this.attrLabel(requirement.attr)}基础要求 ${requirement.minValue}，当前减免后需 ${effectiveValue}`;
+        return `${this.attrLabel(requirement.attr)}达到 ${effectiveValue}（基础 ${requirement.minValue}）`;
       }
       default:
         return '???';
@@ -942,8 +936,8 @@ export class TechniqueService {
       const effectiveValue = this.getEffectiveAttributeRequirement(requirement.minValue, reductionMultiplier);
       const reducedPercent = Math.max(0, Math.round((1 - reductionMultiplier) * 100));
       return reducedPercent > 0
-        ? `当前 ${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}，基础要求 ${requirement.minValue}，已乘算减免 ${reducedPercent}%`
-        : `当前 ${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}`;
+        ? `当前${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}，基础要求 ${requirement.minValue}，已乘算减免 ${reducedPercent}%`
+        : `当前${this.attrLabel(requirement.attr)} ${currentValue} / ${effectiveValue}，基础要求 ${requirement.minValue}`;
     }
     if (this.isOptionalBreakthroughReducer(requirement)) {
       const reductionPct = this.getRequirementReductionPct(requirement);
@@ -974,9 +968,9 @@ export class TechniqueService {
       case 'spirit':
         return '神识';
       case 'perception':
-        return '感知';
+        return '身法';
       case 'talent':
-        return '资质';
+        return '根骨';
       case 'comprehension':
         return '悟性';
       case 'luck':
