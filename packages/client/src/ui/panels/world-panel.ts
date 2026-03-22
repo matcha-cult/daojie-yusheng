@@ -27,6 +27,43 @@ interface WorldGuide {
   threats: string[];
 }
 
+interface NearbyMonsterView {
+  id: string;
+  name: string;
+  distance: number;
+  hp: number;
+  maxHp: number;
+}
+
+interface NearbyNpcView {
+  id: string;
+  name: string;
+}
+
+interface QuickActionView {
+  id: string;
+  name: string;
+  desc: string;
+}
+
+interface WorldPanelSnapshot {
+  mapName: string;
+  mapMood: string;
+  mapDesc: string;
+  danger: number;
+  recommend: string;
+  realmLabel: string;
+  route: string;
+  resourcesLabel: string;
+  threatsLabel: string;
+  cultivatingName: string;
+  currentQuestTitle: string;
+  currentQuestProgress: string;
+  nearbyMonsters: NearbyMonsterView[];
+  nearbyNpcs: NearbyNpcView[];
+  quickActions: QuickActionView[];
+}
+
 const TECH_REALM_LABELS: Record<TechniqueRealm, string> = {
   [TechniqueRealm.Entry]: '武学入门',
   [TechniqueRealm.Minor]: '后天圆熟',
@@ -158,11 +195,16 @@ function resolveRecommendedRealmLabel(raw: string | undefined, fallback: string)
   return labels.join('到');
 }
 
+function buildMonsterStatus(distance: number): string {
+  return distance <= 2 ? '近身' : distance <= 5 ? '逼近' : '远处';
+}
+
 export class WorldPanel {
   private mapPane = document.getElementById('pane-map-intel')!;
   private nearbyPane = document.getElementById('pane-nearby')!;
   private suggestionPane = document.getElementById('pane-suggestions')!;
-  private lastRenderSignature: string | null = null;
+  private lastNearbyStructureKey: string | null = null;
+  private lastSuggestionStructureKey: string | null = null;
 
   /** 根据玩家、地图、实体、行动、任务数据刷新三个子面板 */
   update(input: {
@@ -172,6 +214,27 @@ export class WorldPanel {
     actions: ActionDef[];
     quests: QuestState[];
   }): void {
+    const snapshot = this.buildSnapshot(input);
+    this.syncMapPane(snapshot);
+    this.syncNearbyPane(snapshot);
+    this.syncSuggestionPane(snapshot);
+  }
+
+  clear(): void {
+    this.mapPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
+    this.nearbyPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
+    this.suggestionPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
+    this.lastNearbyStructureKey = null;
+    this.lastSuggestionStructureKey = null;
+  }
+
+  private buildSnapshot(input: {
+    player: PlayerState;
+    mapMeta: MapMeta | null;
+    entities: VisibleEntity[];
+    actions: ActionDef[];
+    quests: QuestState[];
+  }): WorldPanelSnapshot {
     const guide = WORLD_GUIDE[input.player.mapId] ?? {
       title: input.mapMeta?.name ?? input.player.mapId,
       danger: input.mapMeta?.dangerLevel ?? 1,
@@ -193,111 +256,133 @@ export class WorldPanel {
     const nearbyMonsters = input.entities
       .filter((entity) => entity.kind === 'monster')
       .map((entity) => ({
-        ...entity,
+        id: entity.id ?? entity.name ?? '',
+        name: entity.name ?? entity.id ?? '未知妖兽',
         distance: manhattanDistance({ x: entity.wx, y: entity.wy }, input.player),
+        hp: entity.hp ?? 0,
+        maxHp: entity.maxHp ?? 0,
       }))
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 5);
     const nearbyNpcs = input.entities
       .filter((entity) => entity.kind === 'npc')
-      .slice(0, 4);
+      .slice(0, 4)
+      .map((entity) => ({
+        id: entity.id ?? entity.name ?? '',
+        name: entity.name ?? entity.id ?? '未知人物',
+      }));
     const quickActions = input.actions
       .filter((action) => action.cooldownLeft === 0)
-      .slice(0, 6);
-
-    const snapshot = {
-      mapId: input.player.mapId,
-      mapName: input.mapMeta?.name ?? '',
-      danger,
-      recommend,
-      guide: {
-        title: guide.title,
-        route: guide.route,
-        mood: guide.mood,
-        desc: guide.desc,
-        resources: guide.resources,
-        threats: guide.threats,
-      },
-      playerRealmName: input.player.realmName ?? '',
-      playerRealmStage: input.player.realmStage ?? '',
-      cultivatingId: cultivating?.techId ?? null,
-      cultivatingName: cultivating?.name ?? '',
-      quest: currentQuest
-        ? {
-            id: currentQuest.id,
-            status: currentQuest.status,
-            progress: currentQuest.progress,
-            required: currentQuest.required,
-          }
-        : null,
-      nearbyMonsters: nearbyMonsters.map((monster) => ({
-        id: monster.id ?? monster.name ?? '',
-        distance: monster.distance,
-        hp: monster.hp ?? 0,
-        maxHp: monster.maxHp ?? 0,
-      })),
-      nearbyNpcs: nearbyNpcs.map((npc) => npc.id ?? npc.name ?? ''),
-      quickActions: quickActions.map((action) => ({
+      .slice(0, 6)
+      .map((action) => ({
         id: action.id,
-        cooldown: action.cooldownLeft,
         name: action.name,
         desc: action.desc,
-      })),
-    };
-    const signature = JSON.stringify(snapshot);
-    if (signature === this.lastRenderSignature) {
-      return;
-    }
-    this.lastRenderSignature = signature;
+      }));
 
-    const mapHtml = `
+    return {
+      mapName: input.mapMeta?.name ?? guide.title,
+      mapMood: guide.mood,
+      mapDesc: guide.desc,
+      danger,
+      recommend,
+      realmLabel: inferRealm(input.player),
+      route: guide.route,
+      resourcesLabel: guide.resources.join('、') || '暂无',
+      threatsLabel: guide.threats.join('、') || '未知',
+      cultivatingName: cultivating?.name ?? '未设定',
+      currentQuestTitle: currentQuest?.title ?? '继续推进或补修炼',
+      currentQuestProgress: currentQuest ? `${currentQuest.targetName} ${currentQuest.progress}/${currentQuest.required}` : '暂无',
+      nearbyMonsters,
+      nearbyNpcs,
+      quickActions,
+    };
+  }
+
+  private syncMapPane(snapshot: WorldPanelSnapshot): void {
+    if (!this.patchMapPane(snapshot)) {
+      this.renderMapPane(snapshot);
+      this.patchMapPane(snapshot);
+    }
+  }
+
+  private syncNearbyPane(snapshot: WorldPanelSnapshot): void {
+    const structureKey = JSON.stringify({
+      monsters: snapshot.nearbyMonsters.map((monster) => monster.id),
+      npcs: snapshot.nearbyNpcs.map((npc) => npc.id),
+    });
+    if (structureKey !== this.lastNearbyStructureKey || !this.patchNearbyPane(snapshot)) {
+      this.renderNearbyPane(snapshot);
+      this.lastNearbyStructureKey = structureKey;
+      this.patchNearbyPane(snapshot);
+    }
+  }
+
+  private syncSuggestionPane(snapshot: WorldPanelSnapshot): void {
+    const structureKey = JSON.stringify({
+      quickActions: snapshot.quickActions.map((action) => action.id),
+    });
+    if (structureKey !== this.lastSuggestionStructureKey || !this.patchSuggestionPane(snapshot)) {
+      this.renderSuggestionPane(snapshot);
+      this.lastSuggestionStructureKey = structureKey;
+      this.patchSuggestionPane(snapshot);
+    }
+  }
+
+  private renderMapPane(snapshot: WorldPanelSnapshot): void {
+    const html = `
       <div class="world-hero compact">
         <div>
-          <div class="world-kicker">${escapeHtml(guide.mood)}</div>
-          <div class="world-title">${escapeHtml(input.mapMeta?.name ?? guide.title)}</div>
-          <div class="world-desc">${escapeHtml(guide.desc)}</div>
+          <div class="world-kicker" data-world-map-mood="true">${escapeHtml(snapshot.mapMood)}</div>
+          <div class="world-title" data-world-map-title="true">${escapeHtml(snapshot.mapName)}</div>
+          <div class="world-desc" data-world-map-desc="true">${escapeHtml(snapshot.mapDesc)}</div>
         </div>
         <div class="world-danger">
           <div class="world-danger-label">区域危险</div>
-          <div class="world-danger-value danger-${Math.min(danger, 5)}">${dangerLabel(danger)}</div>
-          <div class="world-danger-sub">推荐境界：${escapeHtml(recommend)}</div>
+          <div class="world-danger-value danger-${Math.min(snapshot.danger, 5)}" data-world-map-danger="true">${dangerLabel(snapshot.danger)}</div>
+          <div class="world-danger-sub" data-world-map-recommend="true">推荐境界：${escapeHtml(snapshot.recommend)}</div>
         </div>
       </div>
       <div class="info-list">
-        <div class="info-line"><span>当前阶段</span><strong>${escapeHtml(inferRealm(input.player))}</strong></div>
-        <div class="info-line"><span>推进路线</span><strong>${escapeHtml(guide.route)}</strong></div>
-        <div class="info-line"><span>主要资源</span><strong>${escapeHtml(guide.resources.join('、') || '暂无')}</strong></div>
-        <div class="info-line"><span>主要威胁</span><strong>${escapeHtml(guide.threats.join('、') || '未知')}</strong></div>
-        <div class="info-line"><span>当前主修</span><strong>${escapeHtml(cultivating?.name ?? '未设定')}</strong></div>
+        <div class="info-line"><span>当前阶段</span><strong data-world-map-realm="true">${escapeHtml(snapshot.realmLabel)}</strong></div>
+        <div class="info-line"><span>推进路线</span><strong data-world-map-route="true">${escapeHtml(snapshot.route)}</strong></div>
+        <div class="info-line"><span>主要资源</span><strong data-world-map-resources="true">${escapeHtml(snapshot.resourcesLabel)}</strong></div>
+        <div class="info-line"><span>主要威胁</span><strong data-world-map-threats="true">${escapeHtml(snapshot.threatsLabel)}</strong></div>
+        <div class="info-line"><span>当前主修</span><strong data-world-map-cultivating="true">${escapeHtml(snapshot.cultivatingName)}</strong></div>
       </div>
     `;
+    preserveSelection(this.mapPane, () => {
+      this.mapPane.innerHTML = html;
+    });
+  }
 
-    const nearbyHtml = `
-      ${nearbyMonsters.length === 0 && nearbyNpcs.length === 0 ? '<div class="empty-hint">附近暂时平静</div>' : ''}
-      ${nearbyMonsters.length > 0 ? `
+  private renderNearbyPane(snapshot: WorldPanelSnapshot): void {
+    const html = `
+      ${snapshot.nearbyMonsters.length === 0 && snapshot.nearbyNpcs.length === 0 ? '<div class="empty-hint">附近暂时平静</div>' : ''}
+      ${snapshot.nearbyMonsters.length > 0 ? `
         <div class="panel-section">
           <div class="panel-section-title">附近威胁</div>
           <div class="entity-list">
-            ${nearbyMonsters.map((monster) => `
-              <div class="entity-card threat">
+            ${snapshot.nearbyMonsters.map((monster) => `
+              <div class="entity-card threat" data-world-monster-card="${escapeHtml(monster.id)}">
                 <div>
-                  <div class="entity-name">${escapeHtml(monster.name ?? monster.id)}</div>
-                  <div class="entity-meta">距离 ${monster.distance} 格 · HP ${monster.hp ?? 0}/${monster.maxHp ?? 0}</div>
+                  <div class="entity-name" data-world-monster-name="${escapeHtml(monster.id)}">${escapeHtml(monster.name)}</div>
+                  <div class="entity-meta" data-world-monster-meta="${escapeHtml(monster.id)}">距离 ${monster.distance} 格 · HP ${monster.hp}/${monster.maxHp}</div>
                 </div>
-                <div class="entity-hp">${monster.distance <= 2 ? '近身' : monster.distance <= 5 ? '逼近' : '远处'}</div>
+                <div class="entity-hp" data-world-monster-status="${escapeHtml(monster.id)}">${buildMonsterStatus(monster.distance)}</div>
               </div>
             `).join('')}
           </div>
         </div>
       ` : ''}
-      ${nearbyNpcs.length > 0 ? `
+      ${snapshot.nearbyNpcs.length > 0 ? `
         <div class="panel-section">
           <div class="panel-section-title">可交互人物</div>
           <div class="entity-list">
-            ${nearbyNpcs.map((npc) => `
-              <div class="entity-card ally">
+            ${snapshot.nearbyNpcs.map((npc) => `
+              <div class="entity-card ally" data-world-npc-card="${escapeHtml(npc.id)}">
                 <div>
-                  <div class="entity-name">${escapeHtml(npc.name ?? npc.id)}</div>
+                  <div class="entity-name" data-world-npc-name="${escapeHtml(npc.id)}">${escapeHtml(npc.name)}</div>
                   <div class="entity-meta">就在视野附近，可尝试接话或交任务</div>
                 </div>
               </div>
@@ -306,42 +391,128 @@ export class WorldPanel {
         </div>
       ` : ''}
     `;
+    preserveSelection(this.nearbyPane, () => {
+      this.nearbyPane.innerHTML = html;
+    });
+  }
 
-    const suggestionHtml = `
+  private renderSuggestionPane(snapshot: WorldPanelSnapshot): void {
+    const html = `
       <div class="panel-section">
         <div class="panel-section-title">当前建议</div>
         <div class="info-list">
-          <div class="info-line"><span>优先事项</span><strong>${escapeHtml(currentQuest?.title ?? '继续推进或补修炼')}</strong></div>
-          <div class="info-line"><span>任务节点</span><strong>${escapeHtml(currentQuest ? `${currentQuest.targetName} ${currentQuest.progress}/${currentQuest.required}` : '暂无') }</strong></div>
+          <div class="info-line"><span>优先事项</span><strong data-world-suggestion-priority="true">${escapeHtml(snapshot.currentQuestTitle)}</strong></div>
+          <div class="info-line"><span>任务节点</span><strong data-world-suggestion-progress="true">${escapeHtml(snapshot.currentQuestProgress)}</strong></div>
         </div>
       </div>
-      ${quickActions.length === 0 ? '<div class="empty-hint">当前没有可立即执行的行动</div>' : `
+      ${snapshot.quickActions.length === 0 ? '<div class="empty-hint">当前没有可立即执行的行动</div>' : `
         <div class="action-suggestion-list">
-          ${quickActions.map((action) => `
-            <div class="suggestion-card">
-              <div class="suggestion-title">${escapeHtml(action.name)}</div>
-              <div class="suggestion-desc">${escapeHtml(action.desc)}</div>
+          ${snapshot.quickActions.map((action) => `
+            <div class="suggestion-card" data-world-quick-action="${escapeHtml(action.id)}">
+              <div class="suggestion-title" data-world-quick-action-title="${escapeHtml(action.id)}">${escapeHtml(action.name)}</div>
+              <div class="suggestion-desc" data-world-quick-action-desc="${escapeHtml(action.id)}">${escapeHtml(action.desc)}</div>
             </div>
           `).join('')}
         </div>
       `}
     `;
-
-    preserveSelection(this.mapPane, () => {
-      this.mapPane.innerHTML = mapHtml;
-    });
-    preserveSelection(this.nearbyPane, () => {
-      this.nearbyPane.innerHTML = nearbyHtml;
-    });
     preserveSelection(this.suggestionPane, () => {
-      this.suggestionPane.innerHTML = suggestionHtml;
+      this.suggestionPane.innerHTML = html;
     });
   }
 
-  clear(): void {
-    this.mapPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
-    this.nearbyPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
-    this.suggestionPane.innerHTML = '<div class="empty-hint">尚未进入世界</div>';
-    this.lastRenderSignature = null;
+  private patchMapPane(snapshot: WorldPanelSnapshot): boolean {
+    const moodNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-mood="true"]');
+    const titleNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-title="true"]');
+    const descNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-desc="true"]');
+    const dangerNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-danger="true"]');
+    const recommendNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-recommend="true"]');
+    const realmNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-realm="true"]');
+    const routeNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-route="true"]');
+    const resourcesNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-resources="true"]');
+    const threatsNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-threats="true"]');
+    const cultivatingNode = this.mapPane.querySelector<HTMLElement>('[data-world-map-cultivating="true"]');
+    if (
+      !moodNode
+      || !titleNode
+      || !descNode
+      || !dangerNode
+      || !recommendNode
+      || !realmNode
+      || !routeNode
+      || !resourcesNode
+      || !threatsNode
+      || !cultivatingNode
+    ) {
+      return false;
+    }
+
+    moodNode.textContent = snapshot.mapMood;
+    titleNode.textContent = snapshot.mapName;
+    descNode.textContent = snapshot.mapDesc;
+    dangerNode.textContent = dangerLabel(snapshot.danger);
+    dangerNode.className = `world-danger-value danger-${Math.min(snapshot.danger, 5)}`;
+    recommendNode.textContent = `推荐境界：${snapshot.recommend}`;
+    realmNode.textContent = snapshot.realmLabel;
+    routeNode.textContent = snapshot.route;
+    resourcesNode.textContent = snapshot.resourcesLabel;
+    threatsNode.textContent = snapshot.threatsLabel;
+    cultivatingNode.textContent = snapshot.cultivatingName;
+    return true;
+  }
+
+  private patchNearbyPane(snapshot: WorldPanelSnapshot): boolean {
+    if (snapshot.nearbyMonsters.length === 0 && snapshot.nearbyNpcs.length === 0) {
+      return this.nearbyPane.querySelector('.empty-hint') !== null;
+    }
+
+    for (const monster of snapshot.nearbyMonsters) {
+      const nameNode = this.nearbyPane.querySelector<HTMLElement>(`[data-world-monster-name="${CSS.escape(monster.id)}"]`);
+      const metaNode = this.nearbyPane.querySelector<HTMLElement>(`[data-world-monster-meta="${CSS.escape(monster.id)}"]`);
+      const statusNode = this.nearbyPane.querySelector<HTMLElement>(`[data-world-monster-status="${CSS.escape(monster.id)}"]`);
+      if (!nameNode || !metaNode || !statusNode) {
+        return false;
+      }
+      nameNode.textContent = monster.name;
+      metaNode.textContent = `距离 ${monster.distance} 格 · HP ${monster.hp}/${monster.maxHp}`;
+      statusNode.textContent = buildMonsterStatus(monster.distance);
+    }
+
+    for (const npc of snapshot.nearbyNpcs) {
+      const nameNode = this.nearbyPane.querySelector<HTMLElement>(`[data-world-npc-name="${CSS.escape(npc.id)}"]`);
+      if (!nameNode) {
+        return false;
+      }
+      nameNode.textContent = npc.name;
+    }
+
+    return true;
+  }
+
+  private patchSuggestionPane(snapshot: WorldPanelSnapshot): boolean {
+    const priorityNode = this.suggestionPane.querySelector<HTMLElement>('[data-world-suggestion-priority="true"]');
+    const progressNode = this.suggestionPane.querySelector<HTMLElement>('[data-world-suggestion-progress="true"]');
+    if (!priorityNode || !progressNode) {
+      return false;
+    }
+
+    priorityNode.textContent = snapshot.currentQuestTitle;
+    progressNode.textContent = snapshot.currentQuestProgress;
+
+    if (snapshot.quickActions.length === 0) {
+      return this.suggestionPane.querySelector('.empty-hint') !== null;
+    }
+
+    for (const action of snapshot.quickActions) {
+      const titleNode = this.suggestionPane.querySelector<HTMLElement>(`[data-world-quick-action-title="${CSS.escape(action.id)}"]`);
+      const descNode = this.suggestionPane.querySelector<HTMLElement>(`[data-world-quick-action-desc="${CSS.escape(action.id)}"]`);
+      if (!titleNode || !descNode) {
+        return false;
+      }
+      titleNode.textContent = action.name;
+      descNode.textContent = action.desc;
+    }
+
+    return true;
   }
 }

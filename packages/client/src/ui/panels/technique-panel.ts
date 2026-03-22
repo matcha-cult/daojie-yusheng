@@ -80,6 +80,10 @@ export class TechniquePanel {
   private openTechId: string | null = null;
   private lastState: TechniquePanelState = { techniques: [] };
 
+  constructor() {
+    this.bindPaneEvents();
+  }
+
   clear(): void {
     this.pane.innerHTML = '<div class="empty-hint">尚未习得功法</div>';
     this.closeModal();
@@ -94,6 +98,15 @@ export class TechniquePanel {
     this.lastState = { techniques, cultivatingTechId, previewPlayer };
     this.renderList();
     this.renderModal();
+  }
+
+  /** 仅同步经验、进度条与主修状态，避免高频整块重绘 */
+  syncDynamic(techniques: TechniqueState[], cultivatingTechId?: string, previewPlayer?: PlayerState): void {
+    this.lastState = { techniques, cultivatingTechId, previewPlayer };
+    if (!this.patchList() || !this.patchModal()) {
+      this.renderList();
+      this.renderModal();
+    }
   }
 
   initFromPlayer(player: PlayerState): void {
@@ -119,36 +132,30 @@ export class TechniquePanel {
         const remainText = tech.expToNext > 0
           ? `距下一层还需 ${remainingExp} 功法经验`
           : '当前已达圆满层';
-        return `<div class="tech-card ${isCultivating ? 'cultivating' : ''}">
+        return `<div class="tech-card ${isCultivating ? 'cultivating' : ''}" data-tech-card="${tech.techId}">
           <button class="tech-card-main" data-tech-open="${tech.techId}" type="button">
             <span class="tech-summary-main">
               <span class="tech-name">${escapeHtml(tech.name)}</span>
               <span class="tech-realm">${tech.grade ? TECHNIQUE_GRADE_LABELS[tech.grade] : '无品'}</span>
-              <span class="tech-layer">第${tech.level}/${maxLevel}层</span>
+              <span class="tech-layer" data-tech-layer="${tech.techId}">第${tech.level}/${maxLevel}层</span>
             </span>
             <span class="tech-progress-meta">
-              <span class="tech-progress-text">${progressText}</span>
+              <span class="tech-progress-text" data-tech-progress-text="${tech.techId}">${progressText}</span>
             </span>
-            <span class="tech-progress-bar"><span class="tech-progress-fill" style="width:${(progressRatio * 100).toFixed(2)}%"></span></span>
-            <span class="tech-progress-remain">${remainText}</span>
+            <span class="tech-progress-bar"><span class="tech-progress-fill" data-tech-progress-fill="${tech.techId}" style="width:${(progressRatio * 100).toFixed(2)}%"></span></span>
+            <span class="tech-progress-remain" data-tech-progress-remain="${tech.techId}">${remainText}</span>
           </button>
           <div class="tech-card-actions">
-            ${isCultivating
-              ? `<button class="small-btn danger" data-cultivate-stop="${tech.techId}" type="button">取消主修</button>`
-              : `<button class="small-btn" data-cultivate="${tech.techId}" type="button">设为主修</button>`}
+            <button
+              class="small-btn ${isCultivating ? 'danger' : ''}"
+              data-tech-cultivate-button="${tech.techId}"
+              data-cultivate="${isCultivating ? '' : tech.techId}"
+              data-cultivate-stop="${isCultivating ? tech.techId : ''}"
+              type="button"
+            >${isCultivating ? '取消主修' : '设为主修'}</button>
           </div>
         </div>`;
       }).join('');
-
-      this.pane.querySelectorAll<HTMLElement>('[data-tech-open]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const techId = button.dataset.techOpen;
-          if (!techId) return;
-          this.openTechId = techId;
-          this.renderModal();
-        });
-      });
-      this.bindListActions();
     });
   }
 
@@ -187,7 +194,7 @@ export class TechniquePanel {
       <div class="tech-modal-summary">
         <div class="tech-modal-stat">
           <span class="tech-modal-label">当前经验</span>
-          <span>${tech.expToNext > 0 ? `${tech.exp}/${tech.expToNext}` : '已满层'}</span>
+          <span data-tech-modal-current-exp="true">${tech.expToNext > 0 ? `${tech.exp}/${tech.expToNext}` : '已满层'}</span>
         </div>
         <div class="tech-modal-stat">
           <span class="tech-modal-label">当前原始总加成</span>
@@ -253,26 +260,42 @@ export class TechniquePanel {
     </div>`;
   }
 
-  private bindListActions(): void {
-    this.pane.querySelectorAll<HTMLElement>('[data-cultivate]').forEach((button) => {
-      button.addEventListener('click', (event) => {
+  private bindPaneEvents(): void {
+    this.pane.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const cultivateButton = target.closest<HTMLElement>('[data-tech-cultivate-button]');
+      if (cultivateButton) {
         event.stopPropagation();
-        const techId = (event.currentTarget as HTMLElement).dataset.cultivate;
-        if (!techId) return;
-        this.lastState.cultivatingTechId = techId;
-        this.onCultivate?.(techId);
-        this.renderList();
-        this.renderModal();
-      });
-    });
-    this.pane.querySelectorAll<HTMLElement>('[data-cultivate-stop]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        this.lastState.cultivatingTechId = undefined;
-        this.onCultivate?.(null);
-        this.renderList();
-        this.renderModal();
-      });
+        const techId = cultivateButton.dataset.cultivateStop || cultivateButton.dataset.cultivate;
+        if (!techId) {
+          return;
+        }
+        if (cultivateButton.dataset.cultivateStop) {
+          this.lastState.cultivatingTechId = undefined;
+          this.onCultivate?.(null);
+        } else {
+          this.lastState.cultivatingTechId = techId;
+          this.onCultivate?.(techId);
+        }
+        this.patchList();
+        this.patchModal();
+        return;
+      }
+
+      const openButton = target.closest<HTMLElement>('[data-tech-open]');
+      if (!openButton) {
+        return;
+      }
+      const techId = openButton.dataset.techOpen;
+      if (!techId) {
+        return;
+      }
+      this.openTechId = techId;
+      this.renderModal();
     });
   }
 
@@ -309,5 +332,65 @@ export class TechniquePanel {
     this.openTechId = null;
     detailModalHost.close(TechniquePanel.MODAL_OWNER);
     this.tooltip.hide();
+  }
+
+  private patchList(): boolean {
+    const { techniques, cultivatingTechId } = this.lastState;
+    if (techniques.length === 0) {
+      return false;
+    }
+
+    for (const tech of techniques) {
+      const card = this.pane.querySelector<HTMLElement>(`[data-tech-card="${CSS.escape(tech.techId)}"]`);
+      const layerNode = this.pane.querySelector<HTMLElement>(`[data-tech-layer="${CSS.escape(tech.techId)}"]`);
+      const progressTextNode = this.pane.querySelector<HTMLElement>(`[data-tech-progress-text="${CSS.escape(tech.techId)}"]`);
+      const progressFillNode = this.pane.querySelector<HTMLElement>(`[data-tech-progress-fill="${CSS.escape(tech.techId)}"]`);
+      const remainNode = this.pane.querySelector<HTMLElement>(`[data-tech-progress-remain="${CSS.escape(tech.techId)}"]`);
+      const cultivateButton = this.pane.querySelector<HTMLButtonElement>(`[data-tech-cultivate-button="${CSS.escape(tech.techId)}"]`);
+      if (!card || !layerNode || !progressTextNode || !progressFillNode || !remainNode || !cultivateButton) {
+        return false;
+      }
+
+      const maxLevel = getTechniqueMaxLevel(tech.layers, tech.level, tech.attrCurves);
+      const isCultivating = cultivatingTechId === tech.techId;
+      const progressRatio = getTechniqueProgressRatio(tech);
+      const remainingExp = getTechniqueRemainingExp(tech);
+      const progressText = tech.expToNext > 0 ? `${tech.exp}/${tech.expToNext}` : '已满层';
+      const remainText = tech.expToNext > 0
+        ? `距下一层还需 ${remainingExp} 功法经验`
+        : '当前已达圆满层';
+
+      card.classList.toggle('cultivating', isCultivating);
+      layerNode.textContent = `第${tech.level}/${maxLevel}层`;
+      progressTextNode.textContent = progressText;
+      progressFillNode.style.width = `${(progressRatio * 100).toFixed(2)}%`;
+      remainNode.textContent = remainText;
+      cultivateButton.textContent = isCultivating ? '取消主修' : '设为主修';
+      cultivateButton.classList.toggle('danger', isCultivating);
+      cultivateButton.dataset.cultivate = isCultivating ? '' : tech.techId;
+      cultivateButton.dataset.cultivateStop = isCultivating ? tech.techId : '';
+    }
+
+    return true;
+  }
+
+  private patchModal(): boolean {
+    if (!this.openTechId) {
+      return true;
+    }
+    if (!detailModalHost.isOpenFor(TechniquePanel.MODAL_OWNER)) {
+      return false;
+    }
+    const tech = this.lastState.techniques.find((entry) => entry.techId === this.openTechId);
+    if (!tech) {
+      return false;
+    }
+
+    const expNode = document.querySelector<HTMLElement>('[data-tech-modal-current-exp="true"]');
+    if (!expNode) {
+      return false;
+    }
+    expNode.textContent = tech.expToNext > 0 ? `${tech.exp}/${tech.expToNext}` : '已满层';
+    return true;
   }
 }

@@ -45,8 +45,13 @@ export class QuestPanel {
   private selectedQuestId?: string;
   private hasUserSelectedLine = false;
   private lastQuests: QuestState[] = [];
+  private lastStructureKey: string | null = null;
   private currentMapId?: string;
   private onNavigateToQuestGiver: ((x: number, y: number) => void) | null = null;
+
+  constructor() {
+    this.bindPaneEvents();
+  }
 
   setCallbacks(onNavigateToQuestGiver: (x: number, y: number) => void): void {
     this.onNavigateToQuestGiver = onNavigateToQuestGiver;
@@ -54,14 +59,22 @@ export class QuestPanel {
 
   setCurrentMapId(mapId?: string): void {
     this.currentMapId = mapId;
-    this.renderModal();
+    if (!this.patchModal()) {
+      this.renderModal();
+    }
   }
 
   /** 更新任务列表并刷新列表与弹层 */
   update(quests: QuestState[]): void {
     this.lastQuests = quests;
-    this.renderList();
-    this.renderModal();
+    this.normalizeState(quests);
+    const structureKey = this.buildStructureKey(quests);
+    if (this.lastStructureKey !== structureKey || !this.patchList()) {
+      this.renderList();
+    }
+    if (!this.patchModal()) {
+      this.renderModal();
+    }
   }
 
   initFromPlayer(player: PlayerState): void {
@@ -71,6 +84,7 @@ export class QuestPanel {
 
   clear(): void {
     this.lastQuests = [];
+    this.lastStructureKey = null;
     this.selectedQuestId = undefined;
     this.hasUserSelectedLine = false;
     this.pane.innerHTML = '<div class="empty-hint">暂无任务，和 NPC 交互可接取</div>';
@@ -81,25 +95,18 @@ export class QuestPanel {
     const quests = this.lastQuests;
     if (quests.length === 0) {
       this.selectedQuestId = undefined;
+      this.lastStructureKey = this.buildStructureKey(quests);
       this.pane.innerHTML = '<div class="empty-hint">暂无任务，和 NPC 交互可接取</div>';
       return;
     }
 
     const counts = this.buildCounts(quests);
-    if (!this.hasUserSelectedLine && counts[this.activeLine] === 0) {
-      this.activeLine = LINE_ORDER.find((line) => counts[line] > 0) ?? 'main';
-    }
-    if (this.selectedQuestId && !quests.some((quest) => quest.id === this.selectedQuestId)) {
-      this.selectedQuestId = undefined;
-    }
-
-    const visibleQuests = [...quests]
-      .filter((quest) => quest.line === this.activeLine)
-      .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
+    const visibleQuests = this.getVisibleQuests(quests);
+    this.lastStructureKey = this.buildStructureKey(quests);
 
     const tabs = LINE_ORDER.map((line) => {
       const active = this.activeLine === line ? 'active' : '';
-      return `<button class="quest-subtab-btn ${active}" data-quest-line="${line}" type="button">${LINE_TEXT[line]}<span class="quest-subtab-count">${counts[line]}</span></button>`;
+      return `<button class="quest-subtab-btn ${active}" data-quest-line="${line}" type="button">${LINE_TEXT[line]}<span class="quest-subtab-count" data-quest-line-count="${line}">${counts[line]}</span></button>`;
     }).join('');
 
     let html = `<div class="panel-section">
@@ -107,10 +114,9 @@ export class QuestPanel {
       <div class="quest-subtabs">${tabs}</div>`;
 
     if (visibleQuests.length === 0) {
-      html += `<div class="empty-hint">当前没有${LINE_TEXT[this.activeLine]}任务</div></div>`;
+      html += `<div class="empty-hint" data-quest-empty="true">当前没有${LINE_TEXT[this.activeLine]}任务</div></div>`;
       preserveSelection(this.pane, () => {
         this.pane.innerHTML = html;
-        this.bindListEvents();
       });
       return;
     }
@@ -121,14 +127,14 @@ export class QuestPanel {
       const nextStep = this.resolveNextStep(quest);
       html += `<button class="quest-card quest-card-toggle" data-quest-id="${escapeHtml(quest.id)}" type="button">
         <div class="quest-title-row">
-          <span class="quest-title">${escapeHtml(quest.title)}</span>
-          <span class="quest-status ${STATUS_CLASS[quest.status]}">${STATUS_TEXT[quest.status]}</span>
+          <span class="quest-title" data-quest-title="true">${escapeHtml(quest.title)}</span>
+          <span class="quest-status ${STATUS_CLASS[quest.status]}" data-quest-status="true">${STATUS_TEXT[quest.status]}</span>
         </div>
-        ${quest.chapter ? `<div class="quest-meta">章节：${escapeHtml(quest.chapter)}</div>` : ''}
-        <div class="quest-desc">${escapeHtml(quest.desc)}</div>
-        <div class="quest-progress-label">目标：${escapeHtml(progressText)}</div>
-        <div class="quest-progress-bar"><div class="quest-progress-fill" style="width:${percent}%"></div></div>
-        <div class="quest-meta">下一步：${escapeHtml(nextStep)}</div>
+        <div class="quest-meta ${quest.chapter ? '' : 'hidden'}" data-quest-chapter="true">章节：${escapeHtml(quest.chapter ?? '')}</div>
+        <div class="quest-desc" data-quest-desc="true">${escapeHtml(quest.desc)}</div>
+        <div class="quest-progress-label" data-quest-progress-label="true">目标：${escapeHtml(progressText)}</div>
+        <div class="quest-progress-bar"><div class="quest-progress-fill" data-quest-progress-fill="true" style="width:${percent}%"></div></div>
+        <div class="quest-meta" data-quest-next-step="true">下一步：${escapeHtml(nextStep)}</div>
         <div class="quest-expand-hint">点击查看详情</div>
       </button>`;
     }
@@ -136,31 +142,97 @@ export class QuestPanel {
     html += '</div>';
     preserveSelection(this.pane, () => {
       this.pane.innerHTML = html;
-      this.bindListEvents();
     });
   }
 
-  private bindListEvents(): void {
-    this.pane.querySelectorAll<HTMLElement>('[data-quest-line]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const line = button.dataset.questLine as QuestState['line'] | undefined;
+  private bindPaneEvents(): void {
+    this.pane.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const lineButton = target.closest<HTMLElement>('[data-quest-line]');
+      if (lineButton) {
+        const line = lineButton.dataset.questLine as QuestState['line'] | undefined;
         if (!line || line === this.activeLine) return;
         this.hasUserSelectedLine = true;
         this.activeLine = line;
         this.selectedQuestId = undefined;
         this.renderList();
         this.renderModal();
-      });
-    });
+        return;
+      }
 
-    this.pane.querySelectorAll<HTMLElement>('[data-quest-id]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const questId = button.dataset.questId;
-        if (!questId) return;
-        this.selectedQuestId = questId;
-        this.renderModal();
-      });
+      const questButton = target.closest<HTMLElement>('[data-quest-id]');
+      if (!questButton) {
+        return;
+      }
+      const questId = questButton.dataset.questId;
+      if (!questId) return;
+      this.selectedQuestId = questId;
+      this.renderModal();
     });
+  }
+
+  private patchList(): boolean {
+    const quests = this.lastQuests;
+    if (quests.length === 0) {
+      return false;
+    }
+
+    const counts = this.buildCounts(quests);
+    for (const line of LINE_ORDER) {
+      const button = this.pane.querySelector<HTMLElement>(`[data-quest-line="${line}"]`);
+      const countNode = this.pane.querySelector<HTMLElement>(`[data-quest-line-count="${line}"]`);
+      if (!button || !countNode) {
+        return false;
+      }
+      button.classList.toggle('active', this.activeLine === line);
+      countNode.textContent = `${counts[line]}`;
+    }
+
+    const visibleQuests = this.getVisibleQuests(quests);
+    if (visibleQuests.length === 0) {
+      const emptyNode = this.pane.querySelector<HTMLElement>('[data-quest-empty="true"]');
+      if (!emptyNode) {
+        return false;
+      }
+      emptyNode.textContent = `当前没有${LINE_TEXT[this.activeLine]}任务`;
+      this.lastStructureKey = this.buildStructureKey(quests);
+      return true;
+    }
+
+    for (const quest of visibleQuests) {
+      const card = this.pane.querySelector<HTMLElement>(`[data-quest-id="${CSS.escape(quest.id)}"]`);
+      if (!card) {
+        return false;
+      }
+      const titleNode = card.querySelector<HTMLElement>('[data-quest-title="true"]');
+      const statusNode = card.querySelector<HTMLElement>('[data-quest-status="true"]');
+      const chapterNode = card.querySelector<HTMLElement>('[data-quest-chapter="true"]');
+      const descNode = card.querySelector<HTMLElement>('[data-quest-desc="true"]');
+      const progressLabelNode = card.querySelector<HTMLElement>('[data-quest-progress-label="true"]');
+      const progressFillNode = card.querySelector<HTMLElement>('[data-quest-progress-fill="true"]');
+      const nextStepNode = card.querySelector<HTMLElement>('[data-quest-next-step="true"]');
+      if (!titleNode || !statusNode || !chapterNode || !descNode || !progressLabelNode || !progressFillNode || !nextStepNode) {
+        return false;
+      }
+
+      const percent = quest.required > 0 ? Math.min(100, Math.floor((quest.progress / quest.required) * 100)) : 0;
+      titleNode.textContent = quest.title;
+      statusNode.textContent = STATUS_TEXT[quest.status];
+      statusNode.className = `quest-status ${STATUS_CLASS[quest.status]}`;
+      chapterNode.textContent = `章节：${quest.chapter ?? ''}`;
+      chapterNode.classList.toggle('hidden', !quest.chapter);
+      descNode.textContent = quest.desc;
+      progressLabelNode.textContent = `目标：${this.resolveProgressText(quest)}`;
+      progressFillNode.style.width = `${percent}%`;
+      nextStepNode.textContent = `下一步：${this.resolveNextStep(quest)}`;
+    }
+
+    this.lastStructureKey = this.buildStructureKey(quests);
+    return true;
   }
 
   private renderModal(): void {
@@ -193,28 +265,31 @@ export class QuestPanel {
       title: quest.title,
       subtitle: `${LINE_TEXT[quest.line]} · ${STATUS_TEXT[quest.status]}`,
       bodyHtml: `
-        ${quest.chapter ? `<div class="quest-detail-section"><strong>章节</strong><span>${escapeHtml(quest.chapter)}</span></div>` : ''}
-        <div class="quest-detail-section"><strong>任务描述</strong><span>${escapeHtml(quest.desc)}</span></div>
-        ${quest.story ? `<div class="quest-detail-section"><strong>剧情</strong><span>${escapeHtml(quest.story)}</span></div>` : ''}
+        <div class="quest-detail-section ${quest.chapter ? '' : 'hidden'}" data-quest-modal-chapter-section="true"><strong>章节</strong><span data-quest-modal-chapter="true">${escapeHtml(quest.chapter ?? '')}</span></div>
+        <div class="quest-detail-section"><strong>任务描述</strong><span data-quest-modal-desc="true">${escapeHtml(quest.desc)}</span></div>
+        <div class="quest-detail-section ${quest.story ? '' : 'hidden'}" data-quest-modal-story-section="true"><strong>剧情</strong><span data-quest-modal-story="true">${escapeHtml(quest.story ?? '')}</span></div>
         <div class="quest-detail-grid">
-          <div class="quest-detail-section"><strong>发布者</strong><span>${escapeHtml(quest.giverName)}</span></div>
+          <div class="quest-detail-section"><strong>发布者</strong><span data-quest-modal-giver="true">${escapeHtml(quest.giverName)}</span></div>
           <div class="quest-detail-section">
             <strong>接取地点</strong>
             <div class="quest-detail-location-row">
-              <span>${escapeHtml(giverLocation)}</span>
+              <span data-quest-modal-location="true">${escapeHtml(giverLocation)}</span>
               <button
                 class="small-btn ghost quest-detail-nav-btn"
                 data-quest-navigate="true"
+                data-quest-giver-x="${quest.giverX ?? ''}"
+                data-quest-giver-y="${quest.giverY ?? ''}"
+                data-quest-can-navigate="${canNavigateToGiver ? '1' : '0'}"
                 type="button"
                 ${canNavigateToGiver ? '' : 'disabled'}
               >前往</button>
             </div>
           </div>
-          <div class="quest-detail-section"><strong>奖励</strong><span>${escapeHtml(quest.rewardText)}</span></div>
-          <div class="quest-detail-section"><strong>当前进度</strong><span>${escapeHtml(this.resolveProgressText(quest))}</span></div>
-          <div class="quest-detail-section"><strong>下一步</strong><span>${escapeHtml(this.resolveNextStep(quest))}</span></div>
+          <div class="quest-detail-section"><strong>奖励</strong><span data-quest-modal-reward="true">${escapeHtml(quest.rewardText)}</span></div>
+          <div class="quest-detail-section"><strong>当前进度</strong><span data-quest-modal-progress="true">${escapeHtml(this.resolveProgressText(quest))}</span></div>
+          <div class="quest-detail-section"><strong>下一步</strong><span data-quest-modal-next-step="true">${escapeHtml(this.resolveNextStep(quest))}</span></div>
         </div>
-        ${quest.objectiveText ? `<div class="quest-detail-section"><strong>任务说明</strong><span>${escapeHtml(quest.objectiveText)}</span></div>` : ''}
+        <div class="quest-detail-section ${quest.objectiveText ? '' : 'hidden'}" data-quest-modal-objective-section="true"><strong>任务说明</strong><span data-quest-modal-objective="true">${escapeHtml(quest.objectiveText ?? '')}</span></div>
       `,
       onClose: () => {
         this.selectedQuestId = undefined;
@@ -222,10 +297,120 @@ export class QuestPanel {
       onAfterRender: (body) => {
         body.querySelector<HTMLElement>('[data-quest-navigate]')?.addEventListener('click', (event) => {
           event.stopPropagation();
-          if (!canNavigateToGiver || quest.giverX === undefined || quest.giverY === undefined) return;
-          this.onNavigateToQuestGiver?.(quest.giverX, quest.giverY);
+          const button = event.currentTarget;
+          if (!(button instanceof HTMLElement) || button.dataset.questCanNavigate !== '1') return;
+          const x = Number(button.dataset.questGiverX);
+          const y = Number(button.dataset.questGiverY);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+          this.onNavigateToQuestGiver?.(x, y);
         });
       },
+    });
+  }
+
+  private patchModal(): boolean {
+    if (!this.selectedQuestId) {
+      detailModalHost.close(QuestPanel.MODAL_OWNER);
+      return true;
+    }
+    if (!detailModalHost.isOpenFor(QuestPanel.MODAL_OWNER)) {
+      return false;
+    }
+
+    const quest = this.lastQuests.find((entry) => entry.id === this.selectedQuestId);
+    if (!quest) {
+      this.selectedQuestId = undefined;
+      detailModalHost.close(QuestPanel.MODAL_OWNER);
+      return true;
+    }
+
+    const titleNode = document.getElementById('detail-modal-title');
+    const subtitleNode = document.getElementById('detail-modal-subtitle');
+    const chapterSection = document.querySelector<HTMLElement>('[data-quest-modal-chapter-section="true"]');
+    const chapterNode = document.querySelector<HTMLElement>('[data-quest-modal-chapter="true"]');
+    const descNode = document.querySelector<HTMLElement>('[data-quest-modal-desc="true"]');
+    const storySection = document.querySelector<HTMLElement>('[data-quest-modal-story-section="true"]');
+    const storyNode = document.querySelector<HTMLElement>('[data-quest-modal-story="true"]');
+    const giverNode = document.querySelector<HTMLElement>('[data-quest-modal-giver="true"]');
+    const locationNode = document.querySelector<HTMLElement>('[data-quest-modal-location="true"]');
+    const navigateButton = document.querySelector<HTMLButtonElement>('[data-quest-navigate="true"]');
+    const rewardNode = document.querySelector<HTMLElement>('[data-quest-modal-reward="true"]');
+    const progressNode = document.querySelector<HTMLElement>('[data-quest-modal-progress="true"]');
+    const nextStepNode = document.querySelector<HTMLElement>('[data-quest-modal-next-step="true"]');
+    const objectiveSection = document.querySelector<HTMLElement>('[data-quest-modal-objective-section="true"]');
+    const objectiveNode = document.querySelector<HTMLElement>('[data-quest-modal-objective="true"]');
+    if (
+      !titleNode
+      || !subtitleNode
+      || !chapterSection
+      || !chapterNode
+      || !descNode
+      || !storySection
+      || !storyNode
+      || !giverNode
+      || !locationNode
+      || !navigateButton
+      || !rewardNode
+      || !progressNode
+      || !nextStepNode
+      || !objectiveSection
+      || !objectiveNode
+    ) {
+      return false;
+    }
+
+    const canNavigateToGiver = Boolean(
+      quest.giverMapId
+      && this.currentMapId
+      && quest.giverMapId === this.currentMapId
+      && quest.giverX !== undefined
+      && quest.giverY !== undefined,
+    );
+    const giverLocation = quest.giverMapName && quest.giverX !== undefined && quest.giverY !== undefined
+      ? `${quest.giverMapName} (${quest.giverX}, ${quest.giverY})`
+      : quest.giverMapName ?? '未知';
+
+    titleNode.textContent = quest.title;
+    subtitleNode.textContent = `${LINE_TEXT[quest.line]} · ${STATUS_TEXT[quest.status]}`;
+    chapterSection.classList.toggle('hidden', !quest.chapter);
+    chapterNode.textContent = quest.chapter ?? '';
+    descNode.textContent = quest.desc;
+    storySection.classList.toggle('hidden', !quest.story);
+    storyNode.textContent = quest.story ?? '';
+    giverNode.textContent = quest.giverName;
+    locationNode.textContent = giverLocation;
+    navigateButton.disabled = !canNavigateToGiver;
+    navigateButton.dataset.questGiverX = `${quest.giverX ?? ''}`;
+    navigateButton.dataset.questGiverY = `${quest.giverY ?? ''}`;
+    navigateButton.dataset.questCanNavigate = canNavigateToGiver ? '1' : '0';
+    rewardNode.textContent = quest.rewardText;
+    progressNode.textContent = this.resolveProgressText(quest);
+    nextStepNode.textContent = this.resolveNextStep(quest);
+    objectiveSection.classList.toggle('hidden', !quest.objectiveText);
+    objectiveNode.textContent = quest.objectiveText ?? '';
+    return true;
+  }
+
+  private normalizeState(quests: QuestState[]): void {
+    const counts = this.buildCounts(quests);
+    if (!this.hasUserSelectedLine && counts[this.activeLine] === 0) {
+      this.activeLine = LINE_ORDER.find((line) => counts[line] > 0) ?? 'main';
+    }
+    if (this.selectedQuestId && !quests.some((quest) => quest.id === this.selectedQuestId)) {
+      this.selectedQuestId = undefined;
+    }
+  }
+
+  private getVisibleQuests(quests: QuestState[]): QuestState[] {
+    return [...quests]
+      .filter((quest) => quest.line === this.activeLine)
+      .sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]);
+  }
+
+  private buildStructureKey(quests: QuestState[]): string {
+    return JSON.stringify({
+      activeLine: this.activeLine,
+      quests: this.getVisibleQuests(quests).map((quest) => quest.id),
     });
   }
 

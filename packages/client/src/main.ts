@@ -24,6 +24,7 @@ import { WorldPanel } from './ui/panels/world-panel';
 import { SuggestionPanel } from './ui/suggestion-panel';
 import { ChangelogPanel } from './ui/changelog-panel';
 import { Minimap } from './ui/minimap';
+import { createClientPanelSystem } from './ui/panel-system/bootstrap';
 
 import { FloatingTooltip } from './ui/floating-tooltip';
 import { detailModalHost } from './ui/detail-modal-host';
@@ -301,6 +302,7 @@ const settingsPanel = new SettingsPanel();
 const suggestionPanel = new SuggestionPanel(socket);
 new ChangelogPanel();
 const minimap = new Minimap();
+const panelSystem = createClientPanelSystem(window);
 minimap.setMoveHandler((x, y) => {
   planPathTo({ x, y });
 });
@@ -1270,7 +1272,7 @@ socket.onEquipmentUpdate((data) => {
 socket.onTechniqueUpdate((data) => {
   const mergedTechniques = mergeTechniqueStates(data.techniques);
   const shouldRefreshTechniquePanel = !myPlayer
-    || buildTechniqueRenderSignature(myPlayer.techniques, myPlayer.cultivatingTechId) !== buildTechniqueRenderSignature(mergedTechniques, data.cultivatingTechId);
+    || buildTechniqueStructureSignature(myPlayer.techniques, myPlayer.cultivatingTechId) !== buildTechniqueStructureSignature(mergedTechniques, data.cultivatingTechId);
   if (myPlayer) {
     myPlayer.techniques = mergedTechniques;
     myPlayer.cultivatingTechId = data.cultivatingTechId;
@@ -1278,6 +1280,8 @@ socket.onTechniqueUpdate((data) => {
   if (shouldRefreshTechniquePanel) {
     techniquePanel.update(mergedTechniques, data.cultivatingTechId, myPlayer ?? undefined);
     refreshUiChrome();
+  } else {
+    techniquePanel.syncDynamic(mergedTechniques, data.cultivatingTechId, myPlayer ?? undefined);
   }
 });
 socket.onActionsUpdate((data) => {
@@ -1368,6 +1372,7 @@ socket.onDisconnect((reason) => {
   if (reason === 'io client disconnect') return;
   clearPendingSocketPing();
   renderPingLatency(null, navigator.onLine ? '重连' : '断网');
+  panelSystem.store.setRuntime({ connected: false });
   if (myPlayer) {
     showToast('连接已断开，正在尝试恢复');
   }
@@ -1403,6 +1408,7 @@ let visibleGroundPiles = new Map<string, GroundItemPileView>();
 // 视野中心平滑值（浮点格子坐标），无延迟快速 lerp
 let viewCenterX = 0;
 let viewCenterY = 0;
+let pendingLayoutViewportSync = false;
 const VIEW_LERP_SPEED = 12;
 
 // 世界地图缓存：key = "x,y" → Tile
@@ -1448,7 +1454,7 @@ function refreshZoomChrome(zoom = getZoom()) {
 function refreshZoomViewport() {
   syncDisplayMetrics();
   if (myPlayer) {
-    camera.snap(myPlayer);
+    snapCameraToPlayer();
   }
   renderer.updateEntities(latestEntities);
 }
@@ -1477,15 +1483,13 @@ function buildActionRenderSignature(actions: ActionDef[]): string {
   })));
 }
 
-function buildTechniqueRenderSignature(techniques: TechniqueState[], cultivatingTechId?: string): string {
+function buildTechniqueStructureSignature(techniques: TechniqueState[], cultivatingTechId?: string): string {
   return JSON.stringify({
     cultivatingTechId: cultivatingTechId ?? null,
     techniques: techniques.map((technique) => ({
       techId: technique.techId,
       name: technique.name,
       level: technique.level,
-      exp: technique.exp,
-      expToNext: technique.expToNext,
       realm: technique.realm,
       grade: technique.grade,
       skills: technique.skills.map((skill) => skill.id),
@@ -1622,6 +1626,27 @@ function syncDisplayMetrics(): void {
   updateDisplayMetrics(canvas.width, canvas.height, baseRadius);
 }
 
+function snapCameraToPlayer(): void {
+  if (!myPlayer) {
+    return;
+  }
+  camera.snap(myPlayer);
+  viewCenterX = myPlayer.x;
+  viewCenterY = myPlayer.y;
+}
+
+function scheduleLayoutViewportSync(): void {
+  if (pendingLayoutViewportSync) {
+    return;
+  }
+  pendingLayoutViewportSync = true;
+  requestAnimationFrame(() => {
+    pendingLayoutViewportSync = false;
+    resizeCanvas();
+    snapCameraToPlayer();
+  });
+}
+
 function clearCurrentPath() {
   pathCells = [];
   pathTarget = null;
@@ -1677,6 +1702,12 @@ function resetGameState() {
   lootPanel.clear();
   worldPanel.clear();
   minimap.clear();
+  panelSystem.store.setRuntime({
+    connected: false,
+    playerId: null,
+    mapId: null,
+    shellVisible: false,
+  });
   resizeCanvas();
   document.getElementById('hud')?.classList.add('hidden');
 }
@@ -1743,9 +1774,16 @@ const keyboard = new KeyboardInput((dirs: Direction[]) => {
 
 renderer.init(canvas);
 sidePanel.setVisibilityChangeCallback((visible) => {
+  panelSystem.store.setRuntime({ shellVisible: visible });
   if (visible) {
-    requestAnimationFrame(() => resizeCanvas());
+    scheduleLayoutViewportSync();
   }
+});
+sidePanel.setLayoutChangeCallback(() => {
+  if (!sidePanel.isVisible()) {
+    return;
+  }
+  scheduleLayoutViewportSync();
 });
 
 function resizeCanvas() {
@@ -1935,9 +1973,7 @@ socket.onInit((data: S2C_Init) => {
   syncMinimap();
 
   syncDisplayMetrics();
-  camera.snap(myPlayer);
-  viewCenterX = myPlayer.x;
-  viewCenterY = myPlayer.y;
+  snapCameraToPlayer();
 
   const entities = data.players.map(toObservedEntity);
   latestTechniqueMap = new Map((myPlayer.techniques ?? []).map((technique) => [technique.techId, cloneJson(technique)]));
@@ -1956,6 +1992,12 @@ socket.onInit((data: S2C_Init) => {
   document.getElementById('hud')?.classList.remove('hidden');
   resizeCanvas();
   refreshZoomChrome();
+  panelSystem.store.setRuntime({
+    connected: true,
+    playerId: myPlayer.id,
+    mapId: myPlayer.mapId,
+    shellVisible: true,
+  });
   attrPanel.initFromPlayer(myPlayer);
   inventoryPanel.initFromPlayer(myPlayer);
   equipmentPanel.initFromPlayer(myPlayer);
@@ -2018,6 +2060,7 @@ socket.onTick((data: S2C_Tick) => {
       renderer.resetScene();
     }
     myPlayer.mapId = data.m;
+    panelSystem.store.setRuntime({ mapId: myPlayer.mapId });
     questPanel.setCurrentMapId(myPlayer.mapId);
     if (mapChanged) {
       currentMinimap = (myPlayer.unlockedMinimapIds ?? []).includes(myPlayer.mapId)

@@ -93,18 +93,24 @@ export class InventoryPanel {
   private tooltip = new FloatingTooltip('floating-tooltip inventory-tooltip');
   private activeFilter: InventoryFilter = 'all';
   private lastInventory: Inventory | null = null;
+  private lastStructureKey: string | null = null;
   private selectedSlotIndex: number | null = null;
   private selectedItemKey: string | null = null;
+  private tooltipCell: HTMLElement | null = null;
 
   constructor() {
     this.ensureTooltipStyle();
+    this.bindPaneEvents();
+    this.bindTooltipEvents();
   }
 
   clear(): void {
     this.activeFilter = 'all';
     this.lastInventory = null;
+    this.lastStructureKey = null;
     this.selectedSlotIndex = null;
     this.selectedItemKey = null;
+    this.tooltipCell = null;
     this.tooltip.hide();
     this.pane.innerHTML = '<div class="empty-hint">背包空空如也</div>';
     detailModalHost.close(InventoryPanel.MODAL_OWNER);
@@ -125,73 +131,60 @@ export class InventoryPanel {
   /** 更新背包数据并刷新列表与弹层 */
   update(inventory: Inventory): void {
     this.lastInventory = inventory;
-    this.render(inventory);
-    this.renderModal();
+    const structureKey = this.buildStructureKey(inventory);
+    if (this.lastStructureKey !== structureKey || !this.patchList(inventory)) {
+      this.render(inventory);
+    }
+    if (!this.patchModal()) {
+      this.renderModal();
+    }
   }
 
   initFromPlayer(player: PlayerState): void {
-    this.lastInventory = player.inventory;
-    this.render(player.inventory);
-    this.renderModal();
+    this.update(player.inventory);
   }
 
   private render(inventory: Inventory): void {
     this.lastInventory = inventory;
-    const visibleItems = inventory.items
-      .map((item, slotIndex) => ({ item, slotIndex }))
-      .filter(({ item }) => this.activeFilter === 'all' || item.type === this.activeFilter);
+    const visibleItems = this.getVisibleItems(inventory);
+    this.lastStructureKey = this.buildStructureKey(inventory);
 
     let html = `<div class="panel-section">
       <div class="inventory-panel-head">
-        <div class="panel-section-title">背包 (${inventory.items.length}/${inventory.capacity})</div>
+        <div class="panel-section-title" data-inventory-title="true">背包 (${inventory.items.length}/${inventory.capacity})</div>
         <button class="small-btn" data-sort-inventory type="button">一键整理</button>
       </div>
       <div class="inventory-filter-tabs">`;
 
     for (const tab of FILTER_TABS) {
-      html += `<button class="inventory-filter-tab ${this.activeFilter === tab.id ? 'active' : ''}" data-filter="${tab.id}" type="button">${tab.label}</button>`;
+      html += `<button class="inventory-filter-tab ${this.activeFilter === tab.id ? 'active' : ''}" data-filter-button="${tab.id}" data-filter="${tab.id}" type="button">${tab.label}</button>`;
     }
 
     html += '</div>';
 
     if (visibleItems.length === 0) {
-      html += `<div class="empty-hint">${inventory.items.length === 0 ? '背包空空如也' : '当前分类暂无物品'}</div>`;
+      html += `<div class="empty-hint" data-inventory-empty="true">${inventory.items.length === 0 ? '背包空空如也' : '当前分类暂无物品'}</div>`;
       html += '</div>';
       preserveSelection(this.pane, () => {
         this.pane.innerHTML = html;
-        this.bindActions();
       });
       return;
     }
 
-    html += '<div class="inventory-grid">';
+    html += '<div class="inventory-grid" data-inventory-grid="true">';
 
     visibleItems.forEach(({ item, slotIndex }) => {
-      const attrLines = item.equipAttrs
-        ? Object.entries(item.equipAttrs).map(([key, value]) => `${ATTR_LABELS[key] ?? key} +${value}`)
-        : [];
-      const statLines = item.equipStats
-        ? Object.entries(item.equipStats)
-          .filter(([, value]) => typeof value === 'number' && value !== 0)
-          .map(([key, value]) => `${STAT_LABELS[key] ?? key} +${formatBonusValue(key, value as number)}`)
-        : [];
-      const tooltipLines = [
-        item.desc,
-        `类型：${ITEM_TYPE_LABELS[item.type] ?? item.type}`,
-        item.equipSlot ? `部位：${SLOT_LABELS[item.equipSlot] ?? item.equipSlot}` : '',
-        ...attrLines,
-        ...statLines,
-      ].filter((line) => line.length > 0);
+      const tooltip = this.buildTooltipPayload(item);
       const nameClass = this.getNameClass(item.name);
       const primaryAction = this.getPrimaryAction(item);
-      html += `<div class="inventory-cell" data-open-item="${slotIndex}" data-tooltip-title="${this.escapeHtml(item.name)}" data-tooltip-detail="${this.escapeHtml(tooltipLines.join('\n'))}">
+      html += `<div class="inventory-cell" data-open-item="${slotIndex}" data-item-slot="${slotIndex}" data-item-key="${this.escapeHtml(this.getItemIdentity(item))}" data-tooltip-title="${this.escapeHtml(tooltip.title)}" data-tooltip-detail="${this.escapeHtml(tooltip.detail)}">
         <div class="inventory-cell-head">
-          <span class="inventory-cell-type">${ITEM_TYPE_LABELS[item.type] ?? item.type}</span>
-          <span class="inventory-cell-count">x${item.count}</span>
+          <span class="inventory-cell-type" data-item-type="true">${ITEM_TYPE_LABELS[item.type] ?? item.type}</span>
+          <span class="inventory-cell-count" data-item-count="true">x${item.count}</span>
         </div>
-        <div class="inventory-cell-name ${nameClass}" title="${this.escapeHtml(item.name)}">${this.escapeHtml(item.name)}</div>
+        <div class="inventory-cell-name ${nameClass}" data-item-name="true" title="${this.escapeHtml(item.name)}">${this.escapeHtml(item.name)}</div>
         <div class="inventory-cell-actions">
-          ${primaryAction ? `<button class="small-btn" data-inline-primary="${slotIndex}" type="button">${primaryAction.label}</button>` : ''}
+          ${primaryAction ? `<button class="small-btn" data-inline-primary="${slotIndex}" data-item-primary="true" type="button">${primaryAction.label}</button>` : ''}
           <button class="small-btn danger" data-inline-drop="${slotIndex}" type="button">删除</button>
         </div>
       </div>`;
@@ -200,15 +193,19 @@ export class InventoryPanel {
     html += '</div></div>';
     preserveSelection(this.pane, () => {
       this.pane.innerHTML = html;
-      this.bindTooltips();
-      this.bindActions();
     });
   }
 
-  private bindActions(): void {
-    this.pane.querySelectorAll<HTMLElement>('[data-filter]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const filter = btn.dataset.filter as InventoryFilter | undefined;
+  private bindPaneEvents(): void {
+    this.pane.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const filterButton = target.closest<HTMLElement>('[data-filter-button]');
+      if (filterButton) {
+        const filter = filterButton.dataset.filter as InventoryFilter | undefined;
         if (!filter || filter === this.activeFilter) {
           return;
         }
@@ -216,28 +213,18 @@ export class InventoryPanel {
         if (this.lastInventory) {
           this.render(this.lastInventory);
         }
-      });
-    });
-    this.pane.querySelector<HTMLElement>('[data-sort-inventory]')?.addEventListener('click', () => {
-      this.onSortInventory?.();
-    });
-    this.pane.querySelectorAll<HTMLElement>('[data-open-item]').forEach((cell) => {
-      cell.addEventListener('click', () => {
-        const rawIndex = cell.dataset.openItem;
-        if (!rawIndex) {
-          return;
-        }
-        this.selectedSlotIndex = parseInt(rawIndex, 10);
-        const item = this.lastInventory?.items[this.selectedSlotIndex];
-        this.selectedItemKey = item ? this.getItemIdentity(item) : null;
-        this.tooltip.hide();
-        this.renderModal();
-      });
-    });
-    this.pane.querySelectorAll<HTMLElement>('[data-inline-primary]').forEach((button) => {
-      button.addEventListener('click', (event) => {
+        return;
+      }
+
+      if (target.closest('[data-sort-inventory]')) {
+        this.onSortInventory?.();
+        return;
+      }
+
+      const primaryButton = target.closest<HTMLElement>('[data-inline-primary]');
+      if (primaryButton) {
         event.stopPropagation();
-        const rawIndex = button.dataset.inlinePrimary;
+        const rawIndex = primaryButton.dataset.inlinePrimary;
         if (!rawIndex) {
           return;
         }
@@ -252,23 +239,41 @@ export class InventoryPanel {
           return;
         }
         this.onUseItem?.(slotIndex);
-      });
-    });
-    this.pane.querySelectorAll<HTMLElement>('[data-inline-drop]').forEach((button) => {
-      button.addEventListener('click', (event) => {
+        return;
+      }
+
+      const dropButton = target.closest<HTMLElement>('[data-inline-drop]');
+      if (dropButton) {
         event.stopPropagation();
-        const rawIndex = button.dataset.inlineDrop;
+        const rawIndex = dropButton.dataset.inlineDrop;
         if (!rawIndex) {
           return;
         }
         this.onDropItem?.(parseInt(rawIndex, 10), 1);
-      });
+        return;
+      }
+
+      const cell = target.closest<HTMLElement>('[data-open-item]');
+      if (!cell) {
+        return;
+      }
+      const rawIndex = cell.dataset.openItem;
+      if (!rawIndex) {
+        return;
+      }
+      this.selectedSlotIndex = parseInt(rawIndex, 10);
+      const item = this.lastInventory?.items[this.selectedSlotIndex];
+      this.selectedItemKey = item ? this.getItemIdentity(item) : null;
+      this.tooltip.hide();
+      this.tooltipCell = null;
+      this.renderModal();
     });
   }
 
-  private bindTooltips(): void {
-    const cells = this.pane.querySelectorAll<HTMLElement>('.inventory-cell');
-    const show = (title: string, detail: string, event: PointerEvent) => {
+  private bindTooltipEvents(): void {
+    const show = (cell: HTMLElement, event: PointerEvent) => {
+      const title = cell.dataset.tooltipTitle ?? '';
+      const detail = cell.dataset.tooltipDetail ?? '';
       const lines = detail
         .split('\n')
         .map((line) => line.trim())
@@ -276,16 +281,42 @@ export class InventoryPanel {
       this.tooltip.show(title, lines, event.clientX, event.clientY);
     };
 
-    cells.forEach((cell) => {
-      const title = cell.dataset.tooltipTitle ?? '';
-      const detail = cell.dataset.tooltipDetail ?? '';
-      cell.addEventListener('pointerenter', (event) => show(title, detail, event));
-      cell.addEventListener('pointermove', (event) => {
-        this.tooltip.move(event.clientX, event.clientY);
-      });
-      cell.addEventListener('pointerleave', () => {
+    this.pane.addEventListener('pointermove', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        if (this.tooltipCell) {
+          this.tooltipCell = null;
+          this.tooltip.hide();
+        }
+        return;
+      }
+
+      const cell = target.closest<HTMLElement>('.inventory-cell');
+      if (!cell) {
+        if (this.tooltipCell) {
+          this.tooltipCell = null;
+          this.tooltip.hide();
+        }
+        return;
+      }
+
+      if (this.tooltipCell !== cell) {
+        this.tooltipCell = cell;
+        show(cell, event);
+        return;
+      }
+
+      this.tooltip.move(event.clientX, event.clientY);
+    });
+    this.pane.addEventListener('pointerleave', () => {
+      this.tooltipCell = null;
+      this.tooltip.hide();
+    });
+    this.pane.addEventListener('pointerdown', () => {
+      if (this.tooltipCell) {
+        this.tooltipCell = null;
         this.tooltip.hide();
-      });
+      }
     });
   }
 
@@ -364,24 +395,24 @@ export class InventoryPanel {
         <div class="quest-detail-grid inventory-detail-grid">
           <div class="quest-detail-section">
             <strong>物品类型</strong>
-            <span>${this.escapeHtml(ITEM_TYPE_LABELS[item.type] ?? item.type)}</span>
+            <span data-inventory-modal-type="true">${this.escapeHtml(ITEM_TYPE_LABELS[item.type] ?? item.type)}</span>
           </div>
           <div class="quest-detail-section">
             <strong>当前数量</strong>
-            <span>x${item.count}</span>
+            <span data-inventory-modal-count="true">x${item.count}</span>
           </div>
           ${item.equipSlot ? `<div class="quest-detail-section">
             <strong>装备部位</strong>
-            <span>${this.escapeHtml(SLOT_LABELS[item.equipSlot] ?? item.equipSlot)}</span>
+            <span data-inventory-modal-slot="true">${this.escapeHtml(SLOT_LABELS[item.equipSlot] ?? item.equipSlot)}</span>
           </div>` : ''}
         </div>
         <div class="quest-detail-section">
           <strong>物品说明</strong>
-          <span>${this.escapeHtml(item.desc)}</span>
+          <span data-inventory-modal-desc="true">${this.escapeHtml(item.desc)}</span>
         </div>
         ${bonusLines.length > 0 ? `<div class="quest-detail-section">
           <strong>附加词条</strong>
-          <span>${this.escapeHtml(bonusLines.join(' / '))}</span>
+          <span data-inventory-modal-bonuses="true">${this.escapeHtml(bonusLines.join(' / '))}</span>
         </div>` : ''}
         <div class="inventory-detail-actions">
           ${primaryAction ? `<button class="small-btn" data-inventory-primary="true" type="button">${primaryAction.label}</button>` : ''}
@@ -407,6 +438,109 @@ export class InventoryPanel {
         });
       },
     });
+  }
+
+  private patchList(inventory: Inventory): boolean {
+    const titleNode = this.pane.querySelector<HTMLElement>('[data-inventory-title="true"]');
+    if (!titleNode) {
+      return false;
+    }
+    titleNode.textContent = `背包 (${inventory.items.length}/${inventory.capacity})`;
+
+    for (const tab of FILTER_TABS) {
+      const button = this.pane.querySelector<HTMLElement>(`[data-filter-button="${CSS.escape(tab.id)}"]`);
+      if (!button) {
+        return false;
+      }
+      button.classList.toggle('active', this.activeFilter === tab.id);
+    }
+
+    const visibleItems = this.getVisibleItems(inventory);
+    if (visibleItems.length === 0) {
+      const emptyNode = this.pane.querySelector<HTMLElement>('[data-inventory-empty="true"]');
+      if (!emptyNode) {
+        return false;
+      }
+      emptyNode.textContent = inventory.items.length === 0 ? '背包空空如也' : '当前分类暂无物品';
+      this.lastStructureKey = this.buildStructureKey(inventory);
+      return true;
+    }
+
+    const grid = this.pane.querySelector<HTMLElement>('[data-inventory-grid="true"]');
+    if (!grid) {
+      return false;
+    }
+
+    for (const { item, slotIndex } of visibleItems) {
+      const cell = grid.querySelector<HTMLElement>(`[data-item-slot="${CSS.escape(String(slotIndex))}"]`);
+      if (!cell) {
+        return false;
+      }
+
+      const typeNode = cell.querySelector<HTMLElement>('[data-item-type="true"]');
+      const countNode = cell.querySelector<HTMLElement>('[data-item-count="true"]');
+      const nameNode = cell.querySelector<HTMLElement>('[data-item-name="true"]');
+      if (!typeNode || !countNode || !nameNode) {
+        return false;
+      }
+
+      const tooltip = this.buildTooltipPayload(item);
+      const primaryAction = this.getPrimaryAction(item);
+      const primaryButton = cell.querySelector<HTMLButtonElement>('[data-item-primary="true"]');
+
+      cell.dataset.itemKey = this.getItemIdentity(item);
+      cell.dataset.tooltipTitle = tooltip.title;
+      cell.dataset.tooltipDetail = tooltip.detail;
+      typeNode.textContent = ITEM_TYPE_LABELS[item.type] ?? item.type;
+      countNode.textContent = `x${item.count}`;
+      nameNode.textContent = item.name;
+      nameNode.title = item.name;
+      nameNode.className = `inventory-cell-name ${this.getNameClass(item.name)}`.trim();
+
+      if (primaryAction) {
+        if (!primaryButton) {
+          return false;
+        }
+        primaryButton.textContent = primaryAction.label;
+        primaryButton.dataset.inlinePrimary = String(slotIndex);
+      } else if (primaryButton) {
+        return false;
+      }
+    }
+
+    this.lastStructureKey = this.buildStructureKey(inventory);
+    return true;
+  }
+
+  private patchModal(): boolean {
+    if (!this.lastInventory || !this.selectedItemKey) {
+      detailModalHost.close(InventoryPanel.MODAL_OWNER);
+      return true;
+    }
+    if (!detailModalHost.isOpenFor(InventoryPanel.MODAL_OWNER)) {
+      return false;
+    }
+
+    const resolved = this.resolveSelectedItem(this.lastInventory);
+    if (!resolved) {
+      this.closeModal();
+      return true;
+    }
+
+    const { item } = resolved;
+    const subtitleNode = document.getElementById('detail-modal-subtitle');
+    const typeNode = document.querySelector<HTMLElement>('[data-inventory-modal-type="true"]');
+    const countNode = document.querySelector<HTMLElement>('[data-inventory-modal-count="true"]');
+    const descNode = document.querySelector<HTMLElement>('[data-inventory-modal-desc="true"]');
+    if (!subtitleNode || !typeNode || !countNode || !descNode) {
+      return false;
+    }
+
+    subtitleNode.textContent = `${ITEM_TYPE_LABELS[item.type] ?? item.type} · 数量 x${item.count}`;
+    typeNode.textContent = ITEM_TYPE_LABELS[item.type] ?? item.type;
+    countNode.textContent = `x${item.count}`;
+    descNode.textContent = item.desc;
+    return true;
   }
 
   private resolveSelectedItem(inventory: Inventory): { item: ItemStack; slotIndex: number } | null {
@@ -461,9 +595,49 @@ export class InventoryPanel {
     return createItemStackSignature(item);
   }
 
+  private getVisibleItems(inventory: Inventory): Array<{ item: ItemStack; slotIndex: number }> {
+    return inventory.items
+      .map((item, slotIndex) => ({ item, slotIndex }))
+      .filter(({ item }) => this.activeFilter === 'all' || item.type === this.activeFilter);
+  }
+
+  private buildStructureKey(inventory: Inventory): string {
+    return JSON.stringify({
+      filter: this.activeFilter,
+      items: this.getVisibleItems(inventory).map(({ item, slotIndex }) => ({
+        slotIndex,
+        identity: this.getItemIdentity(item),
+      })),
+    });
+  }
+
+  private buildTooltipPayload(item: ItemStack): { title: string; detail: string } {
+    const attrLines = item.equipAttrs
+      ? Object.entries(item.equipAttrs).map(([key, value]) => `${ATTR_LABELS[key] ?? key} +${value}`)
+      : [];
+    const statLines = item.equipStats
+      ? Object.entries(item.equipStats)
+        .filter(([, value]) => typeof value === 'number' && value !== 0)
+        .map(([key, value]) => `${STAT_LABELS[key] ?? key} +${formatBonusValue(key, value as number)}`)
+      : [];
+    const detail = [
+      item.desc,
+      `类型：${ITEM_TYPE_LABELS[item.type] ?? item.type}`,
+      item.equipSlot ? `部位：${SLOT_LABELS[item.equipSlot] ?? item.equipSlot}` : '',
+      ...attrLines,
+      ...statLines,
+    ].filter((line) => line.length > 0).join('\n');
+
+    return {
+      title: item.name,
+      detail,
+    };
+  }
+
   private closeModal(): void {
     this.selectedSlotIndex = null;
     this.selectedItemKey = null;
+    this.tooltipCell = null;
     detailModalHost.close(InventoryPanel.MODAL_OWNER);
   }
 

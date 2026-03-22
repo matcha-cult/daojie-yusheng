@@ -45,7 +45,9 @@ export function updateDisplayMetrics(viewportWidth: number, viewportHeight: numb
   const safeHeight = Math.max(1, viewportHeight);
   const targetRadius = getDisplayRadius(baseRadius);
   const diameter = targetRadius * 2 + 1;
-  cellSize = Math.max(1, Math.min(safeWidth, safeHeight) / diameter);
+  const desiredCellSize = BASE_CELL_SIZE * (zoom / DEFAULT_ZOOM);
+  const fitCellSize = Math.min(safeWidth, safeHeight) / diameter;
+  cellSize = Math.max(1, Math.min(desiredCellSize, fitCellSize));
   displayRangeX = Math.max(targetRadius, Math.ceil(safeWidth / (cellSize * 2)));
   displayRangeY = Math.max(targetRadius, Math.ceil(safeHeight / (cellSize * 2)));
 }
