@@ -2,7 +2,7 @@
   {
     "id": "redflame_art",
     "name": "赤焰诀",
-    "grade": "mystic",
+    "grade": "yellow",
     "layers": [
       { "level": 1, "expFactor": 90, "attrs": { "spirit": 3, "comprehension": 1 } },
       { "level": 2, "expFactor": 96, "attrs": { "spirit": 3, "comprehension": 1 } },
@@ -14,8 +14,7 @@
       { "level": 8, "expFactor": 171, "attrs": { "spirit": 4, "comprehension": 2 } },
       { "level": 9, "expFactor": 192, "attrs": { "spirit": 4, "comprehension": 2 } },
       { "level": 10, "expFactor": 216, "attrs": { "spirit": 4, "comprehension": 2 } },
-      { "level": 11, "expFactor": 243, "attrs": { "spirit": 5, "comprehension": 2 } },
-      { "level": 12, "expFactor": 0, "attrs": { "spirit": 5, "comprehension": 3 } }
+      { "level": 11, "expFactor": 0, "attrs": { "spirit": 5, "comprehension": 2 } }
     ],
     "skills": [
       {
@@ -31,11 +30,22 @@
             "damageKind": "spell",
             "element": "fire",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                24,
-                { "var": "techLevel", "scale": 2.5 },
-                { "var": "caster.stat.spellAtk", "scale": 1.05 }
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.spellAtk", "scale": 1.05 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 }
+                  ]
+                }
               ]
             }
           },
@@ -49,22 +59,121 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#ef6b3b",
-            "duration": 3,
-            "maxStacks": 3,
+            "duration": 12,
+            "maxStacks": 10,
             "stats": {
-              "spellDef": -8,
-              "resolvePower": -10
+              "spellDef": -3,
+              "resolvePower": -3
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.blazing_thread",
+        "name": "赤线灼脉",
+        "desc": "将离火牵成一线贯入敌阵，烧过之处更容易留下灼印。",
+        "cooldown": 26,
+        "cost": 9,
+        "range": 3,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 3
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "fire",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    { "var": "caster.stat.spellAtk", "scale": 1.1 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 },
+                    { "var": "target.buff.buff.fire_talisman_burn.stacks", "scale": 0.02 }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.fire_talisman_burn",
+            "name": "灼印",
+            "desc": "火印未熄，法抗与化解被持续灼穿。",
+            "shortMark": "灼",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#ef6b3b",
+            "duration": 12,
+            "maxStacks": 10,
+            "stats": {
+              "spellDef": -3,
+              "resolvePower": -3
+            }
+          }
+        ],
+        "unlockLevel": 5
+      },
+      {
+        "id": "skill.burning_heart",
+        "name": "焚心诀",
+        "desc": "先前埋下的火意一并炸开，最适合拿来收尾压血线。",
+        "cooldown": 44,
+        "cost": 13,
+        "range": 4,
+        "targeting": {
+          "shape": "area",
+          "radius": 1,
+          "maxTargets": 4
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "fire",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    30,
+                    { "var": "caster.stat.spellAtk", "scale": 1.65 },
+                    { "var": "target.maxHp", "scale": 0.02 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "target.buff.buff.fire_talisman_burn.stacks", "scale": 0.06 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 9
       }
     ]
   },
   {
     "id": "thunder_palm",
     "name": "惊雷掌",
-    "grade": "earth",
+    "grade": "mystic",
     "layers": [
       { "level": 1, "expFactor": 270, "attrs": { "constitution": 4, "spirit": 3, "perception": 1 } },
       { "level": 2, "expFactor": 288, "attrs": { "constitution": 4, "spirit": 3, "perception": 1 } },
@@ -99,12 +208,23 @@
             "damageKind": "spell",
             "element": "metal",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                20,
-                { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.spellAtk", "scale": 0.95 },
-                { "var": "caster.stat.breakPower", "scale": 0.6 }
+                {
+                  "op": "add",
+                  "args": [
+                    20,
+                    { "var": "caster.stat.spellAtk", "scale": 1.2 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 },
+                    { "var": "caster.stat.breakPower", "scale": 0.008 }
+                  ]
+                }
               ]
             }
           },
@@ -118,23 +238,64 @@
             "category": "buff",
             "visibility": "public",
             "color": "#d6c34a",
-            "duration": 3,
-            "maxStacks": 2,
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "hit": 10,
-              "crit": 20,
-              "breakPower": 14
+              "hit": 3,
+              "crit": 5,
+              "breakPower": 4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.rushing_thunder",
+        "name": "奔雷贯心",
+        "desc": "先以雷势逼出破绽，再把后继掌力整段贯进敌阵中央。",
+        "cooldown": 42,
+        "cost": 13,
+        "range": 3,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 4
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "metal",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    30,
+                    { "var": "caster.stat.spellAtk", "scale": 2.0 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.thunder_palm_force.stacks", "scale": 0.06 },
+                    { "var": "caster.stat.breakPower", "scale": 0.01 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 7
       }
     ]
   },
   {
     "id": "cloud_blade",
     "name": "流云刀谱",
-    "grade": "mystic",
+    "grade": "yellow",
     "layers": [
       { "level": 1, "expFactor": 105, "attrs": { "perception": 3, "constitution": 1 } },
       { "level": 2, "expFactor": 114, "attrs": { "perception": 3, "constitution": 1 } },
@@ -146,8 +307,7 @@
       { "level": 8, "expFactor": 228, "attrs": { "perception": 4, "constitution": 2 } },
       { "level": 9, "expFactor": 252, "attrs": { "perception": 4, "constitution": 2 } },
       { "level": 10, "expFactor": 279, "attrs": { "perception": 4, "constitution": 2 } },
-      { "level": 11, "expFactor": 312, "attrs": { "perception": 5, "constitution": 2 } },
-      { "level": 12, "expFactor": 0, "attrs": { "perception": 5, "constitution": 3 } }
+      { "level": 11, "expFactor": 0, "attrs": { "perception": 5, "constitution": 2 } }
     ],
     "skills": [
       {
@@ -172,14 +332,14 @@
                   "op": "add",
                   "args": [
                     22,
-                    { "var": "techLevel", "scale": 2.6 },
-                    { "var": "caster.stat.physAtk", "scale": 1.05 }
+                    { "var": "caster.stat.physAtk", "scale": 0.6 }
                   ]
                 },
                 {
                   "op": "add",
                   "args": [
                     1,
+                    { "var": "techLevel", "scale": 0.08 },
                     { "var": "caster.stat.moveSpeed", "scale": 0.01 }
                   ]
                 }
@@ -189,23 +349,81 @@
           {
             "type": "buff",
             "target": "self",
-            "buffId": "buff.cloud_blade_flow",
-            "name": "流云",
-            "desc": "刀随身走，短时间提升移速、闪避与暴击。",
-            "shortMark": "云",
+            "buffId": "buff.mobility_flow",
+            "name": "风行",
+            "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+            "shortMark": "行",
             "category": "buff",
             "visibility": "public",
-            "color": "#b7c7da",
-            "duration": 3,
-            "maxStacks": 2,
+            "color": "#95c5a4",
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "moveSpeed": 1,
-              "dodge": 10,
-              "crit": 12
+              "moveSpeed": 10,
+              "dodge": 5,
+              "crit": 4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.rift_step_slash",
+        "name": "踏隙斩",
+        "desc": "借落脚一瞬切开空隙再斩，刀意未尽时身法会自然续成流云。",
+        "cooldown": 24,
+        "cost": 8,
+        "range": 2,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 3
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "physical",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.physAtk", "scale": 0.65 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 },
+                    { "var": "caster.buff.buff.mobility_flow.stacks", "scale": 0.04 },
+                    { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.mobility_flow",
+            "name": "风行",
+            "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+            "shortMark": "行",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#95c5a4",
+            "duration": 12,
+            "maxStacks": 6,
+            "stats": {
+              "moveSpeed": 10,
+              "dodge": 5,
+              "crit": 4
+            }
+          }
+        ],
+        "unlockLevel": 5
       },
       {
         "id": "skill.dragon_turn",
@@ -224,29 +442,25 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
                 {
-                  "op": "mul",
+                  "op": "add",
                   "args": [
-                    {
-                      "op": "add",
-                      "args": [
-                        28,
-                        { "var": "techLevel", "scale": 3.3 },
-                        { "var": "caster.stat.physAtk", "scale": 1.15 }
-                      ]
-                    },
-                    {
-                      "op": "add",
-                      "args": [
-                        1,
-                        { "var": "caster.stat.moveSpeed", "scale": 0.01 }
-                      ]
-                    }
+                    28,
+                    { "var": "caster.stat.physAtk", "scale": 0.95 },
+                    { "var": "target.maxHp", "scale": 0.015 }
                   ]
                 },
-                { "var": "target.maxHp", "scale": 0.015 }
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.mobility_flow.stacks", "scale": 0.05 },
+                    { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                  ]
+                }
               ]
             }
           }
@@ -258,7 +472,7 @@
   {
     "id": "frost_sutra",
     "name": "寒魄经",
-    "grade": "earth",
+    "grade": "mystic",
     "layers": [
       { "level": 1, "expFactor": 285, "attrs": { "spirit": 4, "talent": 2, "comprehension": 1 } },
       { "level": 2, "expFactor": 306, "attrs": { "spirit": 4, "talent": 2, "comprehension": 1 } },
@@ -289,11 +503,22 @@
             "damageKind": "spell",
             "element": "water",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                20,
-                { "var": "techLevel", "scale": 2.7 },
-                { "var": "caster.stat.spellAtk", "scale": 1.0 }
+                {
+                  "op": "add",
+                  "args": [
+                    20,
+                    { "var": "caster.stat.spellAtk", "scale": 1.9 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 }
+                  ]
+                }
               ]
             }
           },
@@ -307,16 +532,74 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#63b9d7",
-            "duration": 4,
-            "maxStacks": 3,
+            "duration": 14,
+            "maxStacks": 8,
             "stats": {
-              "spellDef": -6,
-              "dodge": -10,
-              "hit": -8
+              "spellDef": -2,
+              "dodge": -4,
+              "hit": -3
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.ice_lock_art",
+        "name": "冰锁诀",
+        "desc": "先把寒意钉进经络，再让那股冷劲顺着旧痕继续蔓延。",
+        "cooldown": 28,
+        "cost": 9,
+        "range": 3,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 3
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "water",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.spellAtk", "scale": 2.1 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "target.buff.buff.frost_mark_chill.stacks", "scale": 0.02 }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.frost_mark_chill",
+            "name": "寒痕",
+            "desc": "寒意黏身，法抗、闪避与命中同步走低。",
+            "shortMark": "寒",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#63b9d7",
+            "duration": 14,
+            "maxStacks": 8,
+            "stats": {
+              "spellDef": -2,
+              "dodge": -4,
+              "hit": -3
+            }
+          }
+        ],
+        "unlockLevel": 5
       },
       {
         "id": "skill.cold_moon_seal",
@@ -336,12 +619,24 @@
             "damageKind": "spell",
             "element": "water",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                28,
-                { "var": "techLevel", "scale": 3.3 },
-                { "var": "caster.stat.spellAtk", "scale": 1.05 },
-                { "var": "target.maxHp", "scale": 0.025 }
+                {
+                  "op": "add",
+                  "args": [
+                    28,
+                    { "var": "caster.stat.spellAtk", "scale": 2.6 },
+                    { "var": "target.maxHp", "scale": 0.025 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "target.buff.buff.frost_mark_chill.stacks", "scale": 0.05 }
+                  ]
+                }
               ]
             }
           },
@@ -355,15 +650,15 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#7bd6f5",
-            "duration": 3,
-            "maxStacks": 2,
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "dodge": -12,
-              "breakPower": -10
+              "dodge": -5,
+              "breakPower": -5
             }
           }
         ],
-        "unlockLevel": 6
+        "unlockLevel": 9
       }
     ]
   }

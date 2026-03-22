@@ -2,7 +2,7 @@
   {
     "id": "stillheart",
     "name": "止念诀",
-    "grade": "heaven",
+    "grade": "mystic",
     "layers": [
       { "level": 1, "expFactor": 810, "attrs": { "spirit": 4, "comprehension": 2, "luck": 1 } },
       { "level": 2, "expFactor": 870, "attrs": { "spirit": 4, "comprehension": 2, "luck": 1 } },
@@ -35,12 +35,24 @@
             "damageKind": "spell",
             "element": "earth",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                26,
-                { "var": "techLevel", "scale": 3.3 },
-                { "var": "caster.stat.spellAtk", "scale": 1.1 },
-                { "var": "target.stat.resolvePower", "scale": 0.35 }
+                {
+                  "op": "add",
+                  "args": [
+                    26,
+                    { "var": "caster.stat.spellAtk", "scale": 2.1 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "target.buff.buff.stillheart_suppress.stacks", "scale": 0.05 },
+                    { "var": "target.stat.resolvePower", "scale": 0.004 }
+                  ]
+                }
               ]
             }
           },
@@ -54,23 +66,64 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#8f8a70",
-            "duration": 4,
-            "maxStacks": 2,
+            "duration": 14,
+            "maxStacks": 6,
             "stats": {
-              "spellAtk": -10,
-              "breakPower": -10,
-              "resolvePower": -12
+              "spellAtk": -3,
+              "breakPower": -3,
+              "resolvePower": -4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.mind_break_spike",
+        "name": "断识锥",
+        "desc": "趁对方念头受阻时以神识直凿其识海，越会化解反而越难完全避开。",
+        "cooldown": 38,
+        "cost": 11,
+        "range": 4,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 3
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "earth",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    30,
+                    { "var": "caster.stat.spellAtk", "scale": 2.8 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.11 },
+                    { "var": "target.buff.buff.stillheart_suppress.stacks", "scale": 0.06 },
+                    { "var": "target.stat.resolvePower", "scale": 0.006 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 8
       }
     ]
   },
   {
     "id": "spirit_anchor",
     "name": "镇灵篇",
-    "grade": "spirit",
+    "grade": "mystic",
     "layers": [
       { "level": 1, "expFactor": 2430, "attrs": { "spirit": 4, "comprehension": 2, "talent": 1 } },
       { "level": 2, "expFactor": 2580, "attrs": { "spirit": 4, "comprehension": 2, "talent": 1 } },
@@ -88,8 +141,7 @@
       { "level": 14, "expFactor": 7200, "attrs": { "spirit": 5, "comprehension": 3, "talent": 1 } },
       { "level": 15, "expFactor": 7890, "attrs": { "spirit": 5, "comprehension": 3, "talent": 1 } },
       { "level": 16, "expFactor": 8670, "attrs": { "spirit": 5, "comprehension": 3, "talent": 1 } },
-      { "level": 17, "expFactor": 9540, "attrs": { "spirit": 6, "comprehension": 3, "talent": 2 } },
-      { "level": 18, "expFactor": 0, "attrs": { "spirit": 6, "comprehension": 4, "talent": 2 } }
+      { "level": 17, "expFactor": 0, "attrs": { "spirit": 6, "comprehension": 3, "talent": 2 } }
     ],
     "skills": [
       {
@@ -105,11 +157,22 @@
             "damageKind": "spell",
             "element": "earth",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                22,
-                { "var": "techLevel", "scale": 2.8 },
-                { "var": "caster.stat.spellAtk", "scale": 1.0 }
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    { "var": "caster.stat.spellAtk", "scale": 2.0 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 }
+                  ]
+                }
               ]
             }
           },
@@ -123,16 +186,71 @@
             "category": "buff",
             "visibility": "public",
             "color": "#7f9cff",
-            "duration": 3,
-            "maxStacks": 2,
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "spellAtk": 10,
-              "crit": 22,
-              "resolvePower": 14
+              "spellAtk": 3,
+              "crit": 5,
+              "resolvePower": 4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.soul_nail",
+        "name": "定魂钉",
+        "desc": "先以一点定住魂光，再顺着那一点牵出整段后继灵压。",
+        "cooldown": 32,
+        "cost": 10,
+        "range": 3,
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "earth",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.spellAtk", "scale": 1.4 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.anchor_focus.stacks", "scale": 0.05 },
+                    { "var": "caster.stat.resolvePower", "scale": 0.008 }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.anchor_focus",
+            "name": "镇灵凝神",
+            "desc": "凝聚心神，暂时提高法术攻击、暴击与化解。",
+            "shortMark": "凝",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#7f9cff",
+            "duration": 12,
+            "maxStacks": 6,
+            "stats": {
+              "spellAtk": 3,
+              "crit": 5,
+              "resolvePower": 4
+            }
+          }
+        ],
+        "unlockLevel": 6
       },
       {
         "id": "skill.soul_chain",
@@ -151,12 +269,24 @@
             "damageKind": "spell",
             "element": "earth",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                32,
-                { "var": "techLevel", "scale": 3.6 },
-                { "var": "caster.stat.spellAtk", "scale": 1.15 },
-                { "var": "target.maxHp", "scale": 0.03 }
+                {
+                  "op": "add",
+                  "args": [
+                    32,
+                    { "var": "caster.stat.spellAtk", "scale": 2.5 },
+                    { "var": "target.maxHp", "scale": 0.03 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.11 },
+                    { "var": "caster.buff.buff.anchor_focus.stacks", "scale": 0.05 }
+                  ]
+                }
               ]
             }
           },
@@ -170,12 +300,12 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#9280c6",
-            "duration": 4,
-            "maxStacks": 2,
+            "duration": 14,
+            "maxStacks": 6,
             "stats": {
-              "spellDef": -8,
-              "dodge": -12,
-              "resolvePower": -14
+              "spellDef": -2,
+              "dodge": -4,
+              "resolvePower": -4
             }
           }
         ],
@@ -186,7 +316,7 @@
   {
     "id": "starfall_spear",
     "name": "陨星枪诀",
-    "grade": "saint",
+    "grade": "mystic",
     "layers": [
       { "level": 1, "expFactor": 7290, "attrs": { "perception": 4, "constitution": 2, "spirit": 1 } },
       { "level": 2, "expFactor": 7740, "attrs": { "perception": 4, "constitution": 2, "spirit": 1 } },
@@ -204,10 +334,7 @@
       { "level": 14, "expFactor": 22350, "attrs": { "perception": 5, "constitution": 3, "spirit": 1 } },
       { "level": 15, "expFactor": 24780, "attrs": { "perception": 5, "constitution": 3, "spirit": 1 } },
       { "level": 16, "expFactor": 27480, "attrs": { "perception": 5, "constitution": 3, "spirit": 1 } },
-      { "level": 17, "expFactor": 30510, "attrs": { "perception": 6, "constitution": 3, "spirit": 1 } },
-      { "level": 18, "expFactor": 33870, "attrs": { "perception": 6, "constitution": 3, "spirit": 1 } },
-      { "level": 19, "expFactor": 37170, "attrs": { "perception": 6, "constitution": 4, "spirit": 2 } },
-      { "level": 20, "expFactor": 0, "attrs": { "perception": 7, "constitution": 4, "spirit": 2 } }
+      { "level": 17, "expFactor": 0, "attrs": { "perception": 6, "constitution": 3, "spirit": 1 } }
     ],
     "skills": [
       {
@@ -226,12 +353,24 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                24,
-                { "var": "techLevel", "scale": 3.2 },
-                { "var": "caster.stat.physAtk", "scale": 1.15 },
-                { "var": "caster.stat.hit", "scale": 0.5 }
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.physAtk", "scale": 1.5 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.starfall_momentum.stacks", "scale": 0.05 },
+                    { "var": "caster.stat.hit", "scale": 0.008 }
+                  ]
+                }
               ]
             }
           },
@@ -245,16 +384,110 @@
             "category": "buff",
             "visibility": "public",
             "color": "#d6a86a",
-            "duration": 4,
-            "maxStacks": 2,
+            "duration": 14,
+            "maxStacks": 6,
             "stats": {
-              "hit": 14,
-              "breakPower": 14,
-              "crit": 16
+              "hit": 3,
+              "breakPower": 3,
+              "crit": 4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.chasing_star",
+        "name": "追星步",
+        "desc": "踏前半步再补一枪，借冲势把前一式的坠意继续压实。",
+        "cooldown": 24,
+        "cost": 8,
+        "range": 3,
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "physical",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    { "var": "caster.stat.physAtk", "scale": 1.35 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.starfall_momentum.stacks", "scale": 0.04 },
+                    { "var": "caster.stat.hit", "scale": 0.007 }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "self",
+            "buffId": "buff.starfall_momentum",
+            "name": "坠势",
+            "desc": "枪势下压，提高命中、破招与暴击。",
+            "shortMark": "坠",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#d6a86a",
+            "duration": 14,
+            "maxStacks": 6,
+            "stats": {
+              "hit": 3,
+              "breakPower": 3,
+              "crit": 4
+            }
+          }
+        ],
+        "unlockLevel": 5
+      },
+      {
+        "id": "skill.skybreaker_lance",
+        "name": "裂穹枪",
+        "desc": "将前段积下的枪势一次性贯成长线，最适合用来破开中段敌阵。",
+        "cooldown": 40,
+        "cost": 13,
+        "range": 4,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 4
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "physical",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    28,
+                    { "var": "caster.stat.physAtk", "scale": 2.4 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.11 },
+                    { "var": "caster.buff.buff.starfall_momentum.stacks", "scale": 0.03 },
+                    { "var": "caster.stat.hit", "scale": 0.01 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 9
       },
       {
         "id": "skill.meteor_break",
@@ -273,13 +506,25 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                36,
-                { "var": "techLevel", "scale": 4 },
-                { "var": "caster.stat.physAtk", "scale": 1.2 },
-                { "var": "caster.stat.breakPower", "scale": 1.1 },
-                { "var": "target.maxHp", "scale": 0.03 }
+                {
+                  "op": "add",
+                  "args": [
+                    36,
+                    { "var": "caster.stat.physAtk", "scale": 1.8 },
+                    { "var": "target.maxHp", "scale": 0.03 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.12 },
+                    { "var": "caster.buff.buff.starfall_momentum.stacks", "scale": 0.06 },
+                    { "var": "caster.stat.breakPower", "scale": 0.012 }
+                  ]
+                }
               ]
             }
           }

@@ -2,7 +2,7 @@
   {
     "id": "qingmu_sword",
     "name": "青木剑诀",
-    "grade": "yellow",
+    "grade": "mortal",
     "layers": [
       { "level": 1, "expFactor": 30, "attrs": { "perception": 3, "spirit": 1 } },
       { "level": 2, "expFactor": 33, "attrs": { "perception": 3, "spirit": 1 } },
@@ -12,8 +12,7 @@
       { "level": 6, "expFactor": 54, "attrs": { "perception": 3, "spirit": 2 } },
       { "level": 7, "expFactor": 63, "attrs": { "perception": 3, "spirit": 2 } },
       { "level": 8, "expFactor": 72, "attrs": { "perception": 3, "spirit": 2 } },
-      { "level": 9, "expFactor": 84, "attrs": { "perception": 4, "spirit": 2 } },
-      { "level": 10, "expFactor": 0, "attrs": { "perception": 4, "spirit": 2 } }
+      { "level": 9, "expFactor": 0, "attrs": { "perception": 4, "spirit": 2 } }
     ],
     "skills": [
       {
@@ -29,11 +28,22 @@
             "damageKind": "spell",
             "element": "wood",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                18,
-                { "var": "techLevel", "scale": 2.1 },
-                { "var": "caster.stat.spellAtk", "scale": 0.95 }
+                {
+                  "op": "add",
+                  "args": [
+                    18,
+                    { "var": "caster.stat.spellAtk", "scale": 0.8 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.08 }
+                  ]
+                }
               ]
             }
           },
@@ -47,16 +57,55 @@
             "category": "debuff",
             "visibility": "public",
             "color": "#68b96c",
-            "duration": 3,
-            "maxStacks": 3,
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "spellDef": -5,
-              "dodge": -8,
-              "resolvePower": -6
+              "spellDef": -2,
+              "dodge": -3,
+              "resolvePower": -3
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.qingmu_pierce",
+        "name": "穿林式",
+        "desc": "沿先前斩开的气脉再递一剑，剑气更易顺着经络深扎。",
+        "cooldown": 26,
+        "cost": 7,
+        "range": 2,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 2
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "wood",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    { "var": "caster.stat.spellAtk", "scale": 1.0 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 5
       }
     ]
   },
@@ -96,14 +145,14 @@
                   "op": "add",
                   "args": [
                     20,
-                    { "var": "techLevel", "scale": 2.3 },
-                    { "var": "caster.stat.spellAtk", "scale": 0.9 }
+                    { "var": "caster.stat.spellAtk", "scale": 0.55 }
                   ]
                 },
                 {
                   "op": "add",
                   "args": [
                     1,
+                    { "var": "techLevel", "scale": 0.08 },
                     { "var": "caster.stat.moveSpeed", "scale": 0.01 }
                   ]
                 }
@@ -113,29 +162,71 @@
           {
             "type": "buff",
             "target": "self",
-            "buffId": "buff.wind_step_flow",
-            "name": "踏风",
-            "desc": "借风回身，短时间提升移速与闪避。",
-            "shortMark": "风",
+            "buffId": "buff.mobility_flow",
+            "name": "风行",
+            "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+            "shortMark": "行",
             "category": "buff",
             "visibility": "public",
-            "color": "#82c77b",
-            "duration": 3,
-            "maxStacks": 2,
+            "color": "#95c5a4",
+            "duration": 12,
+            "maxStacks": 6,
             "stats": {
-              "moveSpeed": 1,
-              "dodge": 12
+              "moveSpeed": 10,
+              "dodge": 5,
+              "crit": 4
             }
           }
         ],
         "unlockLevel": 1
+      },
+      {
+        "id": "skill.chasing_shadow",
+        "name": "逐影掠空",
+        "desc": "借踏风余势连续切位，越快越能把一道劲风拖成长线。",
+        "cooldown": 30,
+        "cost": 8,
+        "range": 3,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 3
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "wood",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    24,
+                    { "var": "caster.stat.spellAtk", "scale": 1.0 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.09 },
+                    { "var": "caster.buff.buff.mobility_flow.stacks", "scale": 0.04 },
+                    { "var": "caster.stat.moveSpeed", "scale": 0.01 }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 6
       }
     ]
   },
   {
     "id": "iron_bone_art",
     "name": "铁骨功",
-    "grade": "mortal",
+    "grade": "yellow",
     "layers": [
       { "level": 1, "expFactor": 10, "attrs": { "constitution": 4, "talent": 1 } },
       { "level": 2, "expFactor": 12, "attrs": { "constitution": 4, "talent": 1 } },
@@ -159,12 +250,24 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                14,
-                { "var": "techLevel", "scale": 2.2 },
-                { "var": "caster.stat.physAtk", "scale": 1.05 },
-                { "var": "caster.stat.physDef", "scale": 0.5 }
+                {
+                  "op": "add",
+                  "args": [
+                    14,
+                    { "var": "caster.stat.physAtk", "scale": 0.8 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.08 },
+                    { "var": "caster.buff.buff.iron_bone_guard.stacks", "scale": 0.03 },
+                    { "var": "caster.stat.physDef", "scale": 0.006 }
+                  ]
+                }
               ]
             }
           },
@@ -178,11 +281,11 @@
             "category": "buff",
             "visibility": "public",
             "color": "#a28d74",
-            "duration": 4,
-            "maxStacks": 3,
+            "duration": 14,
+            "maxStacks": 8,
             "stats": {
-              "physDef": 6,
-              "resolvePower": 12
+              "physDef": 2,
+              "resolvePower": 3
             }
           }
         ],
@@ -191,7 +294,7 @@
       {
         "id": "skill.iron_guard_roar",
         "name": "震罡怒吼",
-        "desc": "鼓荡护体罡气轰开身前敌群，罡劲越厚，这一吼越沉。",
+        "desc": "鼓荡护体罡气轰开身前敌群，吼声散后自身罡劲反而更沉一层。",
         "cooldown": 36,
         "cost": 10,
         "range": 2,
@@ -205,31 +308,43 @@
             "type": "damage",
             "damageKind": "physical",
             "formula": {
-              "op": "add",
+              "op": "mul",
               "args": [
-                18,
-                { "var": "techLevel", "scale": 3 },
-                { "var": "caster.stat.physAtk", "scale": 0.75 },
-                { "var": "caster.stat.physDef", "scale": 0.7 },
-                { "var": "caster.maxHp", "scale": 0.03 }
+                {
+                  "op": "add",
+                  "args": [
+                    18,
+                    { "var": "caster.stat.physAtk", "scale": 0.6 },
+                    { "var": "caster.maxHp", "scale": 0.03 }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    { "var": "techLevel", "scale": 0.1 },
+                    { "var": "caster.buff.buff.iron_bone_guard.stacks", "scale": 0.04 },
+                    { "var": "caster.stat.physDef", "scale": 0.008 }
+                  ]
+                }
               ]
             }
           },
           {
             "type": "buff",
-            "target": "target",
-            "buffId": "buff.iron_bone_shock",
-            "name": "震骨",
-            "desc": "被怒吼震散气血，攻击力短暂下滑。",
-            "shortMark": "震",
-            "category": "debuff",
+            "target": "self",
+            "buffId": "buff.iron_bone_guard",
+            "name": "罡劲",
+            "desc": "罡气绕体，提高护甲与化解，供后续重击借势。",
+            "shortMark": "罡",
+            "category": "buff",
             "visibility": "public",
-            "color": "#b08c6b",
-            "duration": 3,
-            "maxStacks": 2,
+            "color": "#a28d74",
+            "duration": 14,
+            "maxStacks": 8,
             "stats": {
-              "physAtk": -8,
-              "spellAtk": -8
+              "physDef": 2,
+              "resolvePower": 3
             }
           }
         ],
