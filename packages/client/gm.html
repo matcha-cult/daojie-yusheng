@@ -887,7 +887,9 @@
 
     @media (max-width: 1200px) {
       .workspace-grid,
-      .map-workspace {
+      .workspace-grid-2col,
+      .map-workspace,
+      .world-workspace {
         grid-template-columns: 1fr;
       }
       .editor-grid,
@@ -900,6 +902,135 @@
       .editor-textarea {
         min-height: 360px;
       }
+    }
+
+    .shell-tab-minor {
+      opacity: 0.6;
+      font-size: 13px;
+    }
+    .shell-tab-minor.active {
+      opacity: 1;
+    }
+
+    .workspace-grid-2col {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 0.85fr) minmax(420px, 1.45fr);
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .world-workspace {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(220px, 0.7fr) minmax(480px, 1.4fr) minmax(280px, 0.9fr);
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .world-map-btn {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--wash-ink);
+      background: var(--paper-white);
+      color: var(--ink-dark);
+      text-align: left;
+      cursor: pointer;
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .world-map-btn.active {
+      border-color: var(--stamp-red);
+      background: rgba(197, 60, 60, 0.06);
+      color: var(--stamp-red);
+    }
+    .world-map-btn:hover {
+      border-color: rgba(17, 17, 17, 0.28);
+    }
+
+    .world-time-info {
+      margin-bottom: 10px;
+    }
+    .world-time-info .panel-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+    .world-time-info .panel-label {
+      color: var(--ink-grey);
+    }
+    .world-time-info .panel-value {
+      color: var(--ink-black);
+      font-size: 13px;
+      margin-top: 0;
+    }
+
+    .world-tick-control {
+      margin-bottom: 10px;
+    }
+    .world-tick-control .panel-section-title,
+    .world-time-adjust .panel-section-title {
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      color: var(--ink-black);
+      margin-bottom: 6px;
+    }
+    .world-speed-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .world-speed-btn.active {
+      border-color: var(--stamp-red);
+      background: rgba(197, 60, 60, 0.08);
+      color: var(--stamp-red);
+    }
+
+    .world-time-adjust {
+      margin-bottom: 10px;
+    }
+    .world-time-adjust .gm-btn-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .world-time-adjust .gm-inline-input {
+      padding: 6px 8px;
+      border: 1px solid var(--ink-light);
+      background: rgba(255,255,255,0.88);
+      color: var(--ink-dark);
+      font-size: 13px;
+      outline: none;
+    }
+
+    #world-info .panel-section {
+      margin-bottom: 12px;
+    }
+    #world-info .panel-section-title {
+      font-family: var(--font-heading-sub);
+      font-size: 15px;
+      color: var(--ink-black);
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--wash-ink);
+      padding-bottom: 4px;
+    }
+    #world-info .panel-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 13px;
+    }
+    #world-info .panel-label {
+      color: var(--ink-grey);
+    }
+    #world-info .panel-value {
+      color: var(--ink-black);
+      font-size: 13px;
+      margin-top: 0;
     }
   </style>
 </head>
@@ -927,14 +1058,17 @@
     <div class="shell-bar">
       <div class="shell-brand">道劫余生 · 监察司</div>
       <div class="shell-tabs">
-        <button class="shell-tab active" id="gm-tab-players" data-gm-tab="players" type="button">角色管理</button>
-        <button class="shell-tab" id="gm-tab-maps" data-gm-tab="maps" type="button">地图编辑</button>
-        <button class="shell-tab" id="gm-tab-suggestions" data-gm-tab="suggestions" type="button">建议反馈</button>
+        <button class="shell-tab active" id="gm-tab-server" data-gm-tab="server" type="button">服务器信息</button>
+        <button class="shell-tab" id="gm-tab-players" data-gm-tab="players" type="button">玩家管理</button>
+        <button class="shell-tab" id="gm-tab-world" data-gm-tab="world" type="button">世界管理</button>
+        <span style="border-left:1px solid var(--ink-light); margin:0 4px;"></span>
+        <button class="shell-tab shell-tab-minor" id="gm-tab-maps" data-gm-tab="maps" type="button">地图编辑</button>
+        <button class="shell-tab shell-tab-minor" id="gm-tab-suggestions" data-gm-tab="suggestions" type="button">建议反馈</button>
       </div>
     </div>
 
-    <section id="player-workspace" class="workspace-grid">
-    <section class="layout-section">
+    <!-- ===== 服务器信息 ===== -->
+    <section id="server-workspace" class="layout-section" style="flex:1; min-height:0;">
       <div class="panel-stamp">司</div>
       <div class="section-head">
         <div class="shell-title">道劫余生</div>
@@ -942,50 +1076,20 @@
       </div>
       <div class="section-body">
         <div class="summary-grid">
-          <div class="summary-card">
-            <div class="panel-title">角色总数</div>
-            <div id="summary-total" class="panel-value">0</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">在线人数</div>
-            <div id="summary-online" class="panel-value">0</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">离线挂机</div>
-            <div id="summary-offline-hanging" class="panel-value">0</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">离线人数</div>
-            <div id="summary-offline" class="panel-value">0</div>
-          </div>
+          <div class="summary-card"><div class="panel-title">角色总数</div><div id="summary-total" class="panel-value">0</div></div>
+          <div class="summary-card"><div class="panel-title">在线人数</div><div id="summary-online" class="panel-value">0</div></div>
+          <div class="summary-card"><div class="panel-title">离线挂机</div><div id="summary-offline-hanging" class="panel-value">0</div></div>
+          <div class="summary-card"><div class="panel-title">离线人数</div><div id="summary-offline" class="panel-value">0</div></div>
         </div>
         <div class="summary-grid">
-          <div class="summary-card">
-            <div class="panel-title">机器人</div>
-            <div id="summary-bots" class="panel-value">0</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">单息耗时</div>
-            <div id="summary-tick" class="panel-value">0 ms</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">CPU 压力</div>
-            <div id="summary-cpu" class="panel-value">0%</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">内存占用</div>
-            <div id="summary-memory" class="panel-value">0 MB</div>
-          </div>
+          <div class="summary-card"><div class="panel-title">机器人</div><div id="summary-bots" class="panel-value">0</div></div>
+          <div class="summary-card"><div class="panel-title">单息耗时</div><div id="summary-tick" class="panel-value">0 ms</div></div>
+          <div class="summary-card"><div class="panel-title">CPU 压力</div><div id="summary-cpu" class="panel-value">0%</div></div>
+          <div class="summary-card"><div class="panel-title">内存占用</div><div id="summary-memory" class="panel-value">0 MB</div></div>
         </div>
         <div class="summary-grid">
-          <div class="summary-card">
-            <div class="panel-title">累计上行</div>
-            <div id="summary-net-in" class="panel-value">0 B</div>
-          </div>
-          <div class="summary-card">
-            <div class="panel-title">累计下行</div>
-            <div id="summary-net-out" class="panel-value">0 B</div>
-          </div>
+          <div class="summary-card"><div class="panel-title">累计上行</div><div id="summary-net-in" class="panel-value">0 B</div></div>
+          <div class="summary-card"><div class="panel-title">累计下行</div><div id="summary-net-out" class="panel-value">0 B</div></div>
         </div>
         <div class="button-row" style="margin-bottom: 12px;">
           <input id="spawn-count" class="number-input" type="number" min="1" max="50" value="5" />
@@ -997,22 +1101,12 @@
           <button id="logout" class="small-btn" type="button">退出管理台</button>
         </div>
         <div class="network-breakdown">
-          <div class="network-breakdown-head">
-            <div class="panel-title">网络事件上行榜</div>
-            <div class="network-breakdown-subtitle">客户端 -> 服务端累计字节</div>
-          </div>
-          <div id="summary-net-in-breakdown" class="network-breakdown-list">
-            <div class="empty-hint">当前还没有累计上行事件。</div>
-          </div>
+          <div class="network-breakdown-head"><div class="panel-title">网络事件上行榜</div><div class="network-breakdown-subtitle">客户端 -> 服务端累计字节</div></div>
+          <div id="summary-net-in-breakdown" class="network-breakdown-list"><div class="empty-hint">当前还没有累计上行事件。</div></div>
         </div>
         <div class="network-breakdown">
-          <div class="network-breakdown-head">
-            <div class="panel-title">网络事件下行榜</div>
-            <div class="network-breakdown-subtitle">服务端 -> 客户端累计字节</div>
-          </div>
-          <div id="summary-net-out-breakdown" class="network-breakdown-list">
-            <div class="empty-hint">当前还没有累计下行事件。</div>
-          </div>
+          <div class="network-breakdown-head"><div class="panel-title">网络事件下行榜</div><div class="network-breakdown-subtitle">服务端 -> 客户端累计字节</div></div>
+          <div id="summary-net-out-breakdown" class="network-breakdown-list"><div class="empty-hint">当前还没有累计下行事件。</div></div>
         </div>
         <div id="status-bar" class="status-bar"></div>
         <div class="note-card">
@@ -1020,31 +1114,20 @@
           默认编辑器展示的是完整运行态快照；高级区可切换查看真实存档态 JSON。像 `actions`、`finalAttrs`、`numericStats`、`realm` 这类派生字段，保存后仍以服务端重算结果为准。
         </div>
         <div class="editor-section" style="margin-top: 12px;">
-          <div class="editor-section-head">
-            <div>
-              <div class="editor-section-title">GM 密码</div>
-              <div class="editor-section-note">修改后立即生效，当前登录态不受影响。</div>
-            </div>
-          </div>
+          <div class="editor-section-head"><div><div class="editor-section-title">GM 密码</div><div class="editor-section-note">修改后立即生效，当前登录态不受影响。</div></div></div>
           <form id="gm-password-form">
             <div class="editor-grid compact">
-              <label class="editor-field">
-                <span>当前密码</span>
-                <input id="gm-password-current" type="password" autocomplete="current-password" />
-              </label>
-              <label class="editor-field">
-                <span>新密码</span>
-                <input id="gm-password-next" type="password" autocomplete="new-password" />
-              </label>
+              <label class="editor-field"><span>当前密码</span><input id="gm-password-current" type="password" autocomplete="current-password" /></label>
+              <label class="editor-field"><span>新密码</span><input id="gm-password-next" type="password" autocomplete="new-password" /></label>
             </div>
-            <div class="button-row" style="margin-top: 10px;">
-              <button id="gm-password-save" class="small-btn" type="submit">修改 GM 密码</button>
-            </div>
+            <div class="button-row" style="margin-top: 10px;"><button id="gm-password-save" class="small-btn" type="submit">修改 GM 密码</button></div>
           </form>
         </div>
       </div>
     </section>
 
+    <!-- ===== 玩家管理 ===== -->
+    <section id="player-workspace" class="workspace-grid-2col hidden">
     <section class="layout-section">
       <div class="section-head">
         <div class="section-title">角色册</div>
@@ -1102,6 +1185,41 @@
     </section>
     </section>
 
+    <!-- ===== 世界管理 ===== -->
+    <section id="world-workspace" class="world-workspace hidden">
+      <section class="layout-section">
+        <div class="section-head">
+          <div class="section-title">地图选择</div>
+          <div class="section-subtitle">选择地图查看运行时状态</div>
+        </div>
+        <div class="section-body">
+          <div id="world-map-list" class="map-list"></div>
+          <div id="world-time-control" style="margin-top:14px;"></div>
+        </div>
+      </section>
+      <section class="layout-section">
+        <div class="section-head">
+          <div class="section-title">上帝视角</div>
+          <div class="section-subtitle">右键拖动 · 滚轮缩放 · 左键选中查看</div>
+        </div>
+        <div class="section-body" style="display:flex; flex-direction:column; padding:0;">
+          <div id="world-canvas-host" class="map-canvas-host" style="min-height:400px;">
+            <canvas id="world-canvas" style="width:100%;height:100%;display:block;background:#1a1816;cursor:crosshair;"></canvas>
+          </div>
+        </div>
+      </section>
+      <section class="layout-section">
+        <div class="section-head">
+          <div class="section-title">信息面板</div>
+          <div class="section-subtitle">地图概况与选中目标详情</div>
+        </div>
+        <div class="section-body">
+          <div id="world-info"><div class="empty-hint">从左侧选择一张地图</div></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ===== 地图编辑 ===== -->
     <section id="map-workspace" class="map-workspace hidden">
       <section class="layout-section">
         <div class="section-head">

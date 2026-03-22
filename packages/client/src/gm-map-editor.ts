@@ -62,7 +62,7 @@ const PAINT_TILE_TYPES: TileType[] = [
   TileType.Stone,
 ];
 
-const TILE_LABELS: Record<TileType, string> = {
+export const TILE_LABELS: Record<TileType, string> = {
   [TileType.Floor]: '地面',
   [TileType.Road]: '大路',
   [TileType.Trail]: '小路',
@@ -81,7 +81,7 @@ const TILE_LABELS: Record<TileType, string> = {
   [TileType.Stone]: '岩石',
 };
 
-const TILE_BG: Record<TileType, string> = {
+export const TILE_BG: Record<TileType, string> = {
   [TileType.Floor]: '#ddd8cf',
   [TileType.Road]: '#cdb89c',
   [TileType.Trail]: '#b4946f',
@@ -100,7 +100,7 @@ const TILE_BG: Record<TileType, string> = {
   [TileType.Stone]: '#7a7570',
 };
 
-const TILE_CHAR: Record<TileType, string> = {
+export const TILE_CHAR: Record<TileType, string> = {
   [TileType.Floor]: '·',
   [TileType.Road]: '路',
   [TileType.Trail]: '径',
@@ -119,7 +119,7 @@ const TILE_CHAR: Record<TileType, string> = {
   [TileType.Stone]: '石',
 };
 
-const CHAR_COLOR: Record<TileType, string> = {
+export const CHAR_COLOR: Record<TileType, string> = {
   [TileType.Floor]: 'rgba(0,0,0,0.15)',
   [TileType.Road]: 'rgba(90,55,24,0.35)',
   [TileType.Trail]: 'rgba(84,52,28,0.42)',

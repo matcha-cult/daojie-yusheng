@@ -28,6 +28,7 @@ import {
   type TemporaryBuffState,
 } from '@mud/shared';
 import { GmMapEditor } from './gm-map-editor';
+import { GmWorldViewer } from './gm-world-viewer';
 
 const TOKEN_KEY = 'mud:gm-access-token';
 const POLL_INTERVAL_MS = 5000;
@@ -114,9 +115,13 @@ const gmPasswordSaveBtn = document.getElementById('gm-password-save') as HTMLBut
 const playerWorkspaceEl = document.getElementById('player-workspace') as HTMLElement;
 const mapWorkspaceEl = document.getElementById('map-workspace') as HTMLElement;
 const suggestionWorkspaceEl = document.getElementById('suggestion-workspace') as HTMLElement;
+const serverWorkspaceEl = document.getElementById('server-workspace') as HTMLElement;
+const worldWorkspaceEl = document.getElementById('world-workspace') as HTMLElement;
+const serverTabBtn = document.getElementById('gm-tab-server') as HTMLButtonElement;
 const playerTabBtn = document.getElementById('gm-tab-players') as HTMLButtonElement;
 const mapTabBtn = document.getElementById('gm-tab-maps') as HTMLButtonElement;
 const suggestionTabBtn = document.getElementById('gm-tab-suggestions') as HTMLButtonElement;
+const worldTabBtn = document.getElementById('gm-tab-world') as HTMLButtonElement;
 const suggestionListEl = document.getElementById('gm-suggestion-list') as HTMLElement;
 
 let token = sessionStorage.getItem(TOKEN_KEY) ?? '';
@@ -130,7 +135,7 @@ let draftSnapshot: PlayerState | null = null;
 let editorDirty = false;
 let draftSourcePlayerId: string | null = null;
 let pollTimer: number | null = null;
-let currentTab: 'players' | 'maps' | 'suggestions' = 'players';
+let currentTab: 'server' | 'players' | 'maps' | 'suggestions' | 'world' = 'server';
 let currentJsonView: 'runtime' | 'persisted' = 'runtime';
 
 function clone<T>(value: T): T {
@@ -220,13 +225,22 @@ function setStatus(message: string, isError = false): void {
 }
 
 const mapEditor = new GmMapEditor(request, setStatus);
+const worldViewer = new GmWorldViewer(request, setStatus);
 
-function switchTab(tab: 'players' | 'maps' | 'suggestions'): void {
+function switchTab(tab: 'server' | 'players' | 'maps' | 'suggestions' | 'world'): void {
+  // 离开世界管理时停止轮询
+  if (currentTab === 'world' && tab !== 'world') {
+    worldViewer.stopPolling();
+  }
   currentTab = tab;
+  serverTabBtn.classList.toggle('active', tab === 'server');
   playerTabBtn.classList.toggle('active', tab === 'players');
+  worldTabBtn.classList.toggle('active', tab === 'world');
   mapTabBtn.classList.toggle('active', tab === 'maps');
   suggestionTabBtn.classList.toggle('active', tab === 'suggestions');
+  serverWorkspaceEl.classList.toggle('hidden', tab !== 'server');
   playerWorkspaceEl.classList.toggle('hidden', tab !== 'players');
+  worldWorkspaceEl.classList.toggle('hidden', tab !== 'world');
   mapWorkspaceEl.classList.toggle('hidden', tab !== 'maps');
   suggestionWorkspaceEl.classList.toggle('hidden', tab !== 'suggestions');
   if (tab === 'maps') {
@@ -235,6 +249,12 @@ function switchTab(tab: 'players' | 'maps' | 'suggestions'): void {
     });
   } else if (tab === 'suggestions') {
     loadSuggestions().catch(() => {});
+  } else if (tab === 'world') {
+    worldViewer.mount();
+    if (state) {
+      worldViewer.updateMapIds(state.mapIds);
+    }
+    worldViewer.startPolling();
   }
 }
 
@@ -1156,6 +1176,10 @@ async function loadState(silent = false, refreshDetail = false): Promise<void> {
   if (!silent) {
     setStatus(`已同步 ${data.players.length} 条角色数据`);
   }
+  // 同步地图列表到世界管理
+  if (currentTab === 'world') {
+    worldViewer.updateMapIds(data.mapIds);
+  }
 }
 
 async function loadSelectedPlayerDetail(playerId: string, silent = false): Promise<void> {
@@ -1219,7 +1243,8 @@ function logout(message?: string): void {
   playerJsonEl.value = '';
   playerPersistedJsonEl.value = '';
   mapEditor.reset();
-  switchTab('players');
+  worldViewer.stopPolling();
+  switchTab('server');
   switchJsonView('runtime');
   loginErrorEl.textContent = message ?? '';
   setStatus('');
@@ -1525,6 +1550,8 @@ playerSearchInput.addEventListener('input', () => render());
 playerTabBtn.addEventListener('click', () => switchTab('players'));
 mapTabBtn.addEventListener('click', () => switchTab('maps'));
 suggestionTabBtn.addEventListener('click', () => switchTab('suggestions'));
+serverTabBtn.addEventListener('click', () => switchTab('server'));
+worldTabBtn.addEventListener('click', () => switchTab('world'));
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   login().catch(() => {});
@@ -1564,7 +1591,7 @@ removeBotBtn.addEventListener('click', () => {
 
 if (token) {
   showShell();
-  switchTab('players');
+  switchTab('server');
   switchJsonView(currentJsonView);
   loadState()
     .then(() => startPolling())
