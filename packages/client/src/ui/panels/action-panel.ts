@@ -1,3 +1,8 @@
+/**
+ * 行动面板
+ * 管理技能、对话、行动三大分类的操作列表，支持快捷键绑定、自动战斗技能排序与拖拽
+ */
+
 import { ActionDef, AutoBattleSkillConfig, PlayerState, SkillDef } from '@mud/shared';
 import { FloatingTooltip } from '../floating-tooltip';
 import { buildSkillTooltipContent } from '../skill-tooltip';
@@ -52,7 +57,7 @@ export class ActionPanel {
   private dragOverSkillId: string | null = null;
   private dragOverPosition: 'before' | 'after' | null = null;
   private previewPlayer?: PlayerState;
-  private skillLookup = new Map<string, { skill: SkillDef; techLevel: number }>();
+  private skillLookup = new Map<string, { skill: SkillDef; techLevel: number; knownSkills: SkillDef[] }>();
   private tooltip = new FloatingTooltip();
 
   constructor() {
@@ -72,6 +77,7 @@ export class ActionPanel {
     this.onUpdateAutoBattleSkills = onUpdateAutoBattleSkills ?? null;
   }
 
+  /** 全量更新行动列表并重新渲染 */
   update(actions: ActionDef[], _autoBattle?: boolean, _autoRetaliate?: boolean, player?: PlayerState): void {
     if (player) {
       this.previewPlayer = player;
@@ -84,6 +90,7 @@ export class ActionPanel {
     this.render(this.currentActions);
   }
 
+  /** 增量同步行动状态，优先 DOM patch 避免全量重绘 */
   syncDynamic(actions: ActionDef[], _autoBattle?: boolean, _autoRetaliate?: boolean, player?: PlayerState): void {
     if (player) {
       this.previewPlayer = player;
@@ -110,10 +117,11 @@ export class ActionPanel {
   }
 
   private syncPlayerContext(player: PlayerState): void {
+    const knownSkills = player.techniques.flatMap((technique) => technique.skills);
     this.skillLookup = new Map(
       player.techniques.flatMap((technique) => technique.skills.map((skill) => [
         skill.id,
-        { skill, techLevel: technique.level },
+        { skill, techLevel: technique.level, knownSkills },
       ] as const)),
     );
   }
@@ -345,6 +353,7 @@ export class ActionPanel {
         const tooltip = skillContext ? buildSkillTooltipContent(skillContext.skill, {
           techLevel: skillContext.techLevel,
           player: this.previewPlayer,
+          knownSkills: skillContext.knownSkills,
         }) : { lines: [], asideCards: [] };
         this.tooltip.show(title, tooltip.lines, event.clientX, event.clientY, {
           allowHtml: rich,

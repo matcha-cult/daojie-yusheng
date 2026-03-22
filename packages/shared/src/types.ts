@@ -1,3 +1,6 @@
+/**
+ * 全局类型定义：地形、方向、地图、实体、修仙系统（属性/物品/功法/境界/技能/任务）等核心数据结构。
+ */
 import type { ElementKey, NumericRatioDivisors, NumericScalarStatKey, NumericStats, PartialNumericStats } from './numeric';
 import type { TargetingShape } from './targeting';
 
@@ -30,11 +33,13 @@ export enum Direction {
 }
 
 /** 格子数据 */
+/** 隐藏入口观察信息 */
 export interface HiddenEntranceObservation {
   title: string;
   desc?: string;
 }
 
+/** 格子完整数据 */
 export interface Tile {
   type: TileType;
   walkable: boolean;
@@ -52,6 +57,7 @@ export interface Tile {
 export type VisibleTile = Tile | null;
 
 /** 地图元数据 */
+/** 地图空间视觉模式 */
 export type MapSpaceVisionMode = 'isolated' | 'parent_overlay';
 
 export interface MapMeta {
@@ -70,7 +76,9 @@ export interface MapMeta {
   description?: string;
 }
 
+/** 传送点类型 */
 export type PortalKind = 'portal' | 'stairs';
+/** 传送触发方式 */
 export type PortalTrigger = 'manual' | 'auto';
 
 /** 传送点 */
@@ -86,6 +94,40 @@ export interface Portal {
   hidden?: boolean;
   observeTitle?: string;
   observeDesc?: string;
+}
+
+/** 小地图标记类型 */
+export type MapMinimapMarkerKind =
+  | 'landmark'
+  | 'container'
+  | 'npc'
+  | 'monster_spawn'
+  | 'portal'
+  | 'stairs';
+
+/** 小地图标记 */
+export interface MapMinimapMarker {
+  id: string;
+  kind: MapMinimapMarkerKind;
+  x: number;
+  y: number;
+  label: string;
+  detail?: string;
+}
+
+/** 小地图快照 */
+export interface MapMinimapSnapshot {
+  width: number;
+  height: number;
+  terrainRows: string[];
+  markers: MapMinimapMarker[];
+}
+
+/** 已解锁地图图鉴条目 */
+export interface MapMinimapArchiveEntry {
+  mapId: string;
+  mapMeta: MapMeta;
+  snapshot: MapMinimapSnapshot;
 }
 
 /** 渲染用实体 */
@@ -106,30 +148,38 @@ export interface RenderEntity {
   buffs?: VisibleBuffState[];
 }
 
+/** NPC 任务标记状态 */
 export type NpcQuestMarkerState = 'available' | 'ready' | 'active';
 
+/** NPC 任务标记 */
 export interface NpcQuestMarker {
   line: QuestLine;
   state: NpcQuestMarkerState;
 }
 
+/** 观察信息行 */
 export interface ObservationLine {
   label: string;
   value: string;
 }
 
+/** 观察清晰度等级 */
 export type ObservationClarity = 'veiled' | 'blurred' | 'partial' | 'clear' | 'complete';
 
+/** 观察洞察结果 */
 export interface ObservationInsight {
   clarity: ObservationClarity;
   verdict: string;
   lines: ObservationLine[];
 }
 
+/** Buff 分类 */
 export type BuffCategory = 'buff' | 'debuff';
 
+/** Buff 可见性 */
 export type BuffVisibility = 'public' | 'observe_only' | 'hidden';
 
+/** 可见 Buff 状态 */
 export interface VisibleBuffState {
   buffId: string;
   name: string;
@@ -148,6 +198,7 @@ export interface VisibleBuffState {
   stats?: PartialNumericStats;
 }
 
+/** 时间段 ID */
 export type TimePhaseId =
   | 'deep_night'
   | 'late_night'
@@ -159,16 +210,19 @@ export type TimePhaseId =
   | 'night'
   | 'midnight';
 
+/** 时间调色板条目 */
 export interface TimePaletteEntry {
   tint?: string;
   alpha?: number;
 }
 
+/** 地图光照配置 */
 export interface MapLightConfig {
   base?: number;
   timeInfluence?: number;
 }
 
+/** 地图时间配置 */
 export interface MapTimeConfig {
   offsetTicks?: number;
   scale?: number;
@@ -176,8 +230,10 @@ export interface MapTimeConfig {
   palette?: Partial<Record<TimePhaseId, TimePaletteEntry>>;
 }
 
+/** 怪物仇恨模式 */
 export type MonsterAggroMode = 'always' | 'retaliate' | 'day_only' | 'night_only';
 
+/** 游戏时间状态 */
 export interface GameTimeState {
   totalTicks: number;
   localTicks: number;
@@ -233,6 +289,7 @@ export interface ItemStack {
   equipSlot?: EquipSlot;
   equipAttrs?: Partial<Attributes>;
   equipStats?: PartialNumericStats;
+  mapUnlockId?: string;
 }
 
 /** 背包 */
@@ -241,14 +298,17 @@ export interface Inventory {
   capacity: number;
 }
 
+/** 拾取来源类型 */
 export type LootSourceKind = 'ground' | 'container';
 
+/** 地面物品条目视图 */
 export interface GroundItemEntryView {
   itemKey: string;
   name: string;
   count: number;
 }
 
+/** 地面物品堆视图 */
 export interface GroundItemPileView {
   sourceId: string;
   x: number;
@@ -256,17 +316,20 @@ export interface GroundItemPileView {
   items: GroundItemEntryView[];
 }
 
+/** 搜索进度视图 */
 export interface LootSearchProgressView {
   totalTicks: number;
   remainingTicks: number;
   elapsedTicks: number;
 }
 
+/** 拾取窗口物品视图 */
 export interface LootWindowItemView {
   itemKey: string;
   item: ItemStack;
 }
 
+/** 拾取窗口来源视图 */
 export interface LootWindowSourceView {
   sourceId: string;
   kind: LootSourceKind;
@@ -279,6 +342,7 @@ export interface LootWindowSourceView {
   emptyText?: string;
 }
 
+/** 拾取窗口状态 */
 export interface LootWindowState {
   tileX: number;
   tileY: number;
@@ -295,8 +359,10 @@ export interface BreakthroughItemRequirement {
   count: number;
 }
 
+/** 突破需求类型 */
 export type BreakthroughRequirementType = 'item' | 'technique' | 'attribute';
 
+/** 突破需求视图条目 */
 export interface BreakthroughRequirementView {
   id: string;
   type: BreakthroughRequirementType;
@@ -308,6 +374,7 @@ export interface BreakthroughRequirementView {
   detail?: string;
 }
 
+/** 突破预览状态 */
 export interface BreakthroughPreviewState {
   targetRealmLv: number;
   targetDisplayName: string;
@@ -382,6 +449,7 @@ export interface PlayerRealmState {
 /** 技能定义 */
 export type SkillDamageKind = 'physical' | 'spell';
 
+/** 技能公式变量类型 */
 export type SkillFormulaVar =
   | 'techLevel'
   | 'targetCount'
@@ -393,9 +461,12 @@ export type SkillFormulaVar =
   | 'target.maxHp'
   | 'target.qi'
   | 'target.maxQi'
+  | `caster.buff.${string}.stacks`
+  | `target.buff.${string}.stacks`
   | `caster.stat.${NumericScalarStatKey}`
   | `target.stat.${NumericScalarStatKey}`;
 
+/** 技能公式（递归结构：常数/变量引用/运算表达式） */
 export type SkillFormula =
   | number
   | {
@@ -413,6 +484,7 @@ export type SkillFormula =
       max?: SkillFormula;
     };
 
+/** 技能目标选取定义 */
 export interface SkillTargetingDef {
   shape?: TargetingShape;
   range?: number;
@@ -422,6 +494,7 @@ export interface SkillTargetingDef {
   targetMode?: 'any' | 'entity' | 'tile';
 }
 
+/** 技能伤害效果定义 */
 export interface SkillDamageEffectDef {
   type: 'damage';
   damageKind?: SkillDamageKind;
@@ -429,6 +502,7 @@ export interface SkillDamageEffectDef {
   formula: SkillFormula;
 }
 
+/** 技能 Buff 效果定义 */
 export interface SkillBuffEffectDef {
   type: 'buff';
   target: 'self' | 'target';
@@ -445,8 +519,10 @@ export interface SkillBuffEffectDef {
   stats?: PartialNumericStats;
 }
 
+/** 技能效果联合类型 */
 export type SkillEffectDef = SkillDamageEffectDef | SkillBuffEffectDef;
 
+/** 技能完整定义 */
 export interface SkillDef {
   id: string;
   name: string;
@@ -463,6 +539,7 @@ export interface SkillDef {
   targetMode?: 'any' | 'entity' | 'tile';
 }
 
+/** 临时 Buff 状态（含属性和数值加成） */
 export interface TemporaryBuffState extends VisibleBuffState {
   attrs?: Partial<Attributes>;
   stats?: PartialNumericStats;
@@ -485,6 +562,7 @@ export interface TechniqueState {
 /** 行动类型 */
 export type ActionType = 'skill' | 'gather' | 'interact' | 'quest' | 'toggle' | 'battle' | 'travel' | 'breakthrough';
 
+/** 自动战斗技能配置 */
 export interface AutoBattleSkillConfig {
   skillId: string;
   enabled: boolean;
@@ -504,6 +582,7 @@ export interface ActionDef {
   autoBattleOrder?: number;
 }
 
+/** 战斗攻击特效 */
 export interface CombatEffectAttack {
   type: 'attack';
   fromX: number;
@@ -513,6 +592,7 @@ export interface CombatEffectAttack {
   color?: string;
 }
 
+/** 战斗飘字特效 */
 export interface CombatEffectFloat {
   type: 'float';
   x: number;
@@ -522,6 +602,7 @@ export interface CombatEffectFloat {
   variant?: 'damage' | 'action';
 }
 
+/** 战斗特效联合类型 */
 export type CombatEffect = CombatEffectAttack | CombatEffectFloat;
 
 /** 场景实体类型 */
@@ -607,5 +688,22 @@ export interface PlayerState {
   cultivatingTechId?: string;
   idleTicks?: number;
   revealedBreakthroughRequirementIds?: string[];
+  unlockedMinimapIds?: string[];
   realm?: PlayerRealmState;
+}
+
+/** 意见状态 */
+export type SuggestionStatus = 'pending' | 'completed';
+
+/** 意见数据结构 */
+export interface Suggestion {
+  id: string;
+  authorId: string;
+  authorName: string;
+  title: string;
+  description: string;
+  status: SuggestionStatus;
+  upvotes: string[]; // 存储玩家 ID
+  downvotes: string[]; // 存储玩家 ID
+  createdAt: number;
 }

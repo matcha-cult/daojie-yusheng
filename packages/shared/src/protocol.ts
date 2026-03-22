@@ -1,4 +1,8 @@
-import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig, ItemType, QuestLine, QuestObjectiveType, GameTimeState, MapTimeConfig, MonsterAggroMode, TechniqueGrade, GroundItemPileView, LootWindowState, VisibleBuffState, ActionType, SkillDef, TechniqueAttrCurves, TechniqueLayerDef, TechniqueRealm, GroundItemEntryView } from './types';
+/**
+ * 前后端通信协议：事件名定义与所有 Payload 类型。
+ * C2S = 客户端→服务端，S2C = 服务端→客户端。
+ */
+import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig, ItemType, QuestLine, QuestObjectiveType, GameTimeState, MapTimeConfig, MonsterAggroMode, TechniqueGrade, GroundItemPileView, LootWindowState, VisibleBuffState, ActionType, SkillDef, TechniqueAttrCurves, TechniqueLayerDef, TechniqueRealm, GroundItemEntryView, MapMinimapArchiveEntry, MapMinimapMarker, MapMinimapSnapshot, Suggestion } from './types';
 import { NumericRatioDivisors, NumericStats } from './numeric';
 
 // ===== 事件名 =====
@@ -23,6 +27,10 @@ export const C2S = {
   Equip: 'c:equip',
   Unequip: 'c:unequip',
   Cultivate: 'c:cultivate',
+  CreateSuggestion: 'c:createSuggestion',
+  VoteSuggestion: 'c:voteSuggestion',
+  GmMarkSuggestionCompleted: 'c:gmMarkSuggestionCompleted',
+  GmRemoveSuggestion: 'c:gmRemoveSuggestion',
 } as const;
 
 /** 服务端 → 客户端 */
@@ -46,6 +54,7 @@ export const S2C = {
   LootWindowUpdate: 's:lootWindowUpdate',
   QuestUpdate: 's:questUpdate',
   SystemMsg: 's:systemMsg',
+  SuggestionUpdate: 's:suggestionUpdate',
 } as const;
 
 // ===== Payload 类型 =====
@@ -108,7 +117,7 @@ export interface C2S_Chat {
   message: string;
 }
 
-/** Tick 更新（紧凑格式） */
+/** Tick 增量实体数据（支持 null 表示清除字段） */
 export interface TickRenderEntity {
   id: string;
   x: number;
@@ -126,6 +135,7 @@ export interface TickRenderEntity {
   buffs?: VisibleBuffState[] | null;
 }
 
+/** 地面物品堆增量补丁 */
 export interface GroundItemPilePatch {
   sourceId: string;
   x: number;
@@ -133,9 +143,16 @@ export interface GroundItemPilePatch {
   items?: GroundItemEntryView[] | null;
 }
 
+/** 视野内地块增量补丁 */
+export interface VisibleTilePatch {
+  x: number;
+  y: number;
+  tile: VisibleTile;
+}
+
 export interface S2C_Tick {
   p: TickRenderEntity[];                          // 玩家可见实体（含自身）
-  t?: [number, number, string][];                 // [x, y, tileType]
+  t?: VisibleTilePatch[];                         // 视野内地块动态 patch
   e: TickRenderEntity[];                          // 怪物 / NPC 可见实体
   g?: GroundItemPilePatch[];                      // 视野内地面物品 patch
   fx?: CombatEffect[];                            // 当前 tick 触发的战斗特效
@@ -143,6 +160,9 @@ export interface S2C_Tick {
   dt?: number;                                    // 实际 tick 间隔（毫秒）
   m?: string;                                     // 当前地图 ID（跨图时用于同步客户端状态）
   mapMeta?: MapMeta;                              // 当前地图元数据
+  minimap?: MapMinimapSnapshot;                   // 当前地图已解锁时的完整 mini 地图静态标记
+  visibleMinimapMarkers?: MapMinimapMarker[];     // 当前视野内可见的静态地图标记
+  minimapLibrary?: MapMinimapArchiveEntry[];      // 已解锁地图图鉴（全图）
   path?: [number, number][];                      // 当前剩余路径点
   hp?: number;                                    // 当前玩家 HP
   qi?: number;                                    // 当前玩家灵力
@@ -164,11 +184,15 @@ export interface S2C_Leave {
 export interface S2C_Init {
   self: PlayerState;
   mapMeta: MapMeta;
+  minimap?: MapMinimapSnapshot;
+  visibleMinimapMarkers?: MapMinimapMarker[];
+  minimapLibrary: MapMinimapArchiveEntry[];
   tiles: VisibleTile[][];
   players: RenderEntity[]; // 初始可见玩家实体（含自身）
   time?: GameTimeState;
 }
 
+/** GM 玩家摘要 */
 export interface GmPlayerSummary {
   id: string;
   name: string;
@@ -182,6 +206,7 @@ export interface GmPlayerSummary {
   isBot: boolean;
 }
 
+/** GM 网络流量分桶统计 */
 export interface GmNetworkBucket {
   key: string;
   label: string;
@@ -189,6 +214,7 @@ export interface GmNetworkBucket {
   count: number;
 }
 
+/** GM 性能快照 */
 export interface GmPerformanceSnapshot {
   cpuPercent: number;
   memoryMb: number;
@@ -199,6 +225,7 @@ export interface GmPerformanceSnapshot {
   networkOutBuckets: GmNetworkBucket[];
 }
 
+/** GM 状态推送 */
 export interface S2C_GmState {
   players: GmPlayerSummary[];
   mapIds: string[];
@@ -271,6 +298,7 @@ export interface S2C_EquipmentUpdate {
   equipment: EquipmentSlots;
 }
 
+/** 功法增量更新条目 */
 export interface TechniqueUpdateEntry {
   techId: string;
   level: number;
@@ -290,6 +318,7 @@ export interface S2C_TechniqueUpdate {
   cultivatingTechId?: string;
 }
 
+/** 行动增量更新条目 */
 export interface ActionUpdateEntry {
   id: string;
   cooldownLeft: number;
@@ -312,6 +341,7 @@ export interface S2C_ActionsUpdate {
   senseQiActive?: boolean;
 }
 
+/** 战利品窗口更新 */
 export interface S2C_LootWindowUpdate {
   window: LootWindowState | null;
 }
@@ -334,38 +364,74 @@ export interface S2C_SystemMsg {
   };
 }
 
+// ===== 建议系统 Payload =====
+
+/** 建议系统 Payload */
+
+/** 创建建议 */
+export interface C2S_CreateSuggestion {
+  title: string;
+  description: string;
+}
+
+/** 建议投票 */
+export interface C2S_VoteSuggestion {
+  suggestionId: string;
+  vote: 'up' | 'down';
+}
+
+export interface C2S_GmMarkSuggestionCompleted {
+  suggestionId: string;
+}
+
+export interface C2S_GmRemoveSuggestion {
+  suggestionId: string;
+}
+
+/** 建议列表更新 */
+export interface S2C_SuggestionUpdate {
+  suggestions: Suggestion[];
+}
+
 // ===== HTTP 接口 =====
 
+/** 注册请求 */
 export interface AuthRegisterReq {
   username: string;
   password: string;
   displayName: string;
 }
 
+/** 登录请求 */
 export interface AuthLoginReq {
   username: string;
   password: string;
 }
 
+/** 刷新令牌请求 */
 export interface AuthRefreshReq {
   refreshToken: string;
 }
 
+/** 令牌响应 */
 export interface AuthTokenRes {
   accessToken: string;
   refreshToken: string;
 }
 
+/** 显示名可用性检查响应 */
 export interface DisplayNameAvailabilityRes {
   available: boolean;
   message?: string;
 }
 
+/** 修改密码请求 */
 export interface AccountUpdatePasswordReq {
   currentPassword: string;
   newPassword: string;
 }
 
+/** 修改显示名请求 */
 export interface AccountUpdateDisplayNameReq {
   displayName: string;
 }
@@ -374,6 +440,7 @@ export interface AccountUpdateDisplayNameRes {
   displayName: string;
 }
 
+/** 修改角色名请求 */
 export interface AccountUpdateRoleNameReq {
   roleName: string;
 }
@@ -386,6 +453,7 @@ export interface BasicOkRes {
   ok: true;
 }
 
+/** GM 登录请求 */
 export interface GmLoginReq {
   password: string;
 }
@@ -395,11 +463,13 @@ export interface GmLoginRes {
   expiresInSec: number;
 }
 
+/** GM 修改密码请求 */
 export interface GmChangePasswordReq {
   currentPassword: string;
   newPassword: string;
 }
 
+/** GM 管理的玩家元信息 */
 export interface GmManagedPlayerMeta {
   userId?: string;
   isBot: boolean;
@@ -408,6 +478,7 @@ export interface GmManagedPlayerMeta {
   dirtyFlags: string[];
 }
 
+/** GM 管理的玩家摘要 */
 export interface GmManagedPlayerSummary {
   id: string;
   name: string;
@@ -423,6 +494,7 @@ export interface GmManagedPlayerSummary {
   meta: GmManagedPlayerMeta;
 }
 
+/** GM 管理的玩家完整记录（含快照） */
 export interface GmManagedPlayerRecord extends GmManagedPlayerSummary {
   snapshot: PlayerState;
   persistedSnapshot: unknown;
@@ -453,6 +525,7 @@ export interface GmRemoveBotsReq {
   all?: boolean;
 }
 
+/** GM 地图传送点记录 */
 export interface GmMapPortalRecord {
   x: number;
   y: number;
@@ -467,12 +540,14 @@ export interface GmMapPortalRecord {
   observeDesc?: string;
 }
 
+/** GM 地图灵气记录 */
 export interface GmMapAuraRecord {
   x: number;
   y: number;
   value: number;
 }
 
+/** GM 地图地标记录 */
 export interface GmMapLandmarkRecord {
   id: string;
   name: string;
@@ -482,6 +557,7 @@ export interface GmMapLandmarkRecord {
   container?: GmMapContainerRecord;
 }
 
+/** GM 地图掉落物记录 */
 export interface GmMapDropRecord {
   itemId: string;
   name: string;
@@ -490,12 +566,14 @@ export interface GmMapDropRecord {
   chance?: number;
 }
 
+/** GM 地图容器记录 */
 export interface GmMapContainerRecord {
   grade?: TechniqueGrade;
   refreshTicks?: number;
   drops?: GmMapDropRecord[];
 }
 
+/** GM 地图任务记录 */
 export interface GmMapQuestRecord {
   id: string;
   title: string;
@@ -520,6 +598,7 @@ export interface GmMapQuestRecord {
   unlockBreakthroughRequirementIds?: string[];
 }
 
+/** GM 地图 NPC 记录 */
 export interface GmMapNpcRecord {
   id: string;
   name: string;
@@ -532,6 +611,7 @@ export interface GmMapNpcRecord {
   quests?: GmMapQuestRecord[];
 }
 
+/** GM 地图怪物刷新点记录 */
 export interface GmMapMonsterSpawnRecord {
   id: string;
   name: string;
@@ -554,6 +634,7 @@ export interface GmMapMonsterSpawnRecord {
   drops?: GmMapDropRecord[];
 }
 
+/** GM 完整地图文档 */
 export interface GmMapDocument {
   id: string;
   name: string;
@@ -581,6 +662,7 @@ export interface GmMapDocument {
   monsterSpawns: GmMapMonsterSpawnRecord[];
 }
 
+/** GM 地图摘要 */
 export interface GmMapSummary {
   id: string;
   name: string;

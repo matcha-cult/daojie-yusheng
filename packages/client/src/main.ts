@@ -1,3 +1,7 @@
+/**
+ * 游戏客户端主入口 —— 初始化所有子系统、绑定网络事件、驱动渲染循环
+ */
+
 import { SocketManager } from './network/socket';
 import { TextRenderer } from './renderer/text';
 import { Camera } from './renderer/camera';
@@ -17,10 +21,14 @@ import { ActionPanel } from './ui/panels/action-panel';
 import { LootPanel } from './ui/panels/loot-panel';
 import { SettingsPanel } from './ui/panels/settings-panel';
 import { WorldPanel } from './ui/panels/world-panel';
+import { SuggestionPanel } from './ui/suggestion-panel';
+import { Minimap } from './ui/minimap';
+
 import { FloatingTooltip } from './ui/floating-tooltip';
 import { detailModalHost } from './ui/detail-modal-host';
 import { adjustZoom, getDisplayRangeX, getDisplayRangeY, getZoom, updateDisplayMetrics } from './display';
-import { hydrateTileCacheFromMemory, rememberVisibleTiles } from './map-memory';
+import { getRememberedMarkers, hydrateTileCacheFromMemory, rememberVisibleMarkers, rememberVisibleTiles } from './map-memory';
+import { cacheMapMeta, cacheMapSnapshot, cacheUnlockedMinimapLibrary, getCachedMapSnapshot } from './map-static-cache';
 import {
   ActionDef,
   computeAffectedCellsFromAnchor,
@@ -32,6 +40,8 @@ import {
   GridPoint,
   isPointInRange,
   MapMeta,
+  MapMinimapMarker,
+  MapMinimapSnapshot,
   manhattanDistance,
   PlayerState,
   RenderEntity,
@@ -39,6 +49,7 @@ import {
   TickRenderEntity,
   TechniqueUpdateEntry,
   ActionUpdateEntry,
+  VisibleTilePatch,
   NUMERIC_SCALAR_STAT_KEYS,
   SkillDef,
   Tile,
@@ -122,6 +133,11 @@ const actionPanel = new ActionPanel();
 const lootPanel = new LootPanel();
 const worldPanel = new WorldPanel();
 const settingsPanel = new SettingsPanel();
+const suggestionPanel = new SuggestionPanel(socket);
+const minimap = new Minimap();
+minimap.setMoveHandler((x, y) => {
+  planPathTo({ x, y });
+});
 const targetingBadgeEl = document.getElementById('map-targeting-indicator');
 const observeModalEl = document.getElementById('observe-modal');
 const observeModalBodyEl = document.getElementById('observe-modal-body');
@@ -802,6 +818,20 @@ function mergeGroundItemPatches(patches: GroundItemPilePatch[]): Map<string, Gro
   return nextMap;
 }
 
+function applyVisibleTilePatches(patches: VisibleTilePatch[]): void {
+  for (const patch of patches) {
+    const key = `${patch.x},${patch.y}`;
+    if (patch.tile) {
+      currentVisibleTiles.add(key);
+      tileCache.set(key, cloneJson(patch.tile));
+      continue;
+    }
+    currentVisibleTiles.delete(key);
+    tileCache.delete(key);
+  }
+  minimapMemoryVersion += 1;
+}
+
 function formatTraversalCost(tile: Tile): string {
   if (!tile.walkable) {
     return '无法通行';
@@ -1178,6 +1208,8 @@ let tickStartTime = performance.now();
 let tickDuration = 1000;
 let myPlayer: PlayerState | null = null;
 let currentMapMeta: MapMeta | null = null;
+let currentMinimap: MapMinimapSnapshot | null = null;
+let currentVisibleMinimapMarkers: MapMinimapMarker[] = [];
 let currentTimeState: GameTimeState | null = null;
 let latestAttrUpdate: S2C_AttrUpdate | null = null;
 let latestTechniqueMap = new Map<string, TechniqueState>();
@@ -1194,6 +1226,7 @@ const VIEW_LERP_SPEED = 12;
 // 世界地图缓存：key = "x,y" → Tile
 const tileCache = new Map<string, Tile>();
 const currentVisibleTiles = new Set<string>();
+let minimapMemoryVersion = 0;
 
 // 当前服务端发来的 tiles 及其 origin
 let currentTiles: VisibleTile[][] = [];
@@ -1359,6 +1392,22 @@ function refreshHudChrome() {
   });
 }
 
+function syncMinimap() {
+  minimap.updateScene({
+    mapMeta: currentMapMeta,
+    snapshot: currentMinimap,
+    rememberedMarkers: myPlayer ? getRememberedMarkers(myPlayer.mapId) : [],
+    visibleMarkers: currentVisibleMinimapMarkers,
+    tileCache,
+    visibleTiles: currentVisibleTiles,
+    visibleEntities: latestEntities,
+    groundPiles: visibleGroundPiles,
+    player: myPlayer ? { x: myPlayer.x, y: myPlayer.y } : null,
+    viewRadius: getInfoRadius(),
+    memoryVersion: minimapMemoryVersion,
+  });
+}
+
 function hasSelectionWithin(root: HTMLElement | null): boolean {
   if (!root) return false;
   const selection = window.getSelection();
@@ -1413,6 +1462,7 @@ function planPathTo(target: { x: number; y: number }, options?: { ignoreVisibili
 function resetGameState() {
   myPlayer = null;
   currentMapMeta = null;
+  currentMinimap = null;
   currentTimeState = null;
   latestAttrUpdate = null;
   renderCurrentTime(null);
@@ -1422,6 +1472,7 @@ function resetGameState() {
   tileOriginY = 0;
   tileCache.clear();
   currentVisibleTiles.clear();
+  minimapMemoryVersion = 0;
   visibleGroundPiles.clear();
   latestTechniqueMap.clear();
   latestActionMap.clear();
@@ -1443,6 +1494,7 @@ function resetGameState() {
   actionPanel.clear();
   lootPanel.clear();
   worldPanel.clear();
+  minimap.clear();
   resizeCanvas();
   document.getElementById('hud')?.classList.add('hidden');
 }
@@ -1496,6 +1548,7 @@ function cacheTiles(mapId: string, tiles: VisibleTile[][], originX: number, orig
       tileCache.set(key, tile);
     }
   }
+  minimapMemoryVersion += 1;
 }
 
 // 键盘输入
@@ -1521,6 +1574,8 @@ function resizeCanvas() {
   canvas.width = width;
   canvas.height = height;
   syncDisplayMetrics();
+  minimap.resize();
+  syncMinimap();
 }
 resizeCanvas();
 refreshZoomChrome();
@@ -1650,6 +1705,19 @@ socket.onInit((data: S2C_Init) => {
   myPlayer.autoIdleCultivation = myPlayer.autoIdleCultivation !== false;
   syncTargetingOverlay();
   currentMapMeta = data.mapMeta;
+  cacheMapMeta(data.mapMeta);
+  currentVisibleMinimapMarkers = data.visibleMinimapMarkers ?? [];
+  rememberVisibleMarkers(myPlayer.mapId, currentVisibleMinimapMarkers);
+  cacheUnlockedMinimapLibrary(data.minimapLibrary);
+  myPlayer.unlockedMinimapIds = data.minimapLibrary.map((entry) => entry.mapId).sort();
+  currentMinimap = data.minimap ?? (
+    myPlayer.unlockedMinimapIds.includes(myPlayer.mapId)
+      ? getCachedMapSnapshot(myPlayer.mapId)
+      : null
+  );
+  if (data.minimap) {
+    cacheMapSnapshot(myPlayer.mapId, data.minimap, { meta: data.mapMeta, unlocked: true });
+  }
   currentTiles = data.tiles;
   tileOriginX = myPlayer.x - getInfoRadius();
   tileOriginY = myPlayer.y - getInfoRadius();
@@ -1658,6 +1726,7 @@ socket.onInit((data: S2C_Init) => {
   hydrateTileCacheFromMemory(myPlayer.mapId, tileCache);
   cacheTiles(myPlayer.mapId, currentTiles, tileOriginX, tileOriginY);
   syncSenseQiOverlay();
+  syncMinimap();
 
   syncDisplayMetrics();
   camera.snap(myPlayer);
@@ -1688,6 +1757,12 @@ socket.onInit((data: S2C_Init) => {
   questPanel.initFromPlayer(myPlayer);
   actionPanel.initFromPlayer(myPlayer);
   refreshUiChrome();
+  suggestionPanel.setPlayerId(myPlayer.id);
+});
+
+// 建议更新
+socket.onSuggestionUpdate((data) => {
+  suggestionPanel.updateSuggestions(data.suggestions);
 });
 
 // Tick 更新
@@ -1720,9 +1795,13 @@ socket.onTick((data: S2C_Tick) => {
     mapChanged = myPlayer.mapId !== data.m;
     if (mapChanged) {
       clearCurrentPath();
+      currentMapMeta = null;
       currentTiles = [];
       tileCache.clear();
       currentVisibleTiles.clear();
+      minimapMemoryVersion = 0;
+      currentMinimap = null;
+      currentVisibleMinimapMarkers = [];
       visibleGroundPiles.clear();
       latestEntities = [];
       latestEntityMap.clear();
@@ -1735,11 +1814,30 @@ socket.onTick((data: S2C_Tick) => {
     myPlayer.mapId = data.m;
     questPanel.setCurrentMapId(myPlayer.mapId);
     if (mapChanged) {
+      currentMinimap = (myPlayer.unlockedMinimapIds ?? []).includes(myPlayer.mapId)
+        ? getCachedMapSnapshot(myPlayer.mapId)
+        : null;
       hydrateTileCacheFromMemory(myPlayer.mapId, tileCache);
     }
   }
   if (data.mapMeta) {
     currentMapMeta = data.mapMeta;
+    cacheMapMeta(data.mapMeta);
+  }
+  if (data.minimapLibrary) {
+    cacheUnlockedMinimapLibrary(data.minimapLibrary);
+    myPlayer.unlockedMinimapIds = data.minimapLibrary.map((entry) => entry.mapId).sort();
+    if (!currentMinimap && myPlayer.unlockedMinimapIds.includes(myPlayer.mapId)) {
+      currentMinimap = getCachedMapSnapshot(myPlayer.mapId);
+    }
+  }
+  if (data.visibleMinimapMarkers) {
+    currentVisibleMinimapMarkers = data.visibleMinimapMarkers;
+    rememberVisibleMarkers(myPlayer.mapId, currentVisibleMinimapMarkers);
+  }
+  if (data.minimap) {
+    currentMinimap = data.minimap;
+    cacheMapSnapshot(myPlayer.mapId, data.minimap, { meta: currentMapMeta, unlocked: true });
   }
 
   if (typeof data.hp === 'number') {
@@ -1773,6 +1871,9 @@ socket.onTick((data: S2C_Tick) => {
     cacheTiles(myPlayer.mapId, currentTiles, tileOriginX, tileOriginY);
     syncSenseQiOverlay();
   }
+  if (data.t) {
+    applyVisibleTilePatches(data.t);
+  }
   if (data.g) {
     visibleGroundPiles = mergeGroundItemPatches(data.g);
   }
@@ -1788,6 +1889,7 @@ socket.onTick((data: S2C_Tick) => {
   latestEntities = entities;
   syncTargetingOverlay();
   refreshHudChrome();
+  syncMinimap();
 
   if (moved) {
     const shiftX = myPlayer.x - oldX;

@@ -1,3 +1,7 @@
+/**
+ * GM 业务逻辑：玩家状态查看/修改、Bot 生成/移除、地图编辑保存
+ * 命令通过队列延迟到 tick 内执行，保证线程安全
+ */
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -82,6 +86,7 @@ export class GmService {
     private readonly techniqueService: TechniqueService,
   ) {}
 
+  /** 获取全局 GM 状态：所有玩家摘要、地图列表、Bot 数量、性能快照 */
   async getState(): Promise<GmStateRes> {
     const [entities, runtimePlayers] = await Promise.all([
       this.playerRepo.find(),
@@ -117,6 +122,7 @@ export class GmService {
     };
   }
 
+  /** 获取单个玩家的完整详情（在线取运行时，离线取数据库） */
   async getPlayerDetail(playerId: string): Promise<GmManagedPlayerRecord | null> {
     const runtime = this.playerService.getPlayer(playerId);
     if (runtime) {
@@ -139,6 +145,7 @@ export class GmService {
     return this.mapService.getEditableMap(mapId) ?? null;
   }
 
+  /** 保存地图编辑结果，自动重载运行时并迁移受影响玩家 */
   async saveEditableMap(mapId: string, document: GmMapDocument): Promise<string | null> {
     if (!this.mapService.getMapMeta(mapId)) {
       return '目标地图不存在';
@@ -167,6 +174,7 @@ export class GmService {
     return null;
   }
 
+  /** 入队玩家状态更新命令（在线走 tick 队列，离线直接写库） */
   async enqueuePlayerUpdate(playerId: string, snapshot: PlayerState): Promise<string | null> {
     const runtime = this.playerService.getPlayer(playerId);
     if (runtime) {
@@ -189,6 +197,7 @@ export class GmService {
     return null;
   }
 
+  /** 入队玩家重置命令（传送回出生点、清除状态） */
   async enqueueResetPlayer(playerId: string): Promise<string | null> {
     const runtime = this.playerService.getPlayer(playerId);
     if (runtime) {
@@ -205,6 +214,7 @@ export class GmService {
     return null;
   }
 
+  /** 入队 Bot 生成命令 */
   async enqueueSpawnBots(anchorPlayerId: string, count: number): Promise<string | null> {
     const runtime = this.playerService.getPlayer(anchorPlayerId);
     if (runtime) {
@@ -233,6 +243,7 @@ export class GmService {
     return null;
   }
 
+  /** 入队 Bot 移除命令 */
   enqueueRemoveBots(playerIds?: string[], removeAll = false): string | null {
     const bots = this.playerService.getAllPlayers().filter((player) => player.isBot);
     const targets = removeAll
@@ -260,12 +271,14 @@ export class GmService {
     return null;
   }
 
+  /** 取出并清空指定地图的待执行 GM 命令 */
   drainCommands(mapId: string): GmCommand[] {
     const commands = this.commandsByMap.get(mapId) ?? [];
     this.commandsByMap.set(mapId, []);
     return commands;
   }
 
+  /** 在 tick 内执行单条 GM 命令 */
   applyCommand(command: GmCommand): string | null {
     switch (command.type) {
       case 'updatePlayer':
@@ -368,6 +381,7 @@ export class GmService {
         techniques: persistedCollections.techniques,
         quests: persistedCollections.quests,
         revealedBreakthroughRequirementIds: player.revealedBreakthroughRequirementIds ?? [],
+        unlockedMinimapIds: player.unlockedMinimapIds ?? [],
         autoBattle: player.autoBattle,
         autoBattleSkills: player.autoBattleSkills,
         autoRetaliate: player.autoRetaliate,
@@ -377,6 +391,7 @@ export class GmService {
     };
   }
 
+  /** 从数据库实体还原为运行时 PlayerState */
   private hydrateStoredPlayer(entity: PlayerEntity): PlayerState {
     const player: PlayerState = {
       id: entity.id,
@@ -408,6 +423,9 @@ export class GmService {
       revealedBreakthroughRequirementIds: Array.isArray(entity.revealedBreakthroughRequirementIds)
         ? entity.revealedBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
         : [],
+      unlockedMinimapIds: Array.isArray(entity.unlockedMinimapIds)
+        ? entity.unlockedMinimapIds.filter((entry): entry is string => typeof entry === 'string')
+        : [],
     };
 
     this.techniqueService.initializePlayerProgression(player);
@@ -416,6 +434,7 @@ export class GmService {
     return player;
   }
 
+  /** 将快照数据应用到玩家状态上 */
   private applyPlayerSnapshot(player: PlayerState, snapshot: PlayerState, runtime: boolean): string | null {
     const nextMapId = typeof snapshot.mapId === 'string' ? snapshot.mapId : player.mapId;
     const nextX = this.normalizeInt(snapshot.x, player.x);
@@ -455,6 +474,9 @@ export class GmService {
     player.idleTicks = 0;
     player.revealedBreakthroughRequirementIds = Array.isArray(snapshot.revealedBreakthroughRequirementIds)
       ? snapshot.revealedBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+    player.unlockedMinimapIds = Array.isArray(snapshot.unlockedMinimapIds)
+      ? [...new Set(snapshot.unlockedMinimapIds.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0))].sort()
       : [];
     player.cultivatingTechId = typeof snapshot.cultivatingTechId === 'string' && snapshot.cultivatingTechId.length > 0
       ? snapshot.cultivatingTechId
@@ -513,6 +535,7 @@ export class GmService {
     return this.mapService.canOccupy(mapId, x, y, { occupancyId: playerId, actorType: 'player' });
   }
 
+  /** 将离线玩家状态持久化到数据库 */
   private async persistOfflinePlayer(entity: PlayerEntity, player: PlayerState): Promise<void> {
     this.techniqueService.preparePlayerForPersistence(player);
     const persisted = buildPersistedPlayerCollections(player, this.contentService, this.mapService);
@@ -535,6 +558,7 @@ export class GmService {
       techniques: persisted.techniques as any,
       quests: persisted.quests as any,
       revealedBreakthroughRequirementIds: player.revealedBreakthroughRequirementIds as any,
+      unlockedMinimapIds: player.unlockedMinimapIds as any,
       autoBattle: player.autoBattle,
       autoBattleSkills: player.autoBattleSkills as any,
       autoRetaliate: player.autoRetaliate,
@@ -549,6 +573,7 @@ export class GmService {
     this.commandsByMap.set(mapId, commands);
   }
 
+  /** 地图保存后为位置不合法的玩家寻找安全坐标 */
   private resolveMapSaveRelocation(player: PlayerState): { x: number; y: number } | null {
     const mapMeta = this.mapService.getMapMeta(player.mapId);
     if (!mapMeta) return null;

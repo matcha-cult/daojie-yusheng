@@ -1,3 +1,7 @@
+/**
+ * WebSocket 网关 —— 客户端连接的入口，负责认证、顶号、断线保留、
+ * 新建角色，以及将所有客户端指令转发到 tick 命令队列。
+ */
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -23,6 +27,10 @@ import {
   C2S_Action,
   C2S_UpdateAutoBattleSkills,
   C2S_Chat,
+  C2S_CreateSuggestion,
+  C2S_VoteSuggestion,
+  C2S_GmMarkSuggestionCompleted,
+  C2S_GmRemoveSuggestion,
   PlayerState,
   S2C_Init,
   S2C_SystemMsg,
@@ -31,6 +39,7 @@ import {
   HP_PER_CONSTITUTION,
   Direction,
   VIEW_RADIUS,
+  encodeServerEventPayload,
 } from '@mud/shared';
 import { AuthService } from '../auth/auth.service';
 import { ActionService } from './action.service';
@@ -42,6 +51,7 @@ import { TimeService } from './time.service';
 import { WorldService } from './world.service';
 import { PerformanceService } from './performance.service';
 import { TickService } from './tick.service';
+import { SuggestionService } from './suggestion.service';
 
 const DEFAULT_MAP = 'spawn';
 
@@ -63,8 +73,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly timeService: TimeService,
     private readonly performanceService: PerformanceService,
     private readonly tickService: TickService,
+    private readonly suggestionService: SuggestionService,
   ) {}
 
+  /** 客户端连接时：认证 → 顶号/断线恢复/存档加载/新建角色 → 下发初始化数据 */
   async handleConnection(client: Socket) {
     this.instrumentSocket(client);
     const token = client.handshake?.auth?.token as string;
@@ -158,6 +170,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       techniques: [],
       actions: [],
       quests: [],
+      unlockedMinimapIds: [],
       autoBattle: false,
       autoBattleSkills: [],
       autoRetaliate: true,
@@ -179,6 +192,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`玩家上线(新建): ${username} (${playerId})`);
   }
 
+  /** 客户端断开时：保存存档、移除占位、进入断线保留期 */
   async handleDisconnect(client: Socket) {
     const playerId = client.data?.playerId as string;
     if (!playerId) return;
@@ -393,15 +407,22 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** 组装并下发玩家初始化数据包（自身状态、地图、视野、小地图等） */
   private sendInit(client: Socket, player: PlayerState) {
     const mapMeta = this.mapService.getMapMeta(player.mapId);
     if (!mapMeta) return;
+    const unlockedMinimapIds = [...new Set((player.unlockedMinimapIds ?? []).filter((entry) => typeof entry === 'string' && entry.length > 0))].sort();
+    const minimap = unlockedMinimapIds.includes(player.mapId)
+      ? this.mapService.getMinimapSnapshot(player.mapId)
+      : undefined;
+    const minimapLibrary = this.mapService.getMinimapArchiveEntries(unlockedMinimapIds);
     this.tickService.resetPlayerSyncState(player.id);
     this.timeService.syncPlayerTimeEffects(player);
     this.actionService.rebuildActions(player, this.worldService.getContextActions(player));
 
     const time = this.timeService.buildPlayerTimeState(player);
     const visibility = this.aoiService.getVisibility(player, time.effectiveViewRange);
+    const visibleMinimapMarkers = this.mapService.getVisibleMinimapMarkers(player.mapId, visibility.visibleKeys);
     const nearbyPlayers = this.playerService.getPlayersByMap(player.mapId)
       .filter((target) => visibility.visibleKeys.has(`${target.x},${target.y}`))
       .map((target) => this.worldService.buildPlayerRenderEntity(
@@ -410,10 +431,54 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         target.id === player.id ? '#ff0' : target.isBot ? '#6bb8ff' : '#0f0',
       ));
 
-    const initData: S2C_Init = { self: player, mapMeta, tiles: visibility.tiles, players: nearbyPlayers, time };
+    const initData: S2C_Init = { self: player, mapMeta, minimap, visibleMinimapMarkers, minimapLibrary, tiles: visibility.tiles, players: nearbyPlayers, time };
     client.emit(S2C.Init, initData);
+    client.emit(S2C.SuggestionUpdate, { suggestions: this.suggestionService.getAll() });
   }
 
+  @SubscribeMessage(C2S.CreateSuggestion)
+  async handleCreateSuggestion(client: Socket, data: C2S_CreateSuggestion) {
+    const playerId = client.data?.playerId as string;
+    const player = this.playerService.getPlayer(playerId);
+    if (!player) return;
+
+    await this.suggestionService.create(
+      playerId,
+      player.displayName || player.name,
+      data.title,
+      data.description,
+    );
+    this.broadcastSuggestions();
+  }
+
+  @SubscribeMessage(C2S.VoteSuggestion)
+  async handleVoteSuggestion(client: Socket, data: C2S_VoteSuggestion) {
+    const playerId = client.data?.playerId as string;
+    if (!playerId) return;
+
+    await this.suggestionService.vote(playerId, data.suggestionId, data.vote);
+    this.broadcastSuggestions();
+  }
+
+  @SubscribeMessage(C2S.GmMarkSuggestionCompleted)
+  async handleGmMarkSuggestionCompleted(client: Socket, data: C2S_GmMarkSuggestionCompleted) {
+    await this.suggestionService.markCompleted(data.suggestionId);
+    this.broadcastSuggestions();
+  }
+
+  @SubscribeMessage(C2S.GmRemoveSuggestion)
+  async handleGmRemoveSuggestion(client: Socket, data: C2S_GmRemoveSuggestion) {
+    await this.suggestionService.remove(data.suggestionId);
+    this.broadcastSuggestions();
+  }
+
+  /** 向所有在线玩家广播最新建议列表 */
+  private broadcastSuggestions() {
+    const suggestions = this.suggestionService.getAll();
+    this.server.emit(S2C.SuggestionUpdate, { suggestions });
+  }
+
+  /** 解析登录位置：若原坐标不可通行则就近寻找可行走格 */
   private resolveLoginPosition(mapId: string, x: number, y: number): { x: number; y: number } {
     if (this.mapService.isWalkable(mapId, x, y, { actorType: 'player' })) {
       return { x, y };
@@ -421,6 +486,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.mapService.findNearbyWalkable(mapId, x, y, 8, { actorType: 'player' }) ?? { x, y };
   }
 
+  /** 拦截 socket.emit，注入出站流量统计 */
   private instrumentSocket(client: Socket): void {
     if ((client.data as { __networkInstrumented?: boolean }).__networkInstrumented) {
       return;
@@ -429,9 +495,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const originalEmit = client.emit.bind(client);
     client.emit = ((event: string, ...args: unknown[]) => {
+      const encodedArgs = args.map((arg) => encodeServerEventPayload(event, arg));
       const label = `WS ${event}`;
-      this.performanceService.recordNetworkOutBytes(this.estimateSocketPacketBytes(event, args), label, label);
-      return originalEmit(event, ...args);
+      this.performanceService.recordNetworkOutBytes(this.estimateSocketPacketBytes(event, encodedArgs), label, label);
+      return originalEmit(event, ...encodedArgs);
     }) as typeof client.emit;
 
     client.onAny((event, ...args) => {
@@ -441,10 +508,32 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private estimateSocketPacketBytes(event: string, args: unknown[]): number {
+    return Buffer.byteLength(String(event)) + args.reduce<number>((total, arg) => total + this.estimateSocketValueBytes(arg), 0);
+  }
+
+  private estimateSocketValueBytes(value: unknown): number {
+    if (value === undefined || value === null) {
+      return 0;
+    }
+    if (typeof value === 'string') {
+      return Buffer.byteLength(value);
+    }
+    if (Buffer.isBuffer(value)) {
+      return value.length;
+    }
+    if (value instanceof Uint8Array) {
+      return value.byteLength;
+    }
+    if (value instanceof ArrayBuffer) {
+      return value.byteLength;
+    }
+    if (ArrayBuffer.isView(value)) {
+      return value.byteLength;
+    }
     try {
-      return Buffer.byteLength(JSON.stringify([event, ...args]));
+      return Buffer.byteLength(JSON.stringify(value));
     } catch {
-      return Buffer.byteLength(String(event));
+      return Buffer.byteLength(String(value));
     }
   }
 }

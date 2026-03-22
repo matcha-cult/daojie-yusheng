@@ -11,7 +11,8 @@
     "report:values:technique": "pnpm build && node dist/tools/report-technique-values.js",
     "report:values:skill": "pnpm build && node dist/tools/report-skill-values.js",
     "report:values:buff": "pnpm build && node dist/tools/report-buff-values.js",
-    "report:values:all": "pnpm build && node dist/tools/report-all-values.js"
+    "report:values:all": "pnpm build && node dist/tools/report-all-values.js",
+    "report:values:docs": "pnpm build && node dist/tools/export-value-reports.js"
   },
   "dependencies": {
     "@mud/shared": "workspace:*",

@@ -1,3 +1,8 @@
+/**
+ * 设置面板
+ * 提供显示名称、角色名称修改与密码修改功能
+ */
+
 import { detailModalHost } from '../detail-modal-host';
 import { validateDisplayName, validatePassword, validateRoleName } from '../account-rules';
 import {
@@ -35,7 +40,8 @@ export class SettingsPanel {
     this.options = options;
   }
 
-  open(): void {
+  /** 打开设置弹层 */
+  open(): void {    
     if (!this.options) {
       return;
     }

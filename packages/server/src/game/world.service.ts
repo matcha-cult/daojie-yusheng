@@ -1,3 +1,8 @@
+/**
+ * 世界服务 —— 游戏核心逻辑的编排层。
+ * 负责战斗结算、技能释放、NPC 交互、任务推进、怪物 AI、
+ * 自动战斗、传送、观察系统等所有与"世界规则"相关的行为。
+ */
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ActionDef,
@@ -93,6 +98,7 @@ interface NpcPresenceProfile {
   qi: number;
 }
 
+/** tick 中产生的消息，最终推送给对应玩家 */
 export interface WorldMessage {
   playerId: string;
   text: string;
@@ -105,6 +111,7 @@ export interface WorldMessage {
   };
 }
 
+/** 世界逻辑执行结果，包含错误、消息、脏标记等 */
 export interface WorldUpdate {
   error?: string;
   messages: WorldMessage[];
@@ -196,10 +203,12 @@ export class WorldService {
     private readonly timeService: TimeService,
   ) {}
 
+  /** 获取玩家视野内的可见实体（容器、NPC、怪物） */
   getVisibleEntities(player: PlayerState, visibleKeys: Set<string>): RenderEntity[] {
     return this.getVisibleEntitiesForMap(player, player.mapId, visibleKeys);
   }
 
+  /** 获取父地图上投影到当前地图视野内的可见实体 */
   getProjectedVisibleEntities(player: PlayerState, sourceMapId: string, visibleKeys: Set<string>): RenderEntity[] {
     return this.getVisibleEntitiesForMap(player, sourceMapId, visibleKeys, (x, y) => {
       const projected = this.mapService.projectPointToMap(player.mapId, sourceMapId, x, y);
@@ -286,6 +295,7 @@ export class WorldService {
     return [...containers, ...npcs, ...monsters];
   }
 
+  /** 地图重载时重建运行时怪物实例 */
   reloadMapRuntime(mapId: string): void {
     const monsters = this.monstersByMap.get(mapId) ?? [];
     for (const monster of monsters) {
@@ -298,6 +308,7 @@ export class WorldService {
     this.ensureMapInitialized(mapId);
   }
 
+  /** 构建玩家的渲染实体数据（用于其他玩家视野中的显示） */
   buildPlayerRenderEntity(viewer: PlayerState, target: PlayerState, color: string): RenderEntity {
     const snapshot = this.createPlayerObservationSnapshot(target);
     const displayName = target.displayName ?? [...target.name][0] ?? '@';
@@ -323,6 +334,7 @@ export class WorldService {
     };
   }
 
+  /** 根据玩家当前位置和状态，构建可用的上下文行动列表 */
   getContextActions(player: PlayerState): ActionDef[] {
     this.syncQuestState(player);
     const effectiveViewRange = this.timeService.getEffectiveViewRangeFromBuff(player.viewRange, player.temporaryBuffs);
@@ -427,6 +439,7 @@ export class WorldService {
     return actions;
   }
 
+  /** 处理无目标交互（开关自动战斗、传送、NPC 对话等） */
   handleInteraction(player: PlayerState, actionId: string): WorldUpdate {
     if (actionId === 'battle:engage') {
       return { ...EMPTY_UPDATE, error: '缺少目标' };
@@ -532,6 +545,7 @@ export class WorldService {
     return this.handleNpcInteraction(player, npc);
   }
 
+  /** 处理需要指定目标的交互（强制攻击等） */
   handleTargetedInteraction(player: PlayerState, actionId: string, targetRef?: string): WorldUpdate {
     if (actionId === 'battle:force_attack') {
       return this.forceAttackTarget(player, targetRef);
@@ -539,6 +553,7 @@ export class WorldService {
     return { ...EMPTY_UPDATE, error: '该行动不支持指定目标' };
   }
 
+  /** 同步玩家任务进度，检测完成条件并刷新状态 */
   syncQuestState(player: PlayerState): WorldDirtyFlag[] {
     let changed = false;
 
@@ -592,6 +607,7 @@ export class WorldService {
     return [];
   }
 
+  /** 自动战斗逻辑：寻敌 → 追击 → 释放技能/普攻 */
   performAutoBattle(player: PlayerState): WorldUpdate {
     if (!player.autoBattle || player.dead) return EMPTY_UPDATE;
 
@@ -674,6 +690,7 @@ export class WorldService {
     return dirty.size > 0 ? { messages: [], dirty: [...dirty] } : EMPTY_UPDATE;
   }
 
+  /** 释放无目标技能 */
   performSkill(player: PlayerState, skillId: string): WorldUpdate {
     const skill = this.contentService.getSkill(skillId);
     if (!skill) {
@@ -685,6 +702,7 @@ export class WorldService {
     return this.castSkill(player, skill);
   }
 
+  /** 释放指定目标的技能 */
   performTargetedSkill(player: PlayerState, skillId: string, targetRef?: string): WorldUpdate {
     const skill = this.contentService.getSkill(skillId);
     if (!skill) {
@@ -705,6 +723,7 @@ export class WorldService {
     return this.castSkill(player, skill, target);
   }
 
+  /** 技能施放核心流程：中断修炼 → 选择目标 → 消耗真气 → 逐效果结算 */
   private castSkill(player: PlayerState, skill: SkillDef, primaryTarget?: ResolvedTarget): WorldUpdate {
     const cultivation = this.techniqueService.interruptCultivation(player, 'attack');
     const dirty = new Set<WorldDirtyFlag>(cultivation.dirty as WorldDirtyFlag[]);
@@ -812,6 +831,7 @@ export class WorldService {
     return result;
   }
 
+  /** 锁定目标并开启自动战斗 */
   engageTarget(player: PlayerState, targetRef?: string): WorldUpdate {
     if (!targetRef) {
       return { ...EMPTY_UPDATE, error: '缺少目标' };
@@ -1127,6 +1147,10 @@ export class WorldService {
   }
 
   private resolveSkillFormulaVar(variable: SkillFormulaVar, context: SkillFormulaContext): number {
+    const parsedBuffVar = this.parseBuffStackVariable(variable);
+    if (parsedBuffVar) {
+      return this.resolveBuffStackVariable(parsedBuffVar.side, parsedBuffVar.buffId, context);
+    }
     switch (variable) {
       case 'techLevel':
         return context.techLevel;
@@ -1170,6 +1194,35 @@ export class WorldService {
         }
         return 0;
     }
+  }
+
+  private parseBuffStackVariable(variable: SkillFormulaVar): { side: 'caster' | 'target'; buffId: string } | null {
+    if (variable.startsWith('caster.buff.') && variable.endsWith('.stacks')) {
+      return {
+        side: 'caster',
+        buffId: variable.slice('caster.buff.'.length, -'.stacks'.length),
+      };
+    }
+    if (variable.startsWith('target.buff.') && variable.endsWith('.stacks')) {
+      return {
+        side: 'target',
+        buffId: variable.slice('target.buff.'.length, -'.stacks'.length),
+      };
+    }
+    return null;
+  }
+
+  private resolveBuffStackVariable(side: 'caster' | 'target', buffId: string, context: SkillFormulaContext): number {
+    if (side === 'caster') {
+      return context.player.temporaryBuffs?.find((buff) => buff.buffId === buffId && buff.remainingTicks > 0)?.stacks ?? 0;
+    }
+    if (context.target?.kind === 'player') {
+      return context.target.player.temporaryBuffs?.find((buff) => buff.buffId === buffId && buff.remainingTicks > 0)?.stacks ?? 0;
+    }
+    if (context.target?.kind === 'monster') {
+      return context.target.monster.temporaryBuffs?.find((buff) => buff.buffId === buffId && buff.remainingTicks > 0)?.stacks ?? 0;
+    }
+    return 0;
   }
 
   resetPlayerToSpawn(player: PlayerState): WorldUpdate {

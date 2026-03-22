@@ -1,3 +1,7 @@
+/**
+ * GM 管理后台前端 —— 登录鉴权、角色列表/编辑器、机器人管理、地图编辑器、建议反馈
+ */
+
 import {
   type BasicOkRes,
   Direction,
@@ -19,6 +23,7 @@ import {
   type ItemStack,
   type PlayerState,
   type QuestState,
+  type Suggestion,
   type TechniqueState,
   type TemporaryBuffState,
 } from '@mud/shared';
@@ -106,11 +111,15 @@ const gmPasswordNextInput = document.getElementById('gm-password-next') as HTMLI
 const gmPasswordSaveBtn = document.getElementById('gm-password-save') as HTMLButtonElement;
 const playerWorkspaceEl = document.getElementById('player-workspace') as HTMLElement;
 const mapWorkspaceEl = document.getElementById('map-workspace') as HTMLElement;
+const suggestionWorkspaceEl = document.getElementById('suggestion-workspace') as HTMLElement;
 const playerTabBtn = document.getElementById('gm-tab-players') as HTMLButtonElement;
 const mapTabBtn = document.getElementById('gm-tab-maps') as HTMLButtonElement;
+const suggestionTabBtn = document.getElementById('gm-tab-suggestions') as HTMLButtonElement;
+const suggestionListEl = document.getElementById('gm-suggestion-list') as HTMLElement;
 
 let token = sessionStorage.getItem(TOKEN_KEY) ?? '';
 let state: GmStateRes | null = null;
+let suggestions: Suggestion[] = [];
 let selectedPlayerId: string | null = null;
 let selectedPlayerDetail: GmManagedPlayerRecord | null = null;
 let loadingPlayerDetailId: string | null = null;
@@ -119,7 +128,7 @@ let draftSnapshot: PlayerState | null = null;
 let editorDirty = false;
 let draftSourcePlayerId: string | null = null;
 let pollTimer: number | null = null;
-let currentTab: 'players' | 'maps' = 'players';
+let currentTab: 'players' | 'maps' | 'suggestions' = 'players';
 let currentJsonView: 'runtime' | 'persisted' = 'runtime';
 
 function clone<T>(value: T): T {
@@ -197,18 +206,89 @@ function setStatus(message: string, isError = false): void {
 
 const mapEditor = new GmMapEditor(request, setStatus);
 
-function switchTab(tab: 'players' | 'maps'): void {
+function switchTab(tab: 'players' | 'maps' | 'suggestions'): void {
   currentTab = tab;
   playerTabBtn.classList.toggle('active', tab === 'players');
   mapTabBtn.classList.toggle('active', tab === 'maps');
+  suggestionTabBtn.classList.toggle('active', tab === 'suggestions');
   playerWorkspaceEl.classList.toggle('hidden', tab !== 'players');
   mapWorkspaceEl.classList.toggle('hidden', tab !== 'maps');
+  suggestionWorkspaceEl.classList.toggle('hidden', tab !== 'suggestions');
   if (tab === 'maps') {
     mapEditor.ensureLoaded().catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : '加载地图编辑器失败', true);
     });
+  } else if (tab === 'suggestions') {
+    loadSuggestions().catch(() => {});
   }
 }
+
+async function loadSuggestions(): Promise<void> {
+  try {
+    suggestions = await request<Suggestion[]>('/gm/suggestions');
+    renderSuggestions();
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '加载建议失败', true);
+  }
+}
+
+function renderSuggestions(): void {
+  if (!suggestions || suggestions.length === 0) {
+    suggestionListEl.innerHTML = '<div class="empty-hint">暂无建议反馈数据</div>';
+    return;
+  }
+
+  const sorted = [...suggestions].sort((a, b) => {
+    const scoreA = a.upvotes.length - a.downvotes.length;
+    const scoreB = b.upvotes.length - b.downvotes.length;
+    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+    return scoreB - scoreA;
+  });
+
+  suggestionListEl.innerHTML = sorted.map(s => `
+    <div class="suggestion-card" style="border: 1.5px solid var(--ink-black); margin-bottom: 20px; background: var(--paper-bg); box-shadow: 6px 6px 0 rgba(0,0,0,0.1);">
+      <div style="padding: 16px; border-bottom: 1.5px solid var(--ink-black); display: flex; justify-content: space-between; align-items: center; background: ${s.status === 'completed' ? '#e8f5e9' : 'transparent'}">
+        <div>
+          <span style="font-family: var(--font-heading-main); font-size: 20px;">${escapeHtml(s.title)}</span>
+          <span class="pill" style="margin-left: 10px; background: ${s.status === 'completed' ? '#2e7d32' : 'var(--ink-grey)'}">${s.status === 'completed' ? '已完成' : '待处理'}</span>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-weight: bold;">${escapeHtml(s.authorName)}</div>
+          <div style="font-size: 12px; color: var(--ink-grey);">${new Date(s.createdAt).toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="padding: 16px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; border-bottom: 1.5px solid var(--ink-black);">${escapeHtml(s.description)}</div>
+      <div style="padding: 12px 16px; display: flex; align-items: center; gap: 20px;">
+        <div style="font-weight: bold; color: var(--ink-black);">赞同: ${s.upvotes.length} | 反对: ${s.downvotes.length} | 分值: ${s.upvotes.length - s.downvotes.length}</div>
+        <div style="margin-left: auto; display: flex; gap: 10px;">
+          ${s.status === 'pending' ? `<button class="primary small-btn" onclick="completeSuggestion('${s.id}')">标记完成</button>` : ''}
+          <button class="danger small-btn" onclick="removeSuggestion('${s.id}')">永久移除</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+(window as any).completeSuggestion = async (id: string) => {
+  try {
+    await request(`/gm/suggestions/${id}/complete`, { method: 'POST' });
+    setStatus('建议已标记为完成');
+    await loadSuggestions();
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '操作失败', true);
+  }
+};
+
+(window as any).removeSuggestion = async (id: string) => {
+  if (!confirm('确定要移除这条建议吗？此操作不可撤销。')) return;
+  try {
+    await request(`/gm/suggestions/${id}`, { method: 'DELETE' });
+    setStatus('建议已成功移除');
+    await loadSuggestions();
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '移除失败', true);
+  }
+};
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers ?? {});
@@ -1424,6 +1504,7 @@ editorContentEl.addEventListener('change', () => {
 playerSearchInput.addEventListener('input', () => render());
 playerTabBtn.addEventListener('click', () => switchTab('players'));
 mapTabBtn.addEventListener('click', () => switchTab('maps'));
+suggestionTabBtn.addEventListener('click', () => switchTab('suggestions'));
 loginForm.addEventListener('submit', (event) => {
   event.preventDefault();
   login().catch(() => {});

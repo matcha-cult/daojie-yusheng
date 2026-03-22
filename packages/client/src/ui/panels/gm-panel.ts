@@ -1,4 +1,9 @@
-import { C2S_GmUpdatePlayer, GmPlayerSummary, S2C_GmState } from '@mud/shared';
+/**
+ * GM 管理面板
+ * 提供服务端性能监控、在线玩家列表、玩家编辑、机器人控制与意见管理
+ */
+
+import { C2S_GmUpdatePlayer, GmPlayerSummary, S2C_GmState, Suggestion } from '@mud/shared';
 
 interface GmCallbacks {
   onRefresh: () => void;
@@ -8,6 +13,8 @@ interface GmCallbacks {
   onRemoveBots: (playerIds?: string[], all?: boolean) => void;
   onUpdatePlayer: (payload: C2S_GmUpdatePlayer) => void;
   onResetPlayer: (playerId: string) => void;
+  onMarkSuggestionCompleted: (id: string) => void;
+  onRemoveSuggestion: (id: string) => void;
 }
 
 function createEmptyGmState(): S2C_GmState {
@@ -30,6 +37,7 @@ function createEmptyGmState(): S2C_GmState {
 export class GmPanel {
   private pane = document.getElementById('pane-gm')!;
   private state: S2C_GmState = createEmptyGmState();
+  private suggestions: Suggestion[] = [];
   private selectedPlayerId: string | null = null;
   private callbacks: GmCallbacks | null = null;
   private initialized = false;
@@ -42,6 +50,7 @@ export class GmPanel {
   private playerListEl: HTMLElement | null = null;
   private detailFormEl: HTMLElement | null = null;
   private detailEmptyEl: HTMLElement | null = null;
+  private suggestionListEl: HTMLElement | null = null;
 
   private mapSelect: HTMLSelectElement | null = null;
   private xInput: HTMLInputElement | null = null;
@@ -58,6 +67,7 @@ export class GmPanel {
     this.callbacks = callbacks;
   }
 
+  /** 接收服务端 GM 状态并刷新所有子区域 */
   update(state: S2C_GmState): void {
     this.state = state;
     this.ensureLayout();
@@ -68,6 +78,54 @@ export class GmPanel {
     this.updateOverview();
     this.updatePlayerList();
     this.updateDetail();
+    this.updateSuggestions();
+  }
+
+  updateSuggestionsData(suggestions: Suggestion[]) {
+    this.suggestions = suggestions;
+    this.updateSuggestions();
+  }
+
+  private updateSuggestions() {
+    if (!this.suggestionListEl) return;
+    
+    if (this.suggestions.length === 0) {
+      this.suggestionListEl.innerHTML = '<div style="color:#666; padding:10px; text-align:center;">暂无意见收集</div>';
+      return;
+    }
+
+    this.suggestionListEl.innerHTML = this.suggestions
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map(s => `
+        <div style="border-bottom:1px solid #333; padding:5px; margin-bottom:5px;">
+          <div style="display:flex; justify-content:space-between;">
+            <span style="font-weight:bold; color:${s.status === 'completed' ? '#0f0' : '#ffcc00'}">${s.title}</span>
+            <span style="color:#888; font-size:10px;">${s.authorName}</span>
+          </div>
+          <div style="color:#aaa; margin:3px 0; word-break:break-all;">${s.description}</div>
+          <div style="display:flex; gap:10px; align-items:center; margin-top:5px;">
+            <span style="color:#888;">👍${s.upvotes.length} 👎${s.downvotes.length}</span>
+            ${s.status === 'pending' ? `<button class="gm-suggest-complete" data-id="${s.id}" style="font-size:10px; padding:1px 4px; cursor:pointer;">标记完成</button>` : ''}
+            <button class="gm-suggest-remove" data-id="${s.id}" style="font-size:10px; padding:1px 4px; color:#ff4444; cursor:pointer;">移除</button>
+          </div>
+        </div>
+      `).join('');
+
+    this.suggestionListEl.querySelectorAll('.gm-suggest-complete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.id;
+        if (id) this.callbacks?.onMarkSuggestionCompleted(id);
+      });
+    });
+
+    this.suggestionListEl.querySelectorAll('.gm-suggest-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.id;
+        if (id && confirm('确定移除这条意见吗？')) {
+          this.callbacks?.onRemoveSuggestion(id);
+        }
+      });
+    });
   }
 
   clear(): void {
@@ -164,6 +222,11 @@ export class GmPanel {
           </div>
         </div>
       </div>
+      <div class="panel-section">
+        <div class="panel-section-title">意见管理</div>
+        <div id="gm-suggestion-list" style="max-height: 200px; overflow-y: auto; font-size: 11px; border: 1px solid #444; padding: 5px; background: rgba(0,0,0,0.2);">
+        </div>
+      </div>
     `;
 
     this.perfCpuEl = this.pane.querySelector('[data-gm-perf-cpu]');
@@ -174,6 +237,7 @@ export class GmPanel {
     this.playerListEl = this.pane.querySelector('[data-gm-player-list]');
     this.detailFormEl = this.pane.querySelector('[data-gm-detail-form]');
     this.detailEmptyEl = this.pane.querySelector('[data-gm-detail-empty]');
+    this.suggestionListEl = this.pane.querySelector<HTMLElement>('#gm-suggestion-list');
     this.mapSelect = this.pane.querySelector<HTMLSelectElement>('#gm-map');
     this.xInput = this.pane.querySelector<HTMLInputElement>('#gm-x');
     this.yInput = this.pane.querySelector<HTMLInputElement>('#gm-y');

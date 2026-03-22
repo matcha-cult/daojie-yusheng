@@ -1,3 +1,6 @@
+/**
+ * 价值报表核心库：读取内容数据、计算装备/功法/技能/Buff 的量化价值、渲染 Markdown 表格
+ */
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -9,6 +12,8 @@ import {
   resolveSkillUnlockLevel,
   SkillBuffEffectDef,
   SkillDef,
+  SkillFormula,
+  SkillFormulaVar,
   TechniqueGrade,
   TechniqueLayerDef,
 } from '@mud/shared';
@@ -37,10 +42,15 @@ type RawMap = {
   dangerLevel?: number;
 };
 
+/** 价值报表单行数据 */
 export interface ValueReportRow {
   name: string;
   grade: string;
   level: string;
+  range?: string;
+  damageTargets?: string;
+  cooldown?: string;
+  cost?: string;
   quantifiedValue: string;
   unquantifiedValue: string;
 }
@@ -80,10 +90,12 @@ function walkForItemIds(value: unknown, found: Set<string>): void {
   }
 }
 
+/** 读取所有功法模板 */
 export function readTechniques(): RawTechnique[] {
   return readJsonEntries<RawTechnique>(path.join(getContentRoot(), 'techniques'));
 }
 
+/** 读取所有装备类物品 */
 export function readEquipmentItems(): RawEquipment[] {
   return readJsonEntries<RawEquipment>(path.join(getContentRoot(), 'items'))
     .filter((entry) => entry.type === 'equipment');
@@ -141,11 +153,134 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
 }
 
+function formatSignedNumber(value: number): string {
+  if (value > 0) return `+${formatNumber(value)}`;
+  return formatNumber(value);
+}
+
+function formatPercent(scale: number): string {
+  return `${formatNumber(scale * 100)}%`;
+}
+
 function joinUnquantified(parts: string[]): string {
   const unique = [...new Set(parts.map((entry) => entry.trim()).filter((entry) => entry.length > 0))];
   return unique.length > 0 ? unique.join('；') : '-';
 }
 
+function describeSkillBuffEffect(effect: SkillBuffEffectDef): string {
+  const summary = calculateBuffValue(effect);
+  const category = effect.category ?? (effect.target === 'self' ? 'buff' : 'debuff');
+  const categoryLabel = category === 'debuff' ? '减益' : '增益';
+  const stackText = effect.maxStacks && effect.maxStacks > 1 ? `，最多${effect.maxStacks}层` : '';
+  return `${categoryLabel} ${effect.name}(${formatSignedNumber(summary.quantifiedValue)}，持续${effect.duration}息${stackText})`;
+}
+
+function buildSkillMetaParts(skill: SkillDef): string[] {
+  const parts: string[] = [];
+  for (const effect of skill.effects) {
+    if (effect.type !== 'buff') continue;
+    parts.push(describeSkillBuffEffect(effect));
+  }
+  return parts;
+}
+
+function parseBuffStackVariable(variable: SkillFormulaVar): { side: 'caster' | 'target'; buffId: string } | null {
+  if (!variable.endsWith('.stacks')) {
+    return null;
+  }
+  const matched = variable.match(/^(caster|target)\.buff\.(.+)\.stacks$/);
+  if (!matched) {
+    return null;
+  }
+  return {
+    side: matched[1] as 'caster' | 'target',
+    buffId: matched[2],
+  };
+}
+
+function collectBuffStackLinks(formula: SkillFormula, found: Array<{ side: 'caster' | 'target'; buffId: string; scale: number }>): void {
+  if (typeof formula === 'number') {
+    return;
+  }
+  if ('var' in formula) {
+    const parsed = parseBuffStackVariable(formula.var);
+    if (parsed) {
+      found.push({
+        ...parsed,
+        scale: formula.scale ?? 1,
+      });
+    }
+    return;
+  }
+  if (formula.op === 'clamp') {
+    collectBuffStackLinks(formula.value, found);
+    if (formula.min !== undefined) {
+      collectBuffStackLinks(formula.min, found);
+    }
+    if (formula.max !== undefined) {
+      collectBuffStackLinks(formula.max, found);
+    }
+    return;
+  }
+  for (const arg of formula.args) {
+    collectBuffStackLinks(arg, found);
+  }
+}
+
+function buildTechniqueBuffNameMap(skills: SkillDef[]): Map<string, string> {
+  const buffNames = new Map<string, string>();
+  for (const skill of skills) {
+    for (const effect of skill.effects) {
+      if (effect.type !== 'buff') {
+        continue;
+      }
+      buffNames.set(effect.buffId, effect.name);
+    }
+  }
+  return buffNames;
+}
+
+function buildSkillComboParts(technique: RawTechnique, skill: SkillDef): string[] {
+  const links: Array<{ side: 'caster' | 'target'; buffId: string; scale: number }> = [];
+  for (const effect of skill.effects) {
+    if (effect.type !== 'damage') {
+      continue;
+    }
+    collectBuffStackLinks(effect.formula, links);
+  }
+
+  if (links.length === 0) {
+    return [];
+  }
+
+  const buffNames = buildTechniqueBuffNameMap(technique.skills);
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const link of links) {
+    const sideLabel = link.side === 'caster' ? '自身' : '目标';
+    const buffName = buffNames.get(link.buffId) ?? '状态';
+    const key = `${link.side}:${link.buffId}:${link.scale}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    parts.push(`连携 ${sideLabel}${buffName}层数×${formatPercent(link.scale)}`);
+  }
+  return parts;
+}
+
+function resolveSkillDamageTargets(skill: SkillDef): string {
+  const hasDamageEffect = skill.effects.some((effect) => effect.type === 'damage');
+  if (!hasDamageEffect) {
+    return '-';
+  }
+  if (typeof skill.targeting?.maxTargets === 'number' && skill.targeting.maxTargets > 0) {
+    return String(skill.targeting.maxTargets);
+  }
+  return '1';
+}
+
+/** 构建装备价值报表行 */
 export function buildEquipmentRows(): ValueReportRow[] {
   const dangerIndex = buildEquipmentMapDangerIndex();
   return readEquipmentItems().map((item) => {
@@ -171,6 +306,7 @@ export function buildEquipmentRows(): ValueReportRow[] {
   });
 }
 
+/** 构建功法价值报表行 */
 export function buildTechniqueRows(): ValueReportRow[] {
   return readTechniques().map((technique) => {
     const maxLevel = technique.layers[technique.layers.length - 1]?.level ?? 1;
@@ -188,19 +324,29 @@ export function buildTechniqueRows(): ValueReportRow[] {
   });
 }
 
+/** 构建技能价值报表行 */
 export function buildSkillRows(): ValueReportRow[] {
   return readTechniques().flatMap((technique) => technique.skills.map((skill) => {
     const summary = calculateSkillValue(skill);
+    const metaParts = buildSkillMetaParts(skill);
+    const comboParts = buildSkillComboParts(technique, skill);
+    const rawDetailParts = summary.unquantified.length > 0 ? summary.unquantified : [skill.desc];
+    const detailParts = rawDetailParts.filter((entry) => entry !== '基础值 1' && !/^(自身|目标)对应状态层数×/.test(entry));
     return {
       name: skill.name,
       grade: formatTechniqueGrade(technique.grade),
       level: String(resolveSkillUnlockLevel(skill)),
+      range: String(skill.range),
+      damageTargets: resolveSkillDamageTargets(skill),
+      cooldown: String(skill.cooldown),
+      cost: String(skill.cost),
       quantifiedValue: formatNumber(summary.quantifiedValue),
-      unquantifiedValue: joinUnquantified(summary.unquantified.length > 0 ? summary.unquantified : [skill.desc]),
+      unquantifiedValue: joinUnquantified([...metaParts, ...comboParts, ...detailParts]),
     };
   }));
 }
 
+/** 构建 Buff 价值报表行 */
 export function buildBuffRows(): ValueReportRow[] {
   return readTechniques().flatMap((technique) => technique.skills.flatMap((skill) => skill.effects
     .filter((effect): effect is SkillBuffEffectDef => effect.type === 'buff')
@@ -216,6 +362,7 @@ export function buildBuffRows(): ValueReportRow[] {
     })));
 }
 
+/** 将报表行渲染为 Markdown 表格 */
 export function renderMarkdownTable(title: string, rows: ValueReportRow[]): string {
   const sortedRows = [...rows].sort((left, right) => {
     const leftValue = Number(left.quantifiedValue) || 0;
@@ -229,9 +376,17 @@ export function renderMarkdownTable(title: string, rows: ValueReportRow[]): stri
   const lines = [
     `## ${title}`,
     '',
-    '| 名字 | 品阶 | 等级 | 量化价值 | 无法量化价值 |',
-    '| --- | --- | --- | --- | --- |',
-    ...sortedRows.map((row) => `| ${escapeCell(row.name)} | ${escapeCell(row.grade)} | ${escapeCell(row.level)} | ${escapeCell(row.quantifiedValue)} | ${escapeCell(row.unquantifiedValue)} |`),
+    ...(title === '技能价值报表'
+      ? [
+          '| 名字 | 品阶 | 等级 | 释放距离 | 伤害数量 | CD | 消耗 | 量化价值 | 无法量化价值 |',
+          '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+          ...sortedRows.map((row) => `| ${escapeCell(row.name)} | ${escapeCell(row.grade)} | ${escapeCell(row.level)} | ${escapeCell(row.range ?? '-')} | ${escapeCell(row.damageTargets ?? '-')} | ${escapeCell(row.cooldown ?? '-')} | ${escapeCell(row.cost ?? '-')} | ${escapeCell(row.quantifiedValue)} | ${escapeCell(row.unquantifiedValue)} |`),
+        ]
+      : [
+          '| 名字 | 品阶 | 等级 | 量化价值 | 无法量化价值 |',
+          '| --- | --- | --- | --- | --- |',
+          ...sortedRows.map((row) => `| ${escapeCell(row.name)} | ${escapeCell(row.grade)} | ${escapeCell(row.level)} | ${escapeCell(row.quantifiedValue)} | ${escapeCell(row.unquantifiedValue)} |`),
+        ]),
     '',
   ];
   return lines.join('\n');

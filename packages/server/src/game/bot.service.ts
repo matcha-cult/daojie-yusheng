@@ -1,3 +1,6 @@
+/**
+ * Bot（傀儡）管理：生成、AI 漫游、移除
+ */
 import { Injectable } from '@nestjs/common';
 import {
   DEFAULT_BASE_ATTRS,
@@ -23,10 +26,12 @@ export class BotService {
     private readonly navigationService: NavigationService,
   ) {}
 
+  /** 在指定玩家附近生成 Bot */
   spawnBots(anchor: PlayerState, count: number): number {
     return this.spawnBotsAt(anchor.mapId, anchor.x, anchor.y, count);
   }
 
+  /** 在指定地图坐标附近生成指定数量的 Bot */
   spawnBotsAt(mapId: string, centerX: number, centerY: number, count: number): number {
     const targetCount = Math.max(0, Math.min(50, Math.floor(count)));
     let created = 0;
@@ -57,6 +62,7 @@ export class BotService {
         techniques: [],
         actions: [],
         quests: [],
+        unlockedMinimapIds: [],
         autoBattle: false,
         autoBattleSkills: [],
         autoRetaliate: false,
@@ -76,6 +82,7 @@ export class BotService {
     return created;
   }
 
+  /** 每 tick 驱动 Bot AI：随机漫游寻路 */
   tickBots(mapId: string) {
     const bots = this.playerService.getPlayersByMap(mapId).filter((player) => player.isBot);
     for (const bot of bots) {
@@ -88,6 +95,7 @@ export class BotService {
     }
   }
 
+  /** 移除指定或全部 Bot */
   removeBots(playerIds?: string[]): number {
     const targets = playerIds && playerIds.length > 0
       ? playerIds.filter((id) => this.botIds.has(id))
@@ -111,6 +119,7 @@ export class BotService {
     return this.botIds.size;
   }
 
+  /** 在中心点附近搜索可用出生位置 */
   private findSpawnPosition(mapId: string, centerX: number, centerY: number): { x: number; y: number } | null {
     for (let radius = 1; radius <= 8; radius++) {
       const candidates: Array<{ x: number; y: number }> = [];
@@ -130,6 +139,7 @@ export class BotService {
     return null;
   }
 
+  /** 为 Bot 随机选取一个漫游目标点 */
   private findRoamTarget(bot: PlayerState): { x: number; y: number } | null {
     const candidates: Array<{ x: number; y: number }> = [];
     for (let attempt = 0; attempt < 16; attempt++) {

@@ -1,3 +1,8 @@
+/**
+ * 功法面板
+ * 展示已习得功法列表、逐层详情弹窗、主修切换与技能提示
+ */
+
 import {
   Attributes,
   calcTechniqueAttrValues,
@@ -84,6 +89,7 @@ export class TechniquePanel {
     this.onCultivate = onCultivate;
   }
 
+  /** 更新功法列表与主修状态 */
   update(techniques: TechniqueState[], cultivatingTechId?: string, previewPlayer?: PlayerState): void {
     this.lastState = { techniques, cultivatingTechId, previewPlayer };
     this.renderList();
@@ -283,6 +289,7 @@ export class TechniquePanel {
           unlockLevel,
           techLevel: technique?.level,
           player: this.lastState.previewPlayer,
+          knownSkills: this.lastState.techniques.flatMap((entry) => entry.skills),
         }) : { lines: [], asideCards: [] };
         this.tooltip.show(title, tooltip.lines, event.clientX, event.clientY, {
           allowHtml: rich,

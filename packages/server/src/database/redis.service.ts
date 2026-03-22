@@ -1,8 +1,12 @@
+/**
+ * Redis 服务 —— 管理玩家在线状态的实时缓存
+ */
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { PlayerState } from '@mud/shared';
 import type { PersistedPlayerCollections } from '../game/player-storage';
 
+/** 生成玩家 Redis 键名 */
 const PLAYER_KEY = (id: string) => `player:${id}`;
 
 @Injectable()
@@ -49,6 +53,7 @@ export class RedisService implements OnModuleDestroy {
       techniques: JSON.stringify(persisted?.techniques ?? state.techniques),
       quests: JSON.stringify(persisted?.quests ?? state.quests),
       actions: JSON.stringify(state.actions),
+      unlockedMinimapIds: JSON.stringify(state.unlockedMinimapIds ?? []),
       autoBattle: state.autoBattle ? '1' : '0',
       autoBattleSkills: JSON.stringify(state.autoBattleSkills),
       autoRetaliate: state.autoRetaliate === false ? '0' : '1',

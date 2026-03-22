@@ -305,3 +305,4 @@
 - `pnpm --filter @mud/server report:values:skill`
 - `pnpm --filter @mud/server report:values:buff`
 - `pnpm --filter @mud/server report:values:all`
+- `pnpm --filter @mud/server report:values:docs` 生成 `docs/量化分析/` 下的四份独立报表

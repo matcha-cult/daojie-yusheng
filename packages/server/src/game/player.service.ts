@@ -1,3 +1,7 @@
+/**
+ * 玩家服务 —— 管理所有在线玩家的内存状态、Socket 映射、命令队列、
+ * 脏标记系统、断线保留，以及与 PG/Redis 的存档读写。
+ */
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,6 +40,7 @@ import {
   hydrateTechniqueSnapshots,
 } from './player-storage';
 
+/** 玩家指令，由客户端消息转化后入队，在 tick 中统一执行 */
 export interface PlayerCommand {
   playerId: string;
   type: 'move' | 'moveTo' | 'action' | 'useItem' | 'dropItem' | 'takeLoot' | 'sortInventory' | 'equip' | 'unequip' | 'cultivate' | 'debugResetSpawn' | 'updateAutoBattleSkills';
@@ -43,11 +48,20 @@ export interface PlayerCommand {
   timestamp: number;
 }
 
+/** 数据变更类型标记，用于增量同步 */
 export type DirtyFlag = 'attr' | 'inv' | 'equip' | 'tech' | 'actions' | 'loot' | 'quest';
 
+/** 断线保留会话，在保留期内重连可恢复状态 */
 interface RetainedSession {
   player: PlayerState;
   expiresAt: number;
+}
+
+function normalizeUnlockedMinimapIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return [...new Set(value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0))].sort();
 }
 
 @Injectable()
@@ -93,6 +107,7 @@ export class PlayerService {
     return buildPersistedPlayerCollections(state, this.contentService, this.mapService);
   }
 
+  /** 将玩家状态同步到 Redis 缓存 */
   private syncPlayerCache(state: PlayerState): Promise<void> {
     return this.redisService.setPlayer(state, this.buildPersistedCollections(state));
   }
@@ -131,6 +146,7 @@ export class PlayerService {
       revealedBreakthroughRequirementIds: Array.isArray(entity.revealedBreakthroughRequirementIds)
         ? entity.revealedBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
         : [],
+      unlockedMinimapIds: normalizeUnlockedMinimapIds(entity.unlockedMinimapIds),
       autoBattle: entity.autoBattle ?? false,
       autoBattleSkills: (entity.autoBattleSkills ?? []) as AutoBattleSkillConfig[],
       autoRetaliate: entity.autoRetaliate ?? true,
@@ -159,6 +175,7 @@ export class PlayerService {
     if (!state.techniques) state.techniques = [];
     if (!state.quests) state.quests = [];
     if (!state.revealedBreakthroughRequirementIds) state.revealedBreakthroughRequirementIds = [];
+    state.unlockedMinimapIds = normalizeUnlockedMinimapIds(state.unlockedMinimapIds);
     if (state.autoBattle === undefined) state.autoBattle = false;
     if (state.combatTargetLocked === undefined) state.combatTargetLocked = false;
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
@@ -199,6 +216,7 @@ export class PlayerService {
       techniques: persisted.techniques as any,
       quests: persisted.quests as any,
       revealedBreakthroughRequirementIds: state.revealedBreakthroughRequirementIds as any,
+      unlockedMinimapIds: state.unlockedMinimapIds as any,
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
@@ -234,6 +252,7 @@ export class PlayerService {
       techniques: persisted.techniques as any,
       quests: persisted.quests as any,
       revealedBreakthroughRequirementIds: state.revealedBreakthroughRequirementIds as any,
+      unlockedMinimapIds: state.unlockedMinimapIds as any,
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
@@ -271,6 +290,7 @@ export class PlayerService {
         techniques: persisted.techniques as any,
         quests: persisted.quests as any,
         revealedBreakthroughRequirementIds: state.revealedBreakthroughRequirementIds as any,
+        unlockedMinimapIds: state.unlockedMinimapIds as any,
         autoBattle: state.autoBattle,
         autoBattleSkills: state.autoBattleSkills as any,
         autoRetaliate: state.autoRetaliate,
@@ -282,15 +302,18 @@ export class PlayerService {
     this.logger.log(`批量落盘 ${entities.length} 名玩家`);
   }
 
+  /** 将玩家加入内存并同步 Redis（用于存档恢复后的注册） */
   addPlayer(state: PlayerState) {
     this.players.set(state.id, state);
     this.syncPlayerCache(state).catch(() => {});
   }
 
+  /** 仅加入内存，不同步 Redis（用于 Bot 等运行时实体） */
   addRuntimePlayer(state: PlayerState) {
     this.players.set(state.id, state);
   }
 
+  /** 移除玩家并清理 Redis 缓存 */
   removePlayer(playerId: string) {
     this.players.delete(playerId);
     this.socketMap.delete(playerId);
@@ -298,6 +321,7 @@ export class PlayerService {
     this.redisService.removePlayer(playerId).catch(() => {});
   }
 
+  /** 仅从内存移除，不清理 Redis（用于 Bot 等运行时实体） */
   removeRuntimePlayer(playerId: string) {
     this.players.delete(playerId);
     this.socketMap.delete(playerId);
@@ -353,6 +377,7 @@ export class PlayerService {
     this.userToPlayer.delete(userId);
   }
 
+  /** 将玩家移入断线保留池，从活跃列表中移除但保留状态 */
   retainPlayer(userId: string, playerId: string) {
     const player = this.players.get(playerId);
     if (!player) return;
@@ -367,6 +392,7 @@ export class PlayerService {
     this.dirtyFlags.delete(playerId);
   }
 
+  /** 从断线保留池恢复玩家状态（未过期时） */
   restoreRetainedPlayer(userId: string): PlayerState | null {
     const retained = this.retainedSessions.get(userId);
     if (!retained) return null;
@@ -381,6 +407,7 @@ export class PlayerService {
     return retained.player;
   }
 
+  /** 清理已过期的断线保留会话 */
   clearExpiredRetainedSessions() {
     const now = Date.now();
     for (const [userId, retained] of this.retainedSessions.entries()) {
@@ -416,6 +443,7 @@ export class PlayerService {
     await this.syncPlayerCache(player);
   }
 
+  /** 将玩家指令入队到对应地图的命令队列 */
   enqueueCommand(mapId: string, cmd: PlayerCommand) {
     const list = this.commands.get(mapId) ?? [];
     list.push(cmd);
@@ -434,6 +462,7 @@ export class PlayerService {
     return [...map.values()];
   }
 
+  /** 规范化任务数据：补全目标名称、NPC 位置、奖励信息等 */
   private normalizeQuests(quests: QuestState[]): QuestState[] {
     return quests.map((quest) => ({
       ...quest,
@@ -468,6 +497,7 @@ export class PlayerService {
     }));
   }
 
+  /** 校验并过滤临时 Buff 数组，剔除字段不完整或已失效的条目 */
   private normalizeTemporaryBuffs(value: unknown): TemporaryBuffState[] {
     if (!Array.isArray(value)) {
       return [];

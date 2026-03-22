@@ -1,3 +1,7 @@
+/**
+ * 价值量化系统：将属性、数值、装备、Buff、技能、功法等游戏要素
+ * 统一折算为可比较的"价值点"，用于平衡性分析。
+ */
 import { ELEMENT_KEYS, NUMERIC_SCALAR_STAT_KEYS, PartialNumericStats } from './numeric';
 import { calcTechniqueAttrValues } from './technique';
 import type {
@@ -13,6 +17,7 @@ import type {
   TechniqueState,
 } from './types';
 
+/** 六维属性每点对应的价值 */
 export const ATTRIBUTE_VALUE_PER_POINT: Record<AttrKey, number> = {
   constitution: 3,
   spirit: 3,
@@ -22,6 +27,7 @@ export const ATTRIBUTE_VALUE_PER_POINT: Record<AttrKey, number> = {
   luck: 3,
 };
 
+/** 各数值属性折算为 1 价值所需的点数 */
 export const NUMERIC_STAT_POINTS_PER_VALUE = {
   maxHp: 12,
   maxQi: 8,
@@ -90,7 +96,12 @@ const FORMULA_VAR_VALUE_UNITS: Partial<Record<QuantifiableFormulaVar, number>> =
 };
 
 const MULTIPLIER_BASELINE = 100;
+const BUFF_DURATION_BASELINE = 10;
+const BUFF_DURATION_SHORT_EXPONENT = 0.5;
+const BUFF_DURATION_LONG_LOG_FACTOR = 1.5;
+const BUFF_DURATION_MAX_MULTIPLIER = 8;
 
+/** 价值分解条目 */
 export interface ValueBreakdownEntry {
   kind: 'attr' | 'stat' | 'element' | 'skill' | 'buff' | 'technique';
   key: string;
@@ -99,12 +110,14 @@ export interface ValueBreakdownEntry {
   note?: string;
 }
 
+/** 价值汇总结果 */
 export interface ValueSummary {
   quantifiedValue: number;
   breakdown: ValueBreakdownEntry[];
   unquantified: string[];
 }
 
+/** 技能价值汇总（含基础价值和乘区倍率） */
 export interface SkillValueSummary extends ValueSummary {
   baseQuantifiedValue: number;
   multiplier: number;
@@ -159,6 +172,29 @@ function formatPercent(scale: number): string {
   return `${formatNumber(scale * 100)}%`;
 }
 
+function getNumericStatLabel(key: string): string {
+  const labels: Record<string, string> = {
+    maxHp: '最大生命',
+    maxQi: '最大灵力',
+    physAtk: '物攻',
+    spellAtk: '法攻',
+    physDef: '物防',
+    spellDef: '法防',
+    hit: '命中',
+    dodge: '闪避',
+    crit: '暴击',
+    critDamage: '暴伤',
+    breakPower: '破招',
+    resolvePower: '化解',
+    moveSpeed: '移速',
+    qiRegenRate: '灵力回复',
+    hpRegenRate: '生命回复',
+    cooldownSpeed: '冷却速度',
+    auraPowerRate: '灵气强度',
+  };
+  return labels[key] ?? key;
+}
+
 function getFormulaVarLabel(variable: SkillFormulaVar): string {
   const labels: Partial<Record<SkillFormulaVar, string>> = {
     techLevel: '功法层数',
@@ -175,11 +211,17 @@ function getFormulaVarLabel(variable: SkillFormulaVar): string {
   if (labels[variable]) {
     return labels[variable]!;
   }
+  if (variable.startsWith('caster.buff.') && variable.endsWith('.stacks')) {
+    return '自身对应状态层数';
+  }
+  if (variable.startsWith('target.buff.') && variable.endsWith('.stacks')) {
+    return '目标对应状态层数';
+  }
   if (variable.startsWith('caster.stat.')) {
-    return `自身${variable.slice('caster.stat.'.length)}`;
+    return `自身${getNumericStatLabel(variable.slice('caster.stat.'.length))}`;
   }
   if (variable.startsWith('target.stat.')) {
-    return `目标${variable.slice('target.stat.'.length)}`;
+    return `目标${getNumericStatLabel(variable.slice('target.stat.'.length))}`;
   }
   return variable;
 }
@@ -196,6 +238,12 @@ function getFormulaVarPointsPerValue(variable: SkillFormulaVar): number | null {
 }
 
 function quantifyFormulaVar(variable: SkillFormulaVar, scale: number): FormulaQuantification {
+  if ((variable.startsWith('caster.buff.') || variable.startsWith('target.buff.')) && variable.endsWith('.stacks')) {
+    return {
+      quantifiedValue: 0,
+      unquantified: [describeFormulaVar(variable, scale)],
+    };
+  }
   if (variable === 'target.maxHp' || variable === 'target.hp' || variable.startsWith('target.stat.')) {
     return {
       quantifiedValue: 0,
@@ -363,6 +411,24 @@ function quantifySkillFormula(formula: SkillFormula): SkillValueSummary {
       };
     }
 
+    const quantifiedBodies = bodyParts.filter((entry) => entry.breakdown.length > 0 || entry.quantifiedValue !== 0 || entry.baseQuantifiedValue !== 0);
+    const multiplierLikeBodies = bodyParts.filter((entry) => !quantifiedBodies.includes(entry));
+    if (quantifiedBodies.length === 1) {
+      const body = quantifiedBodies[0];
+      const multiplierUnquantified = uniqueStrings(multiplierLikeBodies.flatMap((entry) => entry.unquantified));
+      return {
+        quantifiedValue: roundValue(body.quantifiedValue * multiplier),
+        breakdown: body.breakdown.map((entry) => ({
+          ...entry,
+          quantifiedValue: entry.quantifiedValue * multiplier,
+          note: multiplier !== 1 ? `乘区 x${formatNumber(multiplier)}` : entry.note,
+        })),
+        unquantified: uniqueStrings([...body.unquantified, ...multiplierUnquantified]),
+        baseQuantifiedValue: body.baseQuantifiedValue,
+        multiplier: roundValue(body.multiplier * multiplier),
+      };
+    }
+
     return {
       quantifiedValue: 0,
       breakdown: [],
@@ -394,6 +460,7 @@ function quantifySkillFormula(formula: SkillFormula): SkillValueSummary {
   };
 }
 
+/** 计算六维属性的价值 */
 export function calculateAttributesValue(attrs?: Partial<Attributes>): ValueSummary {
   const breakdown: ValueBreakdownEntry[] = [];
   if (attrs) {
@@ -412,6 +479,7 @@ export function calculateAttributesValue(attrs?: Partial<Attributes>): ValueSumm
   return finalizeSummary(breakdown, []);
 }
 
+/** 计算数值属性的价值 */
 export function calculateNumericStatsValue(stats?: PartialNumericStats): ValueSummary {
   const breakdown: ValueBreakdownEntry[] = [];
   if (stats) {
@@ -453,6 +521,7 @@ export function calculateNumericStatsValue(stats?: PartialNumericStats): ValueSu
   return finalizeSummary(breakdown, []);
 }
 
+/** 计算属性加成来源的价值（六维 + 数值） */
 export function calculateAttrBonusValue(bonus: Pick<AttrBonus, 'attrs' | 'stats'>): ValueSummary {
   const attrSummary = calculateAttributesValue(bonus.attrs);
   const statSummary = calculateNumericStatsValue(bonus.stats);
@@ -462,6 +531,7 @@ export function calculateAttrBonusValue(bonus: Pick<AttrBonus, 'attrs' | 'stats'
   );
 }
 
+/** 计算装备的价值 */
 export function calculateEquipmentValue(item: Pick<ItemStack, 'equipAttrs' | 'equipStats' | 'desc'>): ValueSummary {
   const summary = calculateAttrBonusValue({
     attrs: item.equipAttrs ?? {},
@@ -475,9 +545,17 @@ export function calculateEquipmentValue(item: Pick<ItemStack, 'equipAttrs' | 'eq
   return finalizeSummary(summary.breakdown, unquantified);
 }
 
+/** 计算 Buff 效果的价值（按持续时间折算） */
 export function calculateBuffValue(
   effect: Pick<SkillBuffEffectDef, 'buffId' | 'name' | 'desc' | 'duration' | 'attrs' | 'stats'>,
 ): ValueSummary {
+  const duration = Math.max(1, effect.duration);
+  const durationMultiplier = duration <= BUFF_DURATION_BASELINE
+    ? Math.pow(duration / BUFF_DURATION_BASELINE, BUFF_DURATION_SHORT_EXPONENT)
+    : Math.min(
+        BUFF_DURATION_MAX_MULTIPLIER,
+        1 + BUFF_DURATION_LONG_LOG_FACTOR * Math.log(duration / BUFF_DURATION_BASELINE),
+      );
   const summary = calculateAttrBonusValue({
     attrs: effect.attrs ?? {},
     stats: effect.stats,
@@ -486,8 +564,8 @@ export function calculateBuffValue(
     ...entry,
     kind: 'buff' as const,
     key: `${effect.buffId}.${entry.key}`,
-    quantifiedValue: entry.quantifiedValue * effect.duration,
-    note: `持续 ${effect.duration} 息`,
+    quantifiedValue: entry.quantifiedValue * durationMultiplier,
+    note: `持续 ${duration} 息，折算 x${formatNumber(durationMultiplier)}`,
   }));
   const unquantified = [...summary.unquantified];
   if (effect.desc) {
@@ -496,6 +574,7 @@ export function calculateBuffValue(
   return finalizeSummary(breakdown, unquantified);
 }
 
+/** 计算技能的价值（含伤害公式量化） */
 export function calculateSkillValue(skill: Pick<SkillDef, 'id' | 'name' | 'desc' | 'cost' | 'cooldown' | 'effects'>): SkillValueSummary {
   const breakdown: ValueBreakdownEntry[] = [];
   const unquantified: string[] = [];
@@ -523,10 +602,12 @@ export function calculateSkillValue(skill: Pick<SkillDef, 'id' | 'name' | 'desc'
   };
 }
 
+/** 计算功法单层的价值 */
 export function calculateTechniqueLayerValue(layer: TechniqueLayerDef): ValueSummary {
   return calculateAttributesValue(layer.attrs);
 }
 
+/** 计算功法在当前层数下的总价值 */
 export function calculateTechniqueValue(technique: Pick<TechniqueState, 'level' | 'layers' | 'attrCurves'>): ValueSummary {
   const attrs = calcTechniqueAttrValues(technique.level, technique.layers, technique.attrCurves);
   const summary = calculateAttributesValue(attrs);

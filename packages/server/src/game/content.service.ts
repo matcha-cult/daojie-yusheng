@@ -1,3 +1,6 @@
+/**
+ * 内容数据服务：加载并管理功法、物品、境界、突破等静态配置
+ */
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -338,6 +341,7 @@ export class ContentService implements OnModuleInit {
     return PlayerRealmStage[value];
   }
 
+  /** 获取新角色初始背包 */
   getStarterInventory(): Inventory {
     return this.normalizeInventory({
       capacity: DEFAULT_INVENTORY_CAPACITY,
@@ -347,6 +351,7 @@ export class ContentService implements OnModuleInit {
     });
   }
 
+  /** 根据物品 ID 创建物品栈 */
   createItem(itemId: string, count = 1): ItemStack | null {
     const item = this.items.get(itemId);
     if (!item) return null;
@@ -359,9 +364,11 @@ export class ContentService implements OnModuleInit {
       equipSlot: item.equipSlot,
       equipAttrs: item.equipAttrs,
       equipStats: item.equipStats,
+      mapUnlockId: item.mapUnlockId,
     };
   }
 
+  /** 规范化物品栈：用模板数据补全字段 */
   normalizeItemStack(item: ItemStack): ItemStack {
     const normalized = this.createItem(item.itemId, item.count);
     if (!normalized) {
@@ -374,6 +381,7 @@ export class ContentService implements OnModuleInit {
     };
   }
 
+  /** 规范化背包：合并同类物品、补全模板数据 */
   normalizeInventory(inventory: Inventory): Inventory {
     const mergedItems: ItemStack[] = [];
     const mergedIndex = new Map<string, ItemStack>();
@@ -398,6 +406,7 @@ export class ContentService implements OnModuleInit {
     };
   }
 
+  /** 规范化装备槽数据 */
   normalizeEquipment(equipment: EquipmentSlots): EquipmentSlots {
     const normalized = { weapon: null, head: null, body: null, legs: null, accessory: null } as EquipmentSlots;
     for (const slot of EQUIP_SLOTS) {
@@ -435,6 +444,7 @@ export class ContentService implements OnModuleInit {
     return this.getRealmLevelEntry(this.getRealmLevelRange(stage).levelFrom);
   }
 
+  /** 根据境界阶段和修炼进度解析对应的境界等级条目 */
   resolveRealmLevelEntry(
     stage: PlayerRealmStage,
     progress = 0,
@@ -469,6 +479,7 @@ export class ContentService implements OnModuleInit {
       };
   }
 
+  /** 跨功法全局查找技能定义 */
   getSkill(skillId: string): SkillDef | undefined {
     for (const technique of this.techniques.values()) {
       const skill = technique.skills.find((entry) => entry.id === skillId);

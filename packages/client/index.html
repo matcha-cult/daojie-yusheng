@@ -962,6 +962,295 @@
     .map-targeting-indicator.hidden {
       display: none;
     }
+    .map-minimap-shell {
+      position: absolute;
+      right: 12px;
+      top: 12px;
+      z-index: 4;
+      display: grid;
+      justify-items: end;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .map-minimap-shell.hidden {
+      display: none;
+    }
+    .map-minimap-controls {
+      display: flex;
+      gap: 6px;
+      pointer-events: auto;
+    }
+    .map-minimap-btn {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 10px;
+      border: 1px solid rgba(235, 220, 184, 0.24);
+      background: rgba(10, 11, 13, 0.78);
+      color: rgba(245, 235, 216, 0.92);
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .map-minimap-btn:hover {
+      background: rgba(18, 20, 24, 0.9);
+      border-color: rgba(245, 227, 185, 0.4);
+    }
+    .map-minimap-btn:active {
+      transform: translateY(1px);
+    }
+    .map-minimap {
+      width: clamp(132px, 18vw, 204px);
+      aspect-ratio: 1;
+      pointer-events: none;
+    }
+    .map-minimap.hidden {
+      display: none;
+    }
+    .map-minimap-frame {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      padding: 10px;
+      border: 1px solid rgba(240, 224, 196, 0.22);
+      background:
+        linear-gradient(180deg, rgba(20, 18, 16, 0.82), rgba(8, 8, 9, 0.84));
+      box-shadow:
+        0 16px 36px rgba(0, 0, 0, 0.28),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(2px);
+    }
+    .map-minimap-title {
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      right: 12px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-family: var(--font-heading-sub);
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: rgba(245, 235, 216, 0.92);
+    }
+    .map-minimap-canvas,
+    .map-minimap-modal-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.18);
+    }
+    .map-minimap-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 150;
+      background: rgba(3, 4, 6, 0.08);
+      pointer-events: auto;
+    }
+    .map-minimap-modal.hidden {
+      display: none;
+    }
+    .map-minimap-modal-window {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(1320px, calc(100vw - 28px));
+      height: min(860px, calc(100vh - 28px));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      border: 1px solid rgba(236, 222, 192, 0.24);
+      background:
+        linear-gradient(180deg, rgba(14, 15, 18, 0.78), rgba(9, 10, 12, 0.8));
+      box-shadow:
+        0 24px 48px rgba(0, 0, 0, 0.34),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(4px);
+      pointer-events: auto;
+      user-select: none;
+      overflow: hidden;
+    }
+    .map-minimap-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .map-minimap-modal-title {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: rgba(245, 235, 216, 0.94);
+    }
+    .map-minimap-modal-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .map-minimap-modal-close {
+      min-width: 34px;
+      height: 30px;
+      border: 1px solid rgba(235, 220, 184, 0.24);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(245, 235, 216, 0.9);
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .map-minimap-modal-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .map-minimap-modal-body {
+      position: relative;
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+      padding: 12px;
+      overflow: hidden;
+    }
+    .map-minimap-modal-sidebar {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px;
+      min-height: 0;
+    }
+    .map-minimap-modal-toolbar {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .map-minimap-modal-filters {
+      display: flex;
+      gap: 6px;
+    }
+    .map-minimap-modal-filter {
+      flex: 1;
+      min-width: 0;
+      height: 30px;
+      border: 1px solid rgba(235, 220, 184, 0.2);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(245, 235, 216, 0.76);
+      font-family: var(--font-body);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .map-minimap-modal-filter.active {
+      background: rgba(234, 210, 158, 0.16);
+      color: rgba(255, 244, 221, 0.96);
+      border-color: rgba(245, 227, 185, 0.32);
+    }
+    .map-minimap-modal-list {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding-right: 2px;
+    }
+    .map-minimap-modal-empty {
+      padding: 12px;
+      border: 1px dashed rgba(245, 227, 185, 0.18);
+      color: rgba(245, 235, 216, 0.62);
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .map-minimap-modal-item {
+      width: 100%;
+      padding: 10px 10px 9px;
+      border: 1px solid rgba(235, 220, 184, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+      color: rgba(245, 235, 216, 0.9);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.2s;
+      overflow: hidden;
+    }
+    .map-minimap-modal-item:hover {
+      border-color: rgba(245, 227, 185, 0.32);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .map-minimap-modal-item.active {
+      background: rgba(225, 193, 140, 0.12);
+      border-color: rgba(245, 227, 185, 0.38);
+      transform: translateX(2px);
+    }
+    .map-minimap-modal-item-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .map-minimap-modal-item-name {
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+    .map-minimap-modal-item-badges {
+      display: inline-flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .map-minimap-modal-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      font-size: 11px;
+      line-height: 1;
+      color: #0f0e0c;
+    }
+    .map-minimap-modal-badge.unlock {
+      background: #f0d38a;
+    }
+    .map-minimap-modal-badge.memory {
+      background: #91c5d8;
+    }
+    .map-minimap-modal-item-desc {
+      margin-top: 6px;
+      font-size: 11px;
+      line-height: 1.7;
+      color: rgba(245, 235, 216, 0.62);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .map-minimap-modal-stage {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      overscroll-behavior: contain;
+    }
+    @media (max-width: 900px) {
+      .map-minimap-modal-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+      .map-minimap-modal-sidebar {
+        grid-template-rows: auto auto auto;
+      }
+      .map-minimap-modal-list {
+        max-height: 148px;
+      }
+    }
     .observe-modal {
       position: fixed;
       inset: 0;
@@ -1833,6 +2122,27 @@
       width: min(860px, calc(100vw - 32px));
       max-height: min(84vh, 860px);
     }
+    .detail-modal.detail-modal--suggestion {
+      padding: 12px;
+    }
+    .detail-modal-card.detail-modal--suggestion {
+      width: min(1420px, calc(100vw - 24px));
+      height: min(92vh, calc(100vh - 24px));
+      max-height: none;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 18px 18px 16px;
+      background:
+        radial-gradient(circle at top right, rgba(214, 188, 142, 0.16), transparent 28%),
+        linear-gradient(180deg, rgba(249, 247, 241, 0.98), rgba(239, 235, 225, 0.97));
+      box-shadow: 14px 14px 0 rgba(0, 0, 0, 0.16);
+    }
+    .detail-modal-card.detail-modal--suggestion #detail-modal-body {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
     .detail-modal-head {
       display: flex;
       align-items: baseline;
@@ -1986,6 +2296,196 @@
       display: flex;
       justify-content: flex-end;
     }
+    .suggestion-shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 14px;
+      height: 100%;
+      min-height: 0;
+    }
+    .suggestion-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .suggestion-stat {
+      display: grid;
+      gap: 4px;
+      padding: 12px;
+      border: 1px solid var(--wash-ink);
+      background: rgba(255,255,255,0.48);
+    }
+    .suggestion-stat-label {
+      font-size: 11px;
+      color: var(--ink-grey);
+      letter-spacing: 0.08em;
+    }
+    .suggestion-stat-value {
+      font-family: var(--font-heading-sub);
+      font-size: 24px;
+      color: var(--ink-black);
+      line-height: 1;
+    }
+    .suggestion-stat-note {
+      font-size: 12px;
+      color: var(--ink-grey);
+      line-height: 1.5;
+    }
+    .suggestion-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 14px;
+      min-height: 0;
+    }
+    .suggestion-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 12px;
+      border: 1px solid var(--wash-ink);
+      background: linear-gradient(180deg, rgba(255,255,255,0.62), rgba(250,248,242,0.48));
+    }
+    .suggestion-pane-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--wash-ink);
+    }
+    .suggestion-pane-note {
+      font-size: 11px;
+      color: var(--ink-grey);
+    }
+    .suggestion-compose-copy {
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-grey);
+    }
+    .suggestion-form-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .suggestion-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .suggestion-field label {
+      font-family: var(--font-heading-sub);
+      font-size: 14px;
+      color: var(--ink-dark);
+    }
+    .suggestion-field input,
+    .suggestion-field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(17, 17, 17, 0.16);
+      background: rgba(255,255,255,0.86);
+      color: var(--ink-black);
+      font-family: var(--font-body);
+      font-size: 14px;
+      outline: none;
+      resize: none;
+    }
+    .suggestion-field input:focus,
+    .suggestion-field textarea:focus {
+      border-color: rgba(17, 17, 17, 0.38);
+    }
+    .suggestion-field textarea {
+      min-height: 144px;
+      line-height: 1.6;
+    }
+    .suggestion-compose-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .suggestion-compose-actions .small-btn {
+      min-width: 112px;
+    }
+    .suggestion-list {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding-right: 2px;
+    }
+    .suggestion-entry {
+      padding: 12px;
+      border: 1px solid var(--wash-ink);
+      background: rgba(255,255,255,0.66);
+    }
+    .suggestion-entry.completed {
+      background: rgba(247,246,241,0.5);
+      border-color: rgba(44, 47, 51, 0.12);
+    }
+    .suggestion-entry-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .suggestion-entry-title {
+      font-family: var(--font-heading-sub);
+      font-size: 15px;
+      color: var(--ink-black);
+      line-height: 1.4;
+    }
+    .suggestion-entry-meta {
+      flex-shrink: 0;
+      text-align: right;
+      font-size: 11px;
+      color: var(--ink-grey);
+      line-height: 1.5;
+    }
+    .suggestion-entry-desc {
+      font-size: 13px;
+      color: var(--ink-dark);
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .suggestion-entry-foot {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .suggestion-vote-btn {
+      min-width: 72px;
+      justify-content: center;
+    }
+    .suggestion-vote-btn.active.up {
+      border-color: #2e6d46;
+      color: #2e6d46;
+      background: rgba(46, 109, 70, 0.08);
+    }
+    .suggestion-vote-btn.active.down {
+      border-color: var(--stamp-red);
+      color: var(--stamp-red);
+      background: rgba(125, 27, 27, 0.08);
+    }
+    .suggestion-score {
+      margin-left: auto;
+      font-family: var(--font-heading-sub);
+      font-size: 13px;
+      color: var(--ink-grey);
+    }
+    .suggestion-score.positive {
+      color: #8b5e00;
+    }
+    .suggestion-score.negative {
+      color: var(--stamp-red);
+    }
     @media (max-width: 720px) {
       .account-settings-name-grid {
         grid-template-columns: minmax(0, 1fr);
@@ -1996,6 +2496,28 @@
       .account-settings-display-input {
         width: 100%;
         max-width: 120px;
+      }
+      .detail-modal.detail-modal--suggestion {
+        padding: 8px;
+      }
+      .detail-modal-card.detail-modal--suggestion {
+        width: calc(100vw - 16px);
+        height: calc(100vh - 16px);
+        padding: 14px 14px 12px;
+      }
+      .suggestion-summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .suggestion-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    @media (min-width: 721px) and (max-width: 1120px) {
+      .suggestion-layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .suggestion-compose {
+        grid-column: 1 / -1;
       }
     }
     .tech-modal-summary {
@@ -2270,6 +2792,42 @@
     }
     .skill-formula-term-resolve {
       color: #6a5747;
+    }
+    .skill-formula-term-buff-stack {
+      color: #5d4e68;
+    }
+    .skill-formula-term-percent {
+      color: #7a4d1f;
+    }
+    .skill-formula-buff-ref {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .skill-formula-buff-side,
+    .skill-formula-buff-stacks {
+      color: #7a6651;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .skill-formula-section-label {
+      display: inline-block;
+      margin-right: 6px;
+      color: #7a6651;
+      font-weight: 700;
+    }
+    .skill-formula-group {
+      display: inline;
+    }
+    .skill-formula-equals {
+      color: #7a6651;
+      font-weight: 700;
+      margin: 0 2px;
+    }
+    .skill-formula-empty {
+      color: #8a7766;
+      font-size: 12px;
     }
     .skill-damage-total {
       font-size: 14px;
@@ -3145,6 +3703,7 @@
             </div>
             <div class="hud-corner-actions">
               <button id="hud-open-settings" class="hud-corner-btn" type="button">设置</button>
+              <button id="hud-open-suggestions" class="hud-corner-btn" type="button">意见</button>
               <button id="hud-logout" class="hud-corner-btn danger" type="button">登出</button>
             </div>
           </div>
@@ -3178,6 +3737,44 @@
           </div>
         <div id="game-stage">
             <div id="map-targeting-indicator" class="map-targeting-indicator hidden"></div>
+            <div id="map-minimap-shell" class="map-minimap-shell hidden">
+              <div class="map-minimap-controls">
+                <button id="map-minimap-toggle" class="map-minimap-btn" type="button" title="隐藏小地图">隐</button>
+                <button id="map-minimap-open" class="map-minimap-btn" type="button" title="展开大地图">展</button>
+              </div>
+              <div id="map-minimap" class="map-minimap hidden">
+                <div class="map-minimap-frame">
+                  <div id="map-minimap-title" class="map-minimap-title">舆图</div>
+                  <canvas id="map-minimap-canvas" class="map-minimap-canvas"></canvas>
+                </div>
+              </div>
+            </div>
+            <div id="map-minimap-modal" class="map-minimap-modal hidden" aria-hidden="true">
+              <div id="map-minimap-modal-window" class="map-minimap-modal-window">
+                <div id="map-minimap-modal-header" class="map-minimap-modal-header">
+                  <div id="map-minimap-modal-title" class="map-minimap-modal-title">舆图</div>
+                  <div class="map-minimap-modal-actions">
+                    <button id="map-minimap-modal-close" class="map-minimap-modal-close" type="button">关</button>
+                  </div>
+                </div>
+                <div class="map-minimap-modal-body">
+                  <aside class="map-minimap-modal-sidebar">
+                    <div class="map-minimap-modal-filters">
+                      <button id="map-minimap-filter-all" class="map-minimap-modal-filter active" type="button">全部</button>
+                      <button id="map-minimap-filter-memory" class="map-minimap-modal-filter" type="button">记忆</button>
+                      <button id="map-minimap-filter-unlock" class="map-minimap-modal-filter" type="button">解锁</button>
+                    </div>
+                    <div class="map-minimap-modal-toolbar">
+                      <button id="map-minimap-delete-memory" class="small-btn ghost" type="button">删除记忆</button>
+                    </div>
+                    <div id="map-minimap-modal-list" class="map-minimap-modal-list"></div>
+                  </aside>
+                  <div class="map-minimap-modal-stage">
+                    <canvas id="map-minimap-modal-canvas" class="map-minimap-modal-canvas"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
             <canvas id="game-canvas"></canvas>
           </div>
         <div class="map-side-rail right">

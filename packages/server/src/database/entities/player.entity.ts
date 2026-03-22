@@ -1,3 +1,6 @@
+/**
+ * 玩家角色实体 —— 持久化角色的位置、属性、背包、功法等全部存档数据
+ */
 import {
   Entity,
   PrimaryColumn,
@@ -6,17 +9,21 @@ import {
 } from 'typeorm';
 import { DEFAULT_BASE_ATTRS, DEFAULT_INVENTORY_CAPACITY, Direction, VIEW_RADIUS } from '@mud/shared';
 
+/** 玩家表，主键为 "userId:角色名" 格式的复合 ID */
 @Entity('players')
 export class PlayerEntity {
   @PrimaryColumn({ type: 'varchar', length: 100 })
   id!: string;
 
+  /** 所属用户 ID */
   @Column({ type: 'uuid', unique: true })
   userId!: string;
 
+  /** 角色名称 */
   @Column({ type: 'varchar', length: 50 })
   name!: string;
 
+  /** 当前所在地图 ID */
   @Column({ type: 'varchar', length: 50, default: 'spawn' })
   mapId!: string;
 
@@ -44,42 +51,59 @@ export class PlayerEntity {
   @Column({ type: 'boolean', default: false })
   dead!: boolean;
 
+  /** 基础属性（力量、敏捷等） */
   @Column({ type: 'jsonb', default: () => `'${JSON.stringify(DEFAULT_BASE_ATTRS)}'` })
   baseAttrs!: Record<string, number>;
 
+  /** 永久加成列表 */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   bonuses!: unknown[];
 
+  /** 临时 Buff 列表（含剩余时间） */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   temporaryBuffs!: unknown[];
 
+  /** 背包数据 */
   @Column({ type: 'jsonb', default: () => `'{"items":[],"capacity":${DEFAULT_INVENTORY_CAPACITY}}'` })
   inventory!: Record<string, unknown>;
 
+  /** 装备栏 */
   @Column({ type: 'jsonb', default: () => `'{"weapon":null,"head":null,"body":null,"legs":null,"accessory":null}'` })
   equipment!: Record<string, unknown>;
 
+  /** 已学功法列表 */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   techniques!: unknown[];
 
+  /** 任务进度 */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   quests!: unknown[];
 
+  /** 已揭示的突破需求 ID */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   revealedBreakthroughRequirementIds!: unknown[];
 
+  /** 已解锁的小地图 ID */
+  @Column({ type: 'jsonb', default: () => `'[]'` })
+  unlockedMinimapIds!: unknown[];
+
+  /** 是否开启自动战斗 */
   @Column({ type: 'boolean', default: false })
   autoBattle!: boolean;
 
+  /** 自动战斗使用的技能列表 */
   @Column({ type: 'jsonb', default: () => `'[]'` })
   autoBattleSkills!: unknown[];
 
+  /** 是否自动反击 */
   @Column({ type: 'boolean', default: true })
   autoRetaliate!: boolean;
 
+  /** 是否自动闲时修炼 */
   @Column({ type: 'boolean', default: true })
   autoIdleCultivation!: boolean;
 
+  /** 当前正在修炼的功法 ID */
   @Column({ type: 'varchar', nullable: true })
   cultivatingTechId!: string | null;
 

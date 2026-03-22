@@ -1,13 +1,19 @@
+/**
+ * Socket.IO 网络管理器 —— 封装客户端与服务端的双向通信，提供类型安全的事件收发接口
+ */
+
 import { io, Socket } from 'socket.io-client';
 import {
   C2S, S2C, C2S_Move, C2S_MoveTo, C2S_GmGetState, C2S_GmSpawnBots, C2S_GmRemoveBots, C2S_GmUpdatePlayer, C2S_GmResetPlayer, C2S_Action, C2S_UpdateAutoBattleSkills, C2S_DebugResetSpawn, C2S_UseItem, C2S_DropItem,
   C2S_TakeLoot, C2S_SortInventory, C2S_Equip, C2S_Unequip, C2S_Cultivate, C2S_Chat,
   S2C_Tick, S2C_Init, S2C_AttrUpdate, S2C_InventoryUpdate,
   S2C_EquipmentUpdate, S2C_TechniqueUpdate, S2C_ActionsUpdate, S2C_LootWindowUpdate, S2C_QuestUpdate, S2C_SystemMsg, S2C_GmState,
-  S2C_Error,
+  S2C_SuggestionUpdate,
+  S2C_Error, decodeServerEventPayload, encodeClientEventPayload,
   AutoBattleSkillConfig, Direction, EquipSlot,
 } from '@mud/shared';
 
+/** 客户端 Socket.IO 连接管理，负责协议编解码与事件分发 */
 export class SocketManager {
   private socket: Socket | null = null;
   private onTickCallbacks: Array<(data: S2C_Tick) => void> = [];
@@ -23,9 +29,11 @@ export class SocketManager {
   private onSystemMsgCallbacks: Array<(data: S2C_SystemMsg) => void> = [];
   private onErrorCallbacks: Array<(data: S2C_Error) => void> = [];
   private onGmStateCallbacks: Array<(data: S2C_GmState) => void> = [];
+  private onSuggestionUpdateCallbacks: Array<(data: S2C_SuggestionUpdate) => void> = [];
   private onDisconnectCallbacks: Array<(reason: string) => void> = [];
   private onConnectErrorCallbacks: Array<(message: string) => void> = [];
 
+  /** 建立 WebSocket 连接并绑定所有服务端事件 */
   connect(token: string) {
     this.disconnect();
     this.socket = io({
@@ -35,57 +43,22 @@ export class SocketManager {
       transports: ['websocket'],
     });
 
-    this.socket.on(S2C.Init, (data: S2C_Init) => {
-      this.onInitCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.Tick, (data: S2C_Tick) => {
-      this.onTickCallbacks.forEach(cb => cb(data));
-    });
-
+    this.bindServerEvent(S2C.Init, this.onInitCallbacks);
+    this.bindServerEvent(S2C.Tick, this.onTickCallbacks);
+    this.bindServerEvent(S2C.AttrUpdate, this.onAttrUpdateCallbacks);
+    this.bindServerEvent(S2C.InventoryUpdate, this.onInventoryUpdateCallbacks);
+    this.bindServerEvent(S2C.EquipmentUpdate, this.onEquipmentUpdateCallbacks);
+    this.bindServerEvent(S2C.TechniqueUpdate, this.onTechniqueUpdateCallbacks);
+    this.bindServerEvent(S2C.ActionsUpdate, this.onActionsUpdateCallbacks);
+    this.bindServerEvent(S2C.LootWindowUpdate, this.onLootWindowUpdateCallbacks);
+    this.bindServerEvent(S2C.QuestUpdate, this.onQuestUpdateCallbacks);
+    this.bindServerEvent(S2C.SystemMsg, this.onSystemMsgCallbacks);
+    this.bindServerEvent(S2C.SuggestionUpdate, this.onSuggestionUpdateCallbacks);
+    this.bindServerEvent(S2C.Error, this.onErrorCallbacks);
+    this.bindServerEvent(S2C.GmState, this.onGmStateCallbacks);
     this.socket.on(S2C.Kick, () => {
       this.onKickCallbacks.forEach(cb => cb());
       this.disconnect();
-    });
-
-    this.socket.on(S2C.AttrUpdate, (data: S2C_AttrUpdate) => {
-      this.onAttrUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.InventoryUpdate, (data: S2C_InventoryUpdate) => {
-      this.onInventoryUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.EquipmentUpdate, (data: S2C_EquipmentUpdate) => {
-      this.onEquipmentUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.TechniqueUpdate, (data: S2C_TechniqueUpdate) => {
-      this.onTechniqueUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.ActionsUpdate, (data: S2C_ActionsUpdate) => {
-      this.onActionsUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.LootWindowUpdate, (data: S2C_LootWindowUpdate) => {
-      this.onLootWindowUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.QuestUpdate, (data: S2C_QuestUpdate) => {
-      this.onQuestUpdateCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.SystemMsg, (data: S2C_SystemMsg) => {
-      this.onSystemMsgCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.Error, (data: S2C_Error) => {
-      this.onErrorCallbacks.forEach(cb => cb(data));
-    });
-
-    this.socket.on(S2C.GmState, (data: S2C_GmState) => {
-      this.onGmStateCallbacks.forEach(cb => cb(data));
     });
 
     this.socket.on('disconnect', (reason: string) => {
@@ -97,17 +70,30 @@ export class SocketManager {
     });
   }
 
+  /** 绑定服务端事件，自动解码 protobuf 载荷后分发给回调 */
+  private bindServerEvent<T>(event: string, callbacks: Array<(data: T) => void>): void {
+    this.socket?.on(event, (raw: unknown) => {
+      const data = decodeServerEventPayload<T>(event, raw);
+      callbacks.forEach(cb => cb(data));
+    });
+  }
+
+  /** 向服务端发送事件，自动编码载荷 */
+  private emitServer<T>(event: string, payload: T): void {
+    this.socket?.emit(event, encodeClientEventPayload(event, payload));
+  }
+
   disconnect() {
     this.socket?.disconnect();
     this.socket = null;
   }
 
   sendMove(direction: Direction) {
-    this.socket?.emit(C2S.Move, { d: direction } satisfies C2S_Move);
+    this.emitServer(C2S.Move, { d: direction } satisfies C2S_Move);
   }
 
   sendMoveTo(x: number, y: number, options?: { ignoreVisibilityLimit?: boolean; allowNearestReachable?: boolean }) {
-    this.socket?.emit(C2S.MoveTo, {
+    this.emitServer(C2S.MoveTo, {
       x,
       y,
       ignoreVisibilityLimit: options?.ignoreVisibilityLimit,
@@ -116,68 +102,68 @@ export class SocketManager {
   }
 
   sendGmGetState() {
-    this.socket?.emit(C2S.GmGetState, {} satisfies C2S_GmGetState);
+    this.emitServer(C2S.GmGetState, {} satisfies C2S_GmGetState);
   }
 
   sendGmSpawnBots(count: number) {
-    this.socket?.emit(C2S.GmSpawnBots, { count } satisfies C2S_GmSpawnBots);
+    this.emitServer(C2S.GmSpawnBots, { count } satisfies C2S_GmSpawnBots);
   }
 
   sendGmRemoveBots(playerIds?: string[], all = false) {
-    this.socket?.emit(C2S.GmRemoveBots, { playerIds, all } satisfies C2S_GmRemoveBots);
+    this.emitServer(C2S.GmRemoveBots, { playerIds, all } satisfies C2S_GmRemoveBots);
   }
 
   sendGmUpdatePlayer(payload: C2S_GmUpdatePlayer) {
-    this.socket?.emit(C2S.GmUpdatePlayer, payload satisfies C2S_GmUpdatePlayer);
+    this.emitServer(C2S.GmUpdatePlayer, payload satisfies C2S_GmUpdatePlayer);
   }
 
   sendGmResetPlayer(playerId: string) {
-    this.socket?.emit(C2S.GmResetPlayer, { playerId } satisfies C2S_GmResetPlayer);
+    this.emitServer(C2S.GmResetPlayer, { playerId } satisfies C2S_GmResetPlayer);
   }
 
   sendUseItem(slotIndex: number) {
-    this.socket?.emit(C2S.UseItem, { slotIndex } satisfies C2S_UseItem);
+    this.emitServer(C2S.UseItem, { slotIndex } satisfies C2S_UseItem);
   }
 
   sendDropItem(slotIndex: number, count: number) {
-    this.socket?.emit(C2S.DropItem, { slotIndex, count } satisfies C2S_DropItem);
+    this.emitServer(C2S.DropItem, { slotIndex, count } satisfies C2S_DropItem);
   }
 
   sendTakeLoot(sourceId: string, itemKey: string) {
-    this.socket?.emit(C2S.TakeLoot, { sourceId, itemKey } satisfies C2S_TakeLoot);
+    this.emitServer(C2S.TakeLoot, { sourceId, itemKey } satisfies C2S_TakeLoot);
   }
 
   sendSortInventory() {
-    this.socket?.emit(C2S.SortInventory, {} satisfies C2S_SortInventory);
+    this.emitServer(C2S.SortInventory, {} satisfies C2S_SortInventory);
   }
 
   sendEquip(slotIndex: number) {
-    this.socket?.emit(C2S.Equip, { slotIndex } satisfies C2S_Equip);
+    this.emitServer(C2S.Equip, { slotIndex } satisfies C2S_Equip);
   }
 
   sendUnequip(slot: EquipSlot) {
-    this.socket?.emit(C2S.Unequip, { slot } satisfies C2S_Unequip);
+    this.emitServer(C2S.Unequip, { slot } satisfies C2S_Unequip);
   }
 
   sendCultivate(techId: string | null) {
-    this.socket?.emit(C2S.Cultivate, { techId } satisfies C2S_Cultivate);
+    this.emitServer(C2S.Cultivate, { techId } satisfies C2S_Cultivate);
   }
 
   sendAction(actionId: string, target?: string) {
-    this.socket?.emit(C2S.Action, { actionId, type: actionId, target } satisfies C2S_Action);
+    this.emitServer(C2S.Action, { actionId, type: actionId, target } satisfies C2S_Action);
   }
 
   sendUpdateAutoBattleSkills(skills: AutoBattleSkillConfig[]) {
-    this.socket?.emit(C2S.UpdateAutoBattleSkills, { skills } satisfies C2S_UpdateAutoBattleSkills);
+    this.emitServer(C2S.UpdateAutoBattleSkills, { skills } satisfies C2S_UpdateAutoBattleSkills);
   }
 
   sendDebugResetSpawn() {
-    this.socket?.emit(C2S.DebugResetSpawn, { force: true } satisfies C2S_DebugResetSpawn);
-    this.socket?.emit(C2S.Action, { actionId: 'debug:reset_spawn', type: 'debug:reset_spawn' } satisfies C2S_Action);
+    this.emitServer(C2S.DebugResetSpawn, { force: true } satisfies C2S_DebugResetSpawn);
+    this.emitServer(C2S.Action, { actionId: 'debug:reset_spawn', type: 'debug:reset_spawn' } satisfies C2S_Action);
   }
 
   sendChat(message: string) {
-    this.socket?.emit(C2S.Chat, { message } satisfies C2S_Chat);
+    this.emitServer(C2S.Chat, { message } satisfies C2S_Chat);
   }
 
   onInit(cb: (data: S2C_Init) => void) { this.onInitCallbacks.push(cb); }
@@ -191,10 +177,15 @@ export class SocketManager {
   onLootWindowUpdate(cb: (data: S2C_LootWindowUpdate) => void) { this.onLootWindowUpdateCallbacks.push(cb); }
   onQuestUpdate(cb: (data: S2C_QuestUpdate) => void) { this.onQuestUpdateCallbacks.push(cb); }
   onSystemMsg(cb: (data: S2C_SystemMsg) => void) { this.onSystemMsgCallbacks.push(cb); }
+  onSuggestionUpdate(cb: (data: S2C_SuggestionUpdate) => void) { this.onSuggestionUpdateCallbacks.push(cb); }
   onError(cb: (data: S2C_Error) => void) { this.onErrorCallbacks.push(cb); }
   onGmState(cb: (data: S2C_GmState) => void) { this.onGmStateCallbacks.push(cb); }
   onDisconnect(cb: (reason: string) => void) { this.onDisconnectCallbacks.push(cb); }
   onConnectError(cb: (message: string) => void) { this.onConnectErrorCallbacks.push(cb); }
+
+  emit(event: string, payload: any) {
+    this.emitServer(event, payload);
+  }
 
   get connected(): boolean {
     return this.socket?.connected ?? false;

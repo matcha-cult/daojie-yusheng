@@ -1,3 +1,7 @@
+/**
+ * 游戏核心模块 —— 注册所有游戏相关的 Service、Gateway、Controller，
+ * 是服务端游戏逻辑的顶层组织入口。
+ */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
@@ -23,6 +27,7 @@ import { GmService } from './gm.service';
 import { PerformanceService } from './performance.service';
 import { LootService } from './loot.service';
 import { TimeService } from './time.service';
+import { SuggestionService } from './suggestion.service';
 import { PlayerEntity } from '../database/entities/player.entity';
 import { UserEntity } from '../database/entities/user.entity';
 
@@ -53,7 +58,9 @@ import { UserEntity } from '../database/entities/user.entity';
     LootService,
     TimeService,
     WorldService,
+    SuggestionService,
   ],
-  exports: [MapService, PlayerService],
+  exports: [MapService, PlayerService, SuggestionService],
 })
+
 export class GameModule {}

@@ -1,3 +1,8 @@
+/**
+ * Tick 引擎 —— 每张地图独立的定时循环驱动器。
+ * 每 tick 收集玩家指令、执行游戏逻辑、广播状态增量，
+ * 同时负责定时落盘和配置热重载。
+ */
 import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
 import {
   AUTO_IDLE_CULTIVATION_DELAY_TICKS,
@@ -24,6 +29,8 @@ import {
   TechniqueState,
   TechniqueUpdateEntry,
   TickRenderEntity,
+  VisibleTile,
+  VisibleTilePatch,
   PERSIST_INTERVAL,
 } from '@mud/shared';
 import * as fs from 'fs';
@@ -47,6 +54,7 @@ import { WorldMessage, WorldService, WorldUpdate } from './world.service';
 
 const CONFIG_PATH = path.resolve(__dirname, '../../data/config.json');
 
+/** 上一次发送给各玩家的 tick 快照，用于增量比对 */
 interface LastSentTickState {
   mapId?: string;
   hp?: number;
@@ -55,6 +63,8 @@ interface LastSentTickState {
   pathSignature: string;
   visibilityKey?: string;
   mapMetaSignature?: string;
+  minimapSignature?: string;
+  minimapLibrarySignature?: string;
 }
 
 @Injectable()
@@ -66,6 +76,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
   private lastSentTechniqueStates: Map<string, Map<string, TechniqueState>> = new Map();
   private lastSentActionStates: Map<string, Map<string, ActionDef>> = new Map();
   private lastSentGroundPiles: Map<string, Map<string, GroundItemPileView>> = new Map();
+  private lastSentVisibleTiles: Map<string, Map<string, VisibleTile>> = new Map();
   private lastSentRenderEntities: Map<string, Map<string, RenderEntity>> = new Map();
   private persistTimer: ReturnType<typeof setInterval> | null = null;
   private minTickInterval = 1000;
@@ -110,12 +121,14 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`定时落盘已启动，间隔: ${PERSIST_INTERVAL}s`);
   }
 
+  /** 清除玩家的所有增量同步缓存（切图或重连时调用） */
   resetPlayerSyncState(playerId: string): void {
     this.lastSentTickState.delete(playerId);
     this.lastSentAttrUpdates.delete(playerId);
     this.lastSentTechniqueStates.delete(playerId);
     this.lastSentActionStates.delete(playerId);
     this.lastSentGroundPiles.delete(playerId);
+    this.lastSentVisibleTiles.delete(playerId);
     this.lastSentRenderEntities.delete(playerId);
   }
 
@@ -161,6 +174,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 启动指定地图的 tick 循环（幂等，已启动则跳过） */
   startMapTick(mapId: string) {
     if (this.timers.has(mapId)) return;
     this.lastTickTime.set(mapId, Date.now());
@@ -179,6 +193,11 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     this.timers.set(mapId, timer);
   }
 
+  /**
+   * 单张地图的核心 tick 逻辑：
+   * 1. 执行 GM 指令 → 2. 处理玩家命令 → 3. Bot AI → 4. 自动战斗/修炼/寻路
+   * 5. 怪物 AI → 6. 刷新脏数据 → 7. 广播增量 tick 包
+   */
   private tick(mapId: string, now: number) {
     this.ensureMapTicks();
     const last = this.lastTickTime.get(mapId) ?? now;
@@ -258,6 +277,15 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           const itemDef = this.contentService.getItem(item.itemId);
           if (itemDef?.learnTechniqueId && player.techniques.some((technique) => technique.techId === itemDef.learnTechniqueId)) {
             messages.push({ playerId: player.id, text: '你已经学会这门功法了。', kind: 'system' });
+            break;
+          }
+          if (itemDef?.mapUnlockId && (player.unlockedMinimapIds ?? []).includes(itemDef.mapUnlockId)) {
+            const mapMeta = this.mapService.getMapMeta(itemDef.mapUnlockId);
+            messages.push({
+              playerId: player.id,
+              text: mapMeta ? `${mapMeta.name} 的地图你早已记下。` : '这份地图你早已记下。',
+              kind: 'system',
+            });
             break;
           }
           const err = this.inventoryService.useItem(player, slotIndex);
@@ -539,12 +567,14 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     this.ensureMapTicks();
   }
 
+  /** 确保所有已加载地图都有对应的 tick 循环 */
   private ensureMapTicks() {
     for (const mapId of this.mapService.getAllMapIds()) {
       this.startMapTick(mapId);
     }
   }
 
+  /** 使用物品后应用其效果（回血、学功法、解锁地图等） */
   private applyItemEffect(player: PlayerState, itemId: string, messages: WorldMessage[]) {
     const item = this.contentService.getItem(itemId);
     if (!item) return;
@@ -576,9 +606,40 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         text: `你参悟了 ${technique.name}。`,
         kind: 'quest',
       });
+      return;
+    }
+
+    if (item.mapUnlockId) {
+      const mapMeta = this.mapService.getMapMeta(item.mapUnlockId);
+      if (!mapMeta) {
+        messages.push({ playerId: player.id, text: '这份地图残缺不全，无法辨认对应区域。', kind: 'system' });
+        return;
+      }
+      const unlocked = new Set(player.unlockedMinimapIds ?? []);
+      unlocked.add(item.mapUnlockId);
+      player.unlockedMinimapIds = [...unlocked].sort();
+      messages.push({
+        playerId: player.id,
+        text: `你展开 ${item.name}，彻底记下了 ${mapMeta.name} 的地势。`,
+        kind: 'quest',
+      });
     }
   }
 
+  private getUnlockedMinimapIds(player: PlayerState): string[] {
+    return [...new Set((player.unlockedMinimapIds ?? []).filter((entry): entry is string => typeof entry === 'string' && entry.length > 0))].sort();
+  }
+
+  private buildMinimapLibrarySignature(unlockedMinimapIds: string[]): string {
+    if (unlockedMinimapIds.length === 0) {
+      return '';
+    }
+    return unlockedMinimapIds
+      .map((mapId) => `${mapId}:${this.mapService.getMinimapSignature(mapId)}`)
+      .join('|');
+  }
+
+  /** 将 WorldUpdate 的结果（错误、消息、脏标记）合并到当前 tick 上下文 */
   private applyWorldUpdate(playerId: string, update: WorldUpdate, messages: WorldMessage[]) {
     if (update.error) {
       messages.push({ playerId, text: update.error, kind: 'system' });
@@ -591,6 +652,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 检测玩家踩到自动传送点时触发地图切换 */
   private applyAutoTravelIfNeeded(player: PlayerState, messages: WorldMessage[]): boolean {
     const update = this.worldService.tryAutoTravel(player);
     if (!update) {
@@ -600,6 +662,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return true;
   }
 
+  /** 将修炼中断的结果（脏标记、消息）合并到 tick 上下文 */
   private applyCultivationResult(playerId: string, result: ReturnType<TechniqueService['interruptCultivation']>, messages: WorldMessage[]) {
     if (!result.changed) {
       return;
@@ -610,11 +673,13 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 标记玩家为活跃状态，重置闲置计时 */
   private markPlayerActive(player: PlayerState, activePlayerIds: Set<string>) {
     player.idleTicks = 0;
     activePlayerIds.add(player.id);
   }
 
+  /** 闲置超过阈值时自动开始修炼 */
   private tryStartIdleCultivation(player: PlayerState, activePlayerIds: Set<string>, messages: WorldMessage[]) {
     if (
       player.dead
@@ -652,6 +717,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 重新构建玩家的可用行动列表，返回是否发生变化 */
   private syncActions(player: PlayerState): boolean {
     const before = JSON.stringify(player.actions.map((action) => ({
       id: action.id,
@@ -675,6 +741,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return before !== after;
   }
 
+  /** 将所有脏标记对应的数据变更推送给各玩家客户端 */
   private flushDirtyUpdates(players: PlayerState[]) {
     for (const player of players) {
       this.techniqueService.initializePlayerProgression(player);
@@ -747,6 +814,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 将本 tick 产生的系统消息逐条推送给对应玩家 */
   private flushMessages(messages: WorldMessage[]) {
     for (const message of messages) {
       const socket = this.playerService.getSocket(message.playerId);
@@ -760,6 +828,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 向地图内所有玩家广播增量 tick 数据包（视野、实体、地块、特效等） */
   private broadcastTicks(mapId: string, players: PlayerState[], dt: number) {
     const effects = this.worldService.drainEffects(mapId);
     for (const viewer of players) {
@@ -829,8 +898,19 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       const visibilityKey = this.buildVisibilityKey(viewer, time.effectiveViewRange);
       const mapMeta = this.mapService.getMapMeta(viewer.mapId);
       const mapMetaSignature = this.buildMapMetaSignature(mapMeta);
+      const unlockedMinimapIds = this.getUnlockedMinimapIds(viewer);
+      const minimapSignature = unlockedMinimapIds.includes(viewer.mapId)
+        ? this.mapService.getMinimapSignature(viewer.mapId)
+        : '';
+      const minimapLibrarySignature = this.buildMinimapLibrarySignature(unlockedMinimapIds);
       const visibleEntityIds = new Set<string>();
       const groundPilePatches = this.buildSparseGroundPiles(viewer.id, visibleGroundPiles);
+      const tilePatches = this.buildSparseVisibleTilePatches(
+        viewer.id,
+        visibility.tiles,
+        viewer.x - time.effectiveViewRange,
+        viewer.y - time.effectiveViewRange,
+      );
       const tickData: S2C_Tick = {
         p: this.buildSparseRenderEntities(viewer.id, visiblePlayers, visibleEntityIds),
         e: this.buildSparseRenderEntities(viewer.id, visibleEntities, visibleEntityIds),
@@ -841,15 +921,27 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       if (groundPilePatches.length > 0) {
         tickData.g = groundPilePatches;
       }
+      if (tilePatches.length > 0) {
+        tickData.t = tilePatches;
+      }
       this.pruneRenderEntityCache(viewer.id, visibleEntityIds);
       if (!previous || previous.visibilityKey !== visibilityKey) {
         tickData.v = visibility.tiles;
+        tickData.visibleMinimapMarkers = this.mapService.getVisibleMinimapMarkers(viewer.mapId, visibility.visibleKeys);
       }
       if (mapChanged) {
         tickData.m = viewer.mapId;
       }
       if (mapChanged || previous?.mapMetaSignature !== mapMetaSignature) {
         tickData.mapMeta = mapMeta;
+      }
+      if (mapChanged || previous?.minimapSignature !== minimapSignature) {
+        tickData.minimap = unlockedMinimapIds.includes(viewer.mapId)
+          ? this.mapService.getMinimapSnapshot(viewer.mapId)
+          : undefined;
+      }
+      if (mapChanged || previous?.minimapLibrarySignature !== minimapLibrarySignature) {
+        tickData.minimapLibrary = this.mapService.getMinimapArchiveEntries(unlockedMinimapIds);
       }
       if (!previous || previous.hp !== viewer.hp) {
         tickData.hp = viewer.hp;
@@ -873,6 +965,8 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         pathSignature,
         visibilityKey,
         mapMetaSignature,
+        minimapSignature,
+        minimapLibrarySignature,
       });
     }
   }
@@ -898,6 +992,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return JSON.stringify(mapMeta ?? null);
   }
 
+  /** 构建属性增量包，仅发送与上次不同的字段 */
   private buildSparseAttrUpdate(playerId: string, nextState: S2C_AttrUpdate): S2C_AttrUpdate | null {
     const previous = this.lastSentAttrUpdates.get(playerId);
     const patch: S2C_AttrUpdate = {};
@@ -931,6 +1026,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return Object.keys(patch).length > 0 ? patch : null;
   }
 
+  /** 构建功法增量包，仅发送与上次不同的字段 */
   private buildSparseTechniqueStates(playerId: string, techniques: TechniqueState[]): TechniqueUpdateEntry[] {
     let cache = this.lastSentTechniqueStates.get(playerId);
     if (!cache) {
@@ -969,6 +1065,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return patches;
   }
 
+  /** 构建行动列表增量包，仅发送与上次不同的字段 */
   private buildSparseActionStates(playerId: string, actions: ActionDef[]): ActionUpdateEntry[] {
     let cache = this.lastSentActionStates.get(playerId);
     if (!cache) {
@@ -1009,6 +1106,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return patches;
   }
 
+  /** 构建地面物品堆增量包，仅发送变化的堆 */
   private buildSparseGroundPiles(viewerId: string, piles: GroundItemPileView[]): GroundItemPilePatch[] {
     let cache = this.lastSentGroundPiles.get(viewerId);
     if (!cache) {
@@ -1053,6 +1151,49 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return patches;
   }
 
+  /** 构建可见地块增量包，仅发送与上次不同的地块 */
+  private buildSparseVisibleTilePatches(
+    viewerId: string,
+    tiles: VisibleTile[][],
+    originX: number,
+    originY: number,
+  ): VisibleTilePatch[] {
+    let cache = this.lastSentVisibleTiles.get(viewerId);
+    if (!cache) {
+      cache = new Map<string, VisibleTile>();
+      this.lastSentVisibleTiles.set(viewerId, cache);
+    }
+
+    const nextCache = new Map<string, VisibleTile>();
+    const patches: VisibleTilePatch[] = [];
+
+    for (let row = 0; row < tiles.length; row += 1) {
+      for (let col = 0; col < tiles[row].length; col += 1) {
+        const tile = tiles[row][col];
+        if (!tile) {
+          continue;
+        }
+
+        const x = originX + col;
+        const y = originY + row;
+        const key = `${x},${y}`;
+        const previous = cache.get(key);
+        if (!previous || !this.isStructuredEqual(previous, tile)) {
+          patches.push({
+            x,
+            y,
+            tile: JSON.parse(JSON.stringify(tile)) as VisibleTile,
+          });
+        }
+        nextCache.set(key, JSON.parse(JSON.stringify(tile)) as VisibleTile);
+      }
+    }
+
+    this.lastSentVisibleTiles.set(viewerId, nextCache);
+    return patches;
+  }
+
+  /** 构建渲染实体增量包，仅发送与上次不同的字段 */
   private buildSparseRenderEntities(
     viewerId: string,
     entities: RenderEntity[],
@@ -1096,6 +1237,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** 清理已离开视野的渲染实体缓存 */
   private pruneRenderEntityCache(viewerId: string, visibleEntityIds: Set<string>): void {
     const cache = this.lastSentRenderEntities.get(viewerId);
     if (!cache) {
@@ -1113,6 +1255,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
   }
 
+  /** 过滤出观察者视野范围内的战斗特效 */
   private filterEffectsForViewer(effects: CombatEffect[], visibleKeys: Set<string>): CombatEffect[] {
     return effects.filter((effect) => {
       if (effect.type === 'attack') {
@@ -1122,6 +1265,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** 每 tick 自然回复气血和真气 */
   private applyNaturalRecovery(player: PlayerState) {
     const numericStats = this.attrService.getPlayerNumericStats(player);
     const maxQi = Math.max(0, Math.round(numericStats.maxQi));
@@ -1135,6 +1279,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** 每 tick 递减临时 Buff 剩余时间，过期则移除并重算属性 */
   private tickTemporaryBuffs(player: PlayerState): boolean {
     if (!player.temporaryBuffs || player.temporaryBuffs.length === 0) {
       return false;

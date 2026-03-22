@@ -1,5 +1,8 @@
+/**
+ * GM 地图编辑器 —— Canvas 可视化地图编辑，支持地块绘制、对象管理、撤销与 JSON 导入导出
+ */
+
 import {
-  GmMapAuraRecord,
   GmMapDetailRes,
   GmMapDocument,
   GmMapLandmarkRecord,
@@ -264,6 +267,7 @@ function readonlyField(label: string, value: string): string {
   `;
 }
 
+/** GM 地图可视化编辑器，支持地块绘制、对象增删、撤销和 JSON 导入导出 */
 export class GmMapEditor {
   private readonly listEl = document.getElementById('map-list') as HTMLDivElement;
   private readonly searchInput = document.getElementById('map-search') as HTMLInputElement;
@@ -328,11 +332,13 @@ export class GmMapEditor {
     this.updateUndoButtonState();
   }
 
+  /** 确保地图列表已加载，首次切换到地图 tab 时调用 */
   async ensureLoaded(): Promise<void> {
     if (this.listLoaded) return;
     await this.loadMapList();
   }
 
+  /** 重置编辑器状态（登出时调用） */
   reset(): void {
     this.mapList = [];
     this.selectedMapId = null;

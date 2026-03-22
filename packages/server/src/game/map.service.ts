@@ -1,3 +1,7 @@
+/**
+ * 地图服务 —— 管理所有地图的加载、热重载、地块查询、占位管理、
+ * 传送点/NPC/怪物刷新点/容器/任务配置的解析，以及动态地块（可破坏地形）的状态维护。
+ */
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import {
   calculateTerrainDurability,
@@ -18,6 +22,9 @@ import {
   Tile,
   TileType,
   MapMeta,
+  MapMinimapArchiveEntry,
+  MapMinimapMarker,
+  MapMinimapSnapshot,
   MapSpaceVisionMode,
   MapTimeConfig,
   MonsterAggroMode,
@@ -132,6 +139,8 @@ interface MapData {
   containers: ContainerConfig[];
   npcs: NpcConfig[];
   monsterSpawns: MonsterSpawnConfig[];
+  minimap: MapMinimapSnapshot;
+  minimapSignature: string;
   spawnPoint: { x: number; y: number };
   source: GmMapDocument;
 }
@@ -349,6 +358,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     for (const file of files) {
       this.loadMapFile(path.join(this.mapsDir, file));
     }
+    this.rebuildAllMinimapSnapshots();
     this.logger.log(`已加载 ${this.maps.size} 张地图`);
   }
 
@@ -443,6 +453,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     const containers = this.normalizeContainers(document.landmarks, meta);
     const npcs = this.normalizeNpcs(document.npcs, meta);
     const monsterSpawns = this.normalizeMonsterSpawns(document.monsterSpawns, meta);
+    const minimap = this.buildMinimapSnapshot(meta, document, portals, containers, npcs, monsterSpawns);
 
     for (const npc of npcs) {
       for (const quest of npc.quests) {
@@ -461,12 +472,30 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       containers,
       npcs,
       monsterSpawns,
+      minimap,
+      minimapSignature: JSON.stringify(minimap),
       spawnPoint: { ...document.spawnPoint },
       source: document,
     });
+    this.rebuildAllMinimapSnapshots();
     this.rebuildPlayerOverlapPointIndex();
     this.syncOccupancyDisplay(document.id);
     this.revisions.set(document.id, (this.revisions.get(document.id) ?? 0) + 1);
+  }
+
+  private rebuildAllMinimapSnapshots(): void {
+    for (const map of this.maps.values()) {
+      const next = this.buildMinimapSnapshot(
+        map.meta,
+        map.source,
+        map.portals,
+        map.containers,
+        map.npcs,
+        map.monsterSpawns,
+      );
+      map.minimap = next;
+      map.minimapSignature = JSON.stringify(next);
+    }
   }
 
   getEditableMapList(): GmMapListRes {
@@ -1178,6 +1207,112 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return 'mortal';
   }
 
+  private buildMinimapSnapshot(
+    meta: MapMeta,
+    document: GmMapDocument,
+    portals: Portal[],
+    containers: ContainerConfig[],
+    npcs: NpcConfig[],
+    monsterSpawns: MonsterSpawnConfig[],
+  ): MapMinimapSnapshot {
+    const markers: MapMinimapMarker[] = [];
+
+    const pushMarker = (marker: MapMinimapMarker): void => {
+      if (marker.x < 0 || marker.x >= meta.width || marker.y < 0 || marker.y >= meta.height) {
+        return;
+      }
+      markers.push(marker);
+    };
+
+    for (const landmark of document.landmarks ?? []) {
+      if (!Number.isInteger(landmark.x) || !Number.isInteger(landmark.y)) {
+        continue;
+      }
+      if (landmark.container) {
+        continue;
+      }
+      pushMarker({
+        id: `landmark:${landmark.id}`,
+        kind: 'landmark',
+        x: landmark.x,
+        y: landmark.y,
+        label: landmark.name,
+        detail: typeof landmark.desc === 'string' && landmark.desc.trim() ? landmark.desc.trim() : undefined,
+      });
+    }
+
+    for (const container of containers) {
+      pushMarker({
+        id: `container:${container.id}`,
+        kind: 'container',
+        x: container.x,
+        y: container.y,
+        label: container.name,
+        detail: container.desc?.trim() || '可搜索容器',
+      });
+    }
+
+    for (const npc of npcs) {
+      pushMarker({
+        id: `npc:${npc.id}`,
+        kind: 'npc',
+        x: npc.x,
+        y: npc.y,
+        label: npc.name,
+        detail: npc.role ? `NPC · ${npc.role}` : 'NPC',
+      });
+    }
+
+    for (const spawn of monsterSpawns) {
+      pushMarker({
+        id: `monster_spawn:${spawn.id}`,
+        kind: 'monster_spawn',
+        x: spawn.x,
+        y: spawn.y,
+        label: spawn.name,
+        detail: `刷新点 · 半径 ${spawn.radius}`,
+      });
+    }
+
+    for (const portal of portals) {
+      if (portal.hidden) {
+        continue;
+      }
+      const targetMapName = this.getMapMeta(portal.targetMapId)?.name?.trim() || undefined;
+      const label = portal.observeTitle
+        ?? (targetMapName ? `通往 ${targetMapName}` : (portal.kind === 'stairs' ? '楼梯' : '传送阵'));
+      const detail = portal.observeDesc
+        ?? (targetMapName ? `通往 ${targetMapName}` : undefined)
+        ?? `通往 ${portal.targetMapId}`;
+      pushMarker({
+        id: `${portal.kind}:${portal.x},${portal.y}:${portal.targetMapId}`,
+        kind: portal.kind,
+        x: portal.x,
+        y: portal.y,
+        label,
+        detail,
+      });
+    }
+
+    const terrainRows = document.tiles.map((row) => row.split(''));
+    for (const portal of portals) {
+      if (portal.hidden) {
+        continue;
+      }
+      if (!terrainRows[portal.y]?.[portal.x]) {
+        continue;
+      }
+      terrainRows[portal.y]![portal.x] = portal.kind === 'stairs' ? 'S' : 'P';
+    }
+
+    return {
+      width: meta.width,
+      height: meta.height,
+      terrainRows: terrainRows.map((row) => row.join('')),
+      markers,
+    };
+  }
+
   private normalizeDrops(rawDrops: unknown): DropConfig[] {
     if (!Array.isArray(rawDrops)) {
       return [];
@@ -1206,6 +1341,42 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
 
   getMapMeta(mapId: string): MapMeta | undefined {
     return this.maps.get(mapId)?.meta;
+  }
+
+  getMinimapSnapshot(mapId: string): MapMinimapSnapshot | undefined {
+    const snapshot = this.maps.get(mapId)?.minimap;
+    return snapshot ? JSON.parse(JSON.stringify(snapshot)) as MapMinimapSnapshot : undefined;
+  }
+
+  getVisibleMinimapMarkers(mapId: string, visibleKeys: Set<string>): MapMinimapMarker[] {
+    const snapshot = this.maps.get(mapId)?.minimap;
+    if (!snapshot || visibleKeys.size === 0) {
+      return [];
+    }
+    return snapshot.markers
+      .filter((marker) => visibleKeys.has(`${marker.x},${marker.y}`))
+      .map((marker) => JSON.parse(JSON.stringify(marker)) as MapMinimapMarker);
+  }
+
+  getMinimapArchiveEntries(mapIds: string[]): MapMinimapArchiveEntry[] {
+    const uniqueIds = [...new Set(mapIds.filter((mapId) => typeof mapId === 'string' && mapId.length > 0))];
+    const entries: MapMinimapArchiveEntry[] = [];
+    for (const mapId of uniqueIds) {
+      const map = this.maps.get(mapId);
+      if (!map) {
+        continue;
+      }
+      entries.push({
+        mapId,
+        mapMeta: JSON.parse(JSON.stringify(map.meta)) as MapMeta,
+        snapshot: JSON.parse(JSON.stringify(map.minimap)) as MapMinimapSnapshot,
+      });
+    }
+    return entries;
+  }
+
+  getMinimapSignature(mapId: string): string {
+    return this.maps.get(mapId)?.minimapSignature ?? '';
   }
 
   getMapTimeConfig(mapId: string): MapTimeConfig {

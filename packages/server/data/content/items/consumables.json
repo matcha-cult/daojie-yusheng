@@ -3,5 +3,13 @@
   { "itemId": "minor_qi_pill", "name": "小还灵丹", "type": "consumable", "desc": "温养经脉，恢复较多气血。", "healAmount": 36 },
   { "itemId": "major_qi_pill", "name": "大还灵丹", "type": "consumable", "desc": "药力浑厚，适合中阶修士快速恢复。", "healAmount": 62 },
   { "itemId": "pure_yang_pill", "name": "纯阳丹", "type": "consumable", "desc": "以烈阳药引炼制，可在恶战后快速回气。", "healAmount": 90 },
-  { "itemId": "frost_heart_paste", "name": "寒心膏", "type": "consumable", "desc": "寒性药膏，稳固经脉并恢复气血。", "healAmount": 74 }
+  { "itemId": "frost_heart_paste", "name": "寒心膏", "type": "consumable", "desc": "寒性药膏，稳固经脉并恢复气血。", "healAmount": 74 },
+  { "itemId": "map.spawn", "name": "云来初境图", "type": "consumable", "desc": "描摹新手区域的基础地图。使用后可永久解锁云来初境的完整舆图。", "mapUnlockId": "spawn" },
+  { "itemId": "map.bamboo_forest", "name": "青竹林野图", "type": "consumable", "desc": "记载青竹林野地势与出入口。使用后可永久解锁竹林地图。", "mapUnlockId": "bamboo_forest" },
+  { "itemId": "map.wildlands", "name": "荒原游猎图", "type": "consumable", "desc": "标注荒原地貌、营地遗迹与危险通路。使用后可永久解锁荒原地图。", "mapUnlockId": "wildlands" },
+  { "itemId": "map.black_iron_mine", "name": "黑铁矿脉图", "type": "consumable", "desc": "矿道分布与竖井方位都被誊录其上。使用后可永久解锁黑铁矿洞地图。", "mapUnlockId": "black_iron_mine" },
+  { "itemId": "map.ancient_ruins", "name": "古遗迹残图", "type": "consumable", "desc": "残缺却仍可辨认主要遗迹轮廓。使用后可永久解锁古遗迹地图。", "mapUnlockId": "ancient_ruins" },
+  { "itemId": "map.spirit_ridge", "name": "灵脉山岭图", "type": "consumable", "desc": "绘有山脊、灵穴与险峻通路。使用后可永久解锁灵脉山岭地图。", "mapUnlockId": "spirit_ridge" },
+  { "itemId": "map.beast_valley", "name": "群兽谷行图", "type": "consumable", "desc": "专为猎妖者整理的谷地行图。使用后可永久解锁群兽谷地图。", "mapUnlockId": "beast_valley" },
+  { "itemId": "map.sky_ruins", "name": "天阙遗墟图", "type": "consumable", "desc": "记载高阶遗墟的主要路径与坍塌区域。使用后可永久解锁天阙遗墟地图。", "mapUnlockId": "sky_ruins" }
 ]
