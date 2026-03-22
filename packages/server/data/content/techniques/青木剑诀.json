@@ -1,0 +1,187 @@
+[
+  {
+    "id": "qingmu_sword",
+    "name": "青木剑诀",
+    "grade": "mortal",
+    "layers": [
+      {
+        "level": 1,
+        "expFactor": 13,
+        "attrs": {
+          "perception": 3,
+          "spirit": 1
+        }
+      },
+      {
+        "level": 2,
+        "expFactor": 14,
+        "attrs": {
+          "perception": 3,
+          "spirit": 1
+        }
+      },
+      {
+        "level": 3,
+        "expFactor": 16,
+        "attrs": {
+          "perception": 3,
+          "spirit": 1
+        }
+      },
+      {
+        "level": 4,
+        "expFactor": 18,
+        "attrs": {
+          "perception": 3,
+          "spirit": 1
+        }
+      },
+      {
+        "level": 5,
+        "expFactor": 21,
+        "attrs": {
+          "perception": 3,
+          "spirit": 2
+        }
+      },
+      {
+        "level": 6,
+        "expFactor": 23,
+        "attrs": {
+          "perception": 3,
+          "spirit": 2
+        }
+      },
+      {
+        "level": 7,
+        "expFactor": 27,
+        "attrs": {
+          "perception": 3,
+          "spirit": 2
+        }
+      },
+      {
+        "level": 8,
+        "expFactor": 31,
+        "attrs": {
+          "perception": 3,
+          "spirit": 2
+        }
+      },
+      {
+        "level": 9,
+        "expFactor": 0,
+        "attrs": {
+          "perception": 4,
+          "spirit": 2
+        }
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill.qingmu_slash",
+        "name": "青木斩",
+        "desc": "木脉剑气顺着伤口侵入经络，越斩越能削弱目标气机。",
+        "cooldown": 16,
+        "cost": 5,
+        "range": 1,
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "wood",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    18,
+                    {
+                      "var": "caster.stat.spellAtk",
+                      "scale": 0.8
+                    }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    {
+                      "var": "techLevel",
+                      "scale": 0.08
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "type": "buff",
+            "target": "target",
+            "buffId": "buff.qingmu_mark",
+            "name": "青痕",
+            "desc": "木灵缠入经络，削弱法抗、闪避与化解。",
+            "shortMark": "青",
+            "category": "debuff",
+            "visibility": "public",
+            "color": "#68b96c",
+            "duration": 12,
+            "maxStacks": 6,
+            "stats": {
+              "spellDef": -2,
+              "dodge": -3,
+              "resolvePower": -3
+            }
+          }
+        ],
+        "unlockLevel": 1
+      },
+      {
+        "id": "skill.qingmu_pierce",
+        "name": "穿林式",
+        "desc": "沿先前斩开的气脉再递一剑，剑气更易顺着经络深扎。",
+        "cooldown": 26,
+        "cost": 7,
+        "range": 2,
+        "targeting": {
+          "shape": "line",
+          "maxTargets": 2
+        },
+        "effects": [
+          {
+            "type": "damage",
+            "damageKind": "spell",
+            "element": "wood",
+            "formula": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    22,
+                    {
+                      "var": "caster.stat.spellAtk",
+                      "scale": 1
+                    }
+                  ]
+                },
+                {
+                  "op": "add",
+                  "args": [
+                    1,
+                    {
+                      "var": "techLevel",
+                      "scale": 0.09
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "unlockLevel": 5
+      }
+    ]
+  }
+]
