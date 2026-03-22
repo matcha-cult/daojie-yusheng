@@ -3,7 +3,7 @@
  */
 
 import { IRenderer, SenseQiOverlayState, TargetingOverlayState } from './types';
-import { GameTimeState, NpcQuestMarker, Tile, TileType, VisibleBuffState } from '@mud/shared';
+import { GameTimeState, NpcQuestMarker, Tile, TileType, TimePhaseId, VisibleBuffState } from '@mud/shared';
 import { Camera } from './camera';
 import { getCellSize } from '../display';
 
@@ -72,6 +72,36 @@ const PATH_TARGET_STROKE_COLOR = 'rgba(255, 216, 138, 0.96)';
 const PATH_TARGET_CORE_COLOR = 'rgba(255, 244, 219, 0.98)';
 const SENSE_QI_HOVER_STROKE = 'rgba(189, 231, 255, 0.95)';
 const TILE_HIDDEN_FADE_MS = 220;
+const TIME_FILTER_LERP = 0.12;
+
+interface TimeAtmosphereProfile {
+  overlayBoost: number;
+  skyTint: string;
+  skyAlpha: number;
+  horizonTint: string;
+  horizonAlpha: number;
+  vignetteAlpha: number;
+}
+
+interface TimeAtmosphereState {
+  initialized: boolean;
+  overlay: [number, number, number, number];
+  sky: [number, number, number, number];
+  horizon: [number, number, number, number];
+  vignetteAlpha: number;
+}
+
+const TIME_ATMOSPHERE_PROFILES: Record<TimePhaseId, TimeAtmosphereProfile> = {
+  deep_night: { overlayBoost: 1.08, skyTint: '#081221', skyAlpha: 0.34, horizonTint: '#1a3555', horizonAlpha: 0.16, vignetteAlpha: 0.28 },
+  late_night: { overlayBoost: 1.04, skyTint: '#0e1b2e', skyAlpha: 0.28, horizonTint: '#274666', horizonAlpha: 0.14, vignetteAlpha: 0.24 },
+  before_dawn: { overlayBoost: 1.02, skyTint: '#1a2740', skyAlpha: 0.2, horizonTint: '#516b8b', horizonAlpha: 0.14, vignetteAlpha: 0.16 },
+  dawn: { overlayBoost: 0.94, skyTint: '#8ea6c9', skyAlpha: 0.11, horizonTint: '#f0ba80', horizonAlpha: 0.22, vignetteAlpha: 0.06 },
+  day: { overlayBoost: 0.7, skyTint: '#fff0c8', skyAlpha: 0.03, horizonTint: '#fff9ea', horizonAlpha: 0.06, vignetteAlpha: 0.02 },
+  dusk: { overlayBoost: 1.02, skyTint: '#7d5c58', skyAlpha: 0.14, horizonTint: '#dd8c54', horizonAlpha: 0.24, vignetteAlpha: 0.1 },
+  first_night: { overlayBoost: 1.02, skyTint: '#33425f', skyAlpha: 0.16, horizonTint: '#8a6a81', horizonAlpha: 0.13, vignetteAlpha: 0.14 },
+  night: { overlayBoost: 1.04, skyTint: '#1c2944', skyAlpha: 0.23, horizonTint: '#44587b', horizonAlpha: 0.12, vignetteAlpha: 0.2 },
+  midnight: { overlayBoost: 1.06, skyTint: '#121b30', skyAlpha: 0.3, horizonTint: '#2e4968', horizonAlpha: 0.14, vignetteAlpha: 0.25 },
+};
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
@@ -156,6 +186,13 @@ export class TextRenderer implements IRenderer {
   private previousVisibleTileKeys = new Set<string>();
   private hiddenTileFadeStartedAt = new Map<string, number>();
   private visibleTileFadeStartedAt = new Map<string, number>();
+  private timeAtmosphere: TimeAtmosphereState = {
+    initialized: false,
+    overlay: [0, 0, 0, 0],
+    sky: [0, 0, 0, 0],
+    horizon: [0, 0, 0, 0],
+    vignetteAlpha: 0,
+  };
 
   init(canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -175,6 +212,7 @@ export class TextRenderer implements IRenderer {
     this.previousVisibleTileKeys.clear();
     this.hiddenTileFadeStartedAt.clear();
     this.visibleTileFadeStartedAt.clear();
+    this.timeAtmosphere.initialized = false;
   }
 
   /** 设置寻路路径高亮格子列表 */
@@ -951,17 +989,86 @@ export class TextRenderer implements IRenderer {
   }
 
   private renderTimeOverlay(time: GameTimeState | null): void {
-    if (!this.ctx || !time || time.overlayAlpha <= 0) {
+    if (!this.ctx || !time) {
       return;
     }
     const ctx = this.ctx;
+    const atmosphere = this.resolveTimeAtmosphere(time);
     ctx.save();
-    ctx.fillStyle = this.toOverlayColor(time.tint, time.overlayAlpha);
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (atmosphere.overlay[3] > 0.001) {
+      ctx.fillStyle = this.toOverlayColor(atmosphere.overlay);
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    if (atmosphere.sky[3] > 0.001) {
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height * 0.72);
+      skyGradient.addColorStop(0, this.toOverlayColor(atmosphere.sky));
+      skyGradient.addColorStop(0.7, this.toOverlayColor([
+        atmosphere.sky[0],
+        atmosphere.sky[1],
+        atmosphere.sky[2],
+        atmosphere.sky[3] * 0.18,
+      ]));
+      skyGradient.addColorStop(1, this.toOverlayColor([atmosphere.sky[0], atmosphere.sky[1], atmosphere.sky[2], 0]));
+      ctx.fillStyle = skyGradient;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    if (atmosphere.horizon[3] > 0.001) {
+      const horizonGradient = ctx.createLinearGradient(0, ctx.canvas.height * 0.35, 0, ctx.canvas.height);
+      horizonGradient.addColorStop(0, this.toOverlayColor([atmosphere.horizon[0], atmosphere.horizon[1], atmosphere.horizon[2], 0]));
+      horizonGradient.addColorStop(0.58, this.toOverlayColor([
+        atmosphere.horizon[0],
+        atmosphere.horizon[1],
+        atmosphere.horizon[2],
+        atmosphere.horizon[3] * 0.42,
+      ]));
+      horizonGradient.addColorStop(1, this.toOverlayColor(atmosphere.horizon));
+      ctx.fillStyle = horizonGradient;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+    if (atmosphere.vignetteAlpha > 0.001) {
+      const radius = Math.max(ctx.canvas.width, ctx.canvas.height) * 0.9;
+      const vignette = ctx.createRadialGradient(
+        ctx.canvas.width * 0.5,
+        ctx.canvas.height * 0.46,
+        0,
+        ctx.canvas.width * 0.5,
+        ctx.canvas.height * 0.5,
+        radius,
+      );
+      vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vignette.addColorStop(0.58, `rgba(9, 8, 11, ${(atmosphere.vignetteAlpha * 0.18).toFixed(3)})`);
+      vignette.addColorStop(1, `rgba(5, 4, 8, ${atmosphere.vignetteAlpha.toFixed(3)})`);
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
     ctx.restore();
   }
 
-  private toOverlayColor(hex: string, alpha: number): string {
+  private resolveTimeAtmosphere(time: GameTimeState): TimeAtmosphereState {
+    const profile = TIME_ATMOSPHERE_PROFILES[time.phase];
+    const target: TimeAtmosphereState = {
+      initialized: true,
+      overlay: this.buildRgbaVector(time.tint, Math.max(0, Math.min(1, time.overlayAlpha * profile.overlayBoost))),
+      sky: this.buildRgbaVector(profile.skyTint, profile.skyAlpha),
+      horizon: this.buildRgbaVector(profile.horizonTint, profile.horizonAlpha),
+      vignetteAlpha: profile.vignetteAlpha,
+    };
+    if (!this.timeAtmosphere.initialized) {
+      this.timeAtmosphere = target;
+      return this.timeAtmosphere;
+    }
+    this.timeAtmosphere.overlay = this.lerpColorVector(this.timeAtmosphere.overlay, target.overlay, TIME_FILTER_LERP);
+    this.timeAtmosphere.sky = this.lerpColorVector(this.timeAtmosphere.sky, target.sky, TIME_FILTER_LERP);
+    this.timeAtmosphere.horizon = this.lerpColorVector(this.timeAtmosphere.horizon, target.horizon, TIME_FILTER_LERP);
+    this.timeAtmosphere.vignetteAlpha = this.lerpNumber(
+      this.timeAtmosphere.vignetteAlpha,
+      target.vignetteAlpha,
+      TIME_FILTER_LERP,
+    );
+    return this.timeAtmosphere;
+  }
+
+  private buildRgbaVector(hex: string, alpha: number): [number, number, number, number] {
     const value = hex.trim().replace('#', '');
     const normalized = value.length === 3
       ? value.split('').map((char) => char + char).join('')
@@ -970,7 +1077,29 @@ export class TextRenderer implements IRenderer {
     const green = Number.parseInt(normalized.slice(2, 4), 16) || 0;
     const blue = Number.parseInt(normalized.slice(4, 6), 16) || 0;
     const safeAlpha = Math.max(0, Math.min(1, alpha));
-    return `rgba(${red}, ${green}, ${blue}, ${safeAlpha.toFixed(3)})`;
+    return [red, green, blue, safeAlpha];
+  }
+
+  private lerpColorVector(
+    current: [number, number, number, number],
+    target: [number, number, number, number],
+    factor: number,
+  ): [number, number, number, number] {
+    return [
+      this.lerpNumber(current[0], target[0], factor),
+      this.lerpNumber(current[1], target[1], factor),
+      this.lerpNumber(current[2], target[2], factor),
+      this.lerpNumber(current[3], target[3], factor),
+    ];
+  }
+
+  private lerpNumber(current: number, target: number, factor: number): number {
+    return current + (target - current) * factor;
+  }
+
+  private toOverlayColor(color: [number, number, number, number]): string {
+    const [red, green, blue, alpha] = color;
+    return `rgba(${red.toFixed(2)}, ${green.toFixed(2)}, ${blue.toFixed(2)}, ${Math.max(0, Math.min(1, alpha)).toFixed(3)})`;
   }
 
   private drawOutlinedText(text: string, x: number, y: number, fill: string, stroke: string) {
