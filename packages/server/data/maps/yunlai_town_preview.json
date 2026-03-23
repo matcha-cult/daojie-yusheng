@@ -770,7 +770,7 @@
           "name": "灵石",
           "type": "consumable",
           "count": 1,
-          "chance": 0.001
+          "chance": 0.01
         }
       ]
     },
@@ -800,7 +800,7 @@
           "name": "灵石",
           "type": "consumable",
           "count": 1,
-          "chance": 0.001
+          "chance": 0.01
         }
       ]
     },
@@ -830,7 +830,7 @@
           "name": "灵石",
           "type": "consumable",
           "count": 1,
-          "chance": 0.001
+          "chance": 0.01
         }
       ]
     },
@@ -868,7 +868,7 @@
           "name": "灵石",
           "type": "consumable",
           "count": 1,
-          "chance": 0.001
+          "chance": 0.01
         }
       ]
     }
