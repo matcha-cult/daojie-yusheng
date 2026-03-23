@@ -6,6 +6,7 @@ import {
   type BasicOkRes,
   Direction,
   type GmChangePasswordReq,
+  type GmCpuSectionSnapshot,
   TechniqueRealm,
   type AttrKey,
   type AutoBattleSkillConfig,
@@ -171,6 +172,10 @@ let currentCpuBreakdownSort: 'total' | 'count' | 'avg' = 'total';
 let currentJsonView: 'runtime' | 'persisted' = 'runtime';
 let lastPlayerListStructureKey: string | null = null;
 let lastEditorStructureKey: string | null = null;
+let lastSuggestionStructureKey: string | null = null;
+let lastNetworkInStructureKey: string | null = null;
+let lastNetworkOutStructureKey: string | null = null;
+let lastCpuBreakdownStructureKey: string | null = null;
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -514,16 +519,7 @@ function clearEditorRenderCache(): void {
   editorContentEl.innerHTML = '';
 }
 
-function renderNetworkBucketList(
-  totalBytes: number,
-  buckets: GmNetworkBucket[],
-  elapsedSec: number,
-  emptyText: string,
-): string {
-  if (buckets.length === 0 || totalBytes <= 0) {
-    return `<div class="empty-hint">${escapeHtml(emptyText)}</div>`;
-  }
-
+function getVisibleNetworkBuckets(buckets: GmNetworkBucket[]): GmNetworkBucket[] {
   const visibleBuckets = buckets.slice(0, 8);
   const hiddenBuckets = buckets.slice(8);
   if (hiddenBuckets.length > 0) {
@@ -536,23 +532,62 @@ function renderNetworkBucketList(
       count: otherCount,
     });
   }
-
-  return visibleBuckets.map((bucket) => `
-    <div class="network-row">
-      <div class="network-row-main">
-        <div class="network-row-label">${escapeHtml(bucket.label)}</div>
-        <div class="network-row-meta">${formatBytes(bucket.bytes)} · ${formatPercent(bucket.bytes, totalBytes)} · ${bucket.count} 次 · 均次 ${formatAverageBytesPerEvent(bucket.bytes, bucket.count)} · 均秒 ${formatBytesPerSecond(bucket.bytes, elapsedSec)}</div>
-      </div>
-    </div>
-  `).join('');
+  return visibleBuckets;
 }
 
-function renderCpuBreakdownList(data: GmStateRes): string {
-  const sections = [...data.perf.cpu.breakdown];
-  if (sections.length === 0) {
-    return '<div class="empty-hint">当前还没有 CPU 分项数据。</div>';
+function getNetworkBucketMeta(
+  totalBytes: number,
+  bucket: GmNetworkBucket,
+  elapsedSec: number,
+): string {
+  return `${formatBytes(bucket.bytes)} · ${formatPercent(bucket.bytes, totalBytes)} · ${bucket.count} 次 · 均次 ${formatAverageBytesPerEvent(bucket.bytes, bucket.count)} · 均秒 ${formatBytesPerSecond(bucket.bytes, elapsedSec)}`;
+}
+
+function getStatRowMarkup(key: string): string {
+  return `
+    <div class="network-row" data-key="${escapeHtml(key)}">
+      <div class="network-row-main">
+        <div class="network-row-label" data-role="label"></div>
+        <div class="network-row-meta" data-role="meta"></div>
+      </div>
+    </div>
+  `;
+}
+
+function patchStatRow(row: HTMLElement, label: string, meta: string): void {
+  row.querySelector<HTMLElement>('[data-role="label"]')!.textContent = label;
+  row.querySelector<HTMLElement>('[data-role="meta"]')!.textContent = meta;
+}
+
+function renderStructuredStatList(
+  container: HTMLElement,
+  structureKey: string | null,
+  items: Array<{ key: string; label: string; meta: string }>,
+  emptyText: string,
+): string {
+  if (items.length === 0) {
+    if (structureKey !== 'empty') {
+      container.innerHTML = `<div class="empty-hint">${escapeHtml(emptyText)}</div>`;
+    }
+    return 'empty';
   }
 
+  const nextStructureKey = items.map((item) => item.key).join('|');
+  if (structureKey !== nextStructureKey) {
+    container.innerHTML = items.map((item) => getStatRowMarkup(item.key)).join('');
+  }
+  items.forEach((item, index) => {
+    const row = container.children[index];
+    if (!(row instanceof HTMLElement)) {
+      return;
+    }
+    patchStatRow(row, item.label, item.meta);
+  });
+  return nextStructureKey;
+}
+
+function getSortedCpuSections(data: GmStateRes): GmCpuSectionSnapshot[] {
+  const sections = [...data.perf.cpu.breakdown];
   sections.sort((left, right) => {
     if (currentCpuBreakdownSort === 'count') {
       if (right.count !== left.count) {
@@ -580,15 +615,104 @@ function renderCpuBreakdownList(data: GmStateRes): string {
     }
     return left.label.localeCompare(right.label, 'zh-CN');
   });
+  return sections.slice(0, 12);
+}
 
-  return sections.slice(0, 12).map((section) => `
-    <div class="network-row">
-      <div class="network-row-main">
-        <div class="network-row-label">${escapeHtml(section.label)}</div>
-        <div class="network-row-meta">${section.totalMs.toFixed(2)} ms · ${section.percent.toFixed(1)}% · ${section.count} 次 · 均次 ${section.avgMs.toFixed(3)} ms</div>
+function getCpuSectionMeta(section: GmCpuSectionSnapshot): string {
+  return `${section.totalMs.toFixed(2)} ms · ${section.percent.toFixed(1)}% · ${section.count} 次 · 均次 ${section.avgMs.toFixed(3)} ms`;
+}
+
+function renderPerfLists(data: GmStateRes): void {
+  const elapsedSec = Math.max(0, data.perf.networkStatsElapsedSec);
+  const networkInItems = data.perf.networkInBytes > 0
+    ? getVisibleNetworkBuckets(data.perf.networkInBuckets).map((bucket) => ({
+        key: bucket.key,
+        label: bucket.label,
+        meta: getNetworkBucketMeta(data.perf.networkInBytes, bucket, elapsedSec),
+      }))
+    : [];
+  const networkOutItems = data.perf.networkOutBytes > 0
+    ? getVisibleNetworkBuckets(data.perf.networkOutBuckets).map((bucket) => ({
+        key: bucket.key,
+        label: bucket.label,
+        meta: getNetworkBucketMeta(data.perf.networkOutBytes, bucket, elapsedSec),
+      }))
+    : [];
+  const cpuItems = getSortedCpuSections(data).map((section) => ({
+    key: section.key,
+    label: section.label,
+    meta: getCpuSectionMeta(section),
+  }));
+
+  lastNetworkInStructureKey = renderStructuredStatList(
+    summaryNetInBreakdownEl,
+    lastNetworkInStructureKey,
+    networkInItems,
+    '当前还没有累计上行事件。',
+  );
+  lastNetworkOutStructureKey = renderStructuredStatList(
+    summaryNetOutBreakdownEl,
+    lastNetworkOutStructureKey,
+    networkOutItems,
+    '当前还没有累计下行事件。',
+  );
+  lastCpuBreakdownStructureKey = renderStructuredStatList(
+    cpuBreakdownListEl,
+    lastCpuBreakdownStructureKey,
+    cpuItems,
+    '当前还没有 CPU 分项数据。',
+  );
+}
+
+function getSortedSuggestions(items: Suggestion[]): Suggestion[] {
+  return [...items].sort((a, b) => {
+    const scoreA = a.upvotes.length - a.downvotes.length;
+    const scoreB = b.upvotes.length - b.downvotes.length;
+    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
+    return scoreB - scoreA;
+  });
+}
+
+function getSuggestionCardMarkup(id: string): string {
+  return `
+    <div class="suggestion-card" data-suggestion-id="${escapeHtml(id)}" style="border: 1.5px solid var(--ink-black); margin-bottom: 20px; background: var(--paper-bg); box-shadow: 6px 6px 0 rgba(0,0,0,0.1);">
+      <div data-role="header" style="padding: 16px; border-bottom: 1.5px solid var(--ink-black); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span data-role="title" style="font-family: var(--font-heading-main); font-size: 20px;"></span>
+          <span class="pill" data-role="status-pill" style="margin-left: 10px;"></span>
+        </div>
+        <div style="text-align: right;">
+          <div data-role="author" style="font-weight: bold;"></div>
+          <div data-role="created-at" style="font-size: 12px; color: var(--ink-grey);"></div>
+        </div>
+      </div>
+      <div data-role="description" style="padding: 16px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; border-bottom: 1.5px solid var(--ink-black);"></div>
+      <div style="padding: 12px 16px; display: flex; align-items: center; gap: 20px;">
+        <div data-role="score" style="font-weight: bold; color: var(--ink-black);"></div>
+        <div style="margin-left: auto; display: flex; gap: 10px;">
+          <button class="primary small-btn" type="button" data-action="complete-suggestion">标记完成</button>
+          <button class="danger small-btn" type="button" data-action="remove-suggestion">永久移除</button>
+        </div>
       </div>
     </div>
-  `).join('');
+  `;
+}
+
+function patchSuggestionCard(card: HTMLElement, suggestion: Suggestion): void {
+  const completed = suggestion.status === 'completed';
+  const score = suggestion.upvotes.length - suggestion.downvotes.length;
+  const header = card.querySelector<HTMLElement>('[data-role="header"]')!;
+  header.style.background = completed ? '#e8f5e9' : 'transparent';
+  card.querySelector<HTMLElement>('[data-role="title"]')!.textContent = suggestion.title;
+  const statusPill = card.querySelector<HTMLElement>('[data-role="status-pill"]')!;
+  statusPill.textContent = completed ? '已完成' : '待处理';
+  statusPill.style.background = completed ? '#2e7d32' : 'var(--ink-grey)';
+  card.querySelector<HTMLElement>('[data-role="author"]')!.textContent = suggestion.authorName;
+  card.querySelector<HTMLElement>('[data-role="created-at"]')!.textContent = new Date(suggestion.createdAt).toLocaleString();
+  card.querySelector<HTMLElement>('[data-role="description"]')!.textContent = suggestion.description;
+  card.querySelector<HTMLElement>('[data-role="score"]')!.textContent = `赞同: ${suggestion.upvotes.length} | 反对: ${suggestion.downvotes.length} | 分值: ${score}`;
+  const completeBtn = card.querySelector<HTMLButtonElement>('[data-action="complete-suggestion"]')!;
+  completeBtn.style.display = completed ? 'none' : '';
 }
 
 function switchJsonView(view: 'runtime' | 'persisted'): void {
@@ -623,7 +747,8 @@ function setCpuBreakdownSort(sort: 'total' | 'count' | 'avg'): void {
   cpuBreakdownSortCountBtn.classList.toggle('primary', sort === 'count');
   cpuBreakdownSortAvgBtn.classList.toggle('primary', sort === 'avg');
   if (state) {
-    cpuBreakdownListEl.innerHTML = renderCpuBreakdownList(state);
+    lastCpuBreakdownStructureKey = null;
+    renderPerfLists(state);
   }
 }
 
@@ -671,42 +796,29 @@ async function loadSuggestions(): Promise<void> {
 
 function renderSuggestions(): void {
   if (!suggestions || suggestions.length === 0) {
-    suggestionListEl.innerHTML = '<div class="empty-hint">暂无建议反馈数据</div>';
+    if (lastSuggestionStructureKey !== 'empty') {
+      suggestionListEl.innerHTML = '<div class="empty-hint">暂无建议反馈数据</div>';
+      lastSuggestionStructureKey = 'empty';
+    }
     return;
   }
 
-  const sorted = [...suggestions].sort((a, b) => {
-    const scoreA = a.upvotes.length - a.downvotes.length;
-    const scoreB = b.upvotes.length - b.downvotes.length;
-    if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
-    return scoreB - scoreA;
+  const sorted = getSortedSuggestions(suggestions);
+  const structureKey = sorted.map((suggestion) => suggestion.id).join('|');
+  if (lastSuggestionStructureKey !== structureKey) {
+    suggestionListEl.innerHTML = sorted.map((suggestion) => getSuggestionCardMarkup(suggestion.id)).join('');
+    lastSuggestionStructureKey = structureKey;
+  }
+  sorted.forEach((suggestion, index) => {
+    const card = suggestionListEl.children[index];
+    if (!(card instanceof HTMLElement)) {
+      return;
+    }
+    patchSuggestionCard(card, suggestion);
   });
-
-  suggestionListEl.innerHTML = sorted.map(s => `
-    <div class="suggestion-card" style="border: 1.5px solid var(--ink-black); margin-bottom: 20px; background: var(--paper-bg); box-shadow: 6px 6px 0 rgba(0,0,0,0.1);">
-      <div style="padding: 16px; border-bottom: 1.5px solid var(--ink-black); display: flex; justify-content: space-between; align-items: center; background: ${s.status === 'completed' ? '#e8f5e9' : 'transparent'}">
-        <div>
-          <span style="font-family: var(--font-heading-main); font-size: 20px;">${escapeHtml(s.title)}</span>
-          <span class="pill" style="margin-left: 10px; background: ${s.status === 'completed' ? '#2e7d32' : 'var(--ink-grey)'}">${s.status === 'completed' ? '已完成' : '待处理'}</span>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-weight: bold;">${escapeHtml(s.authorName)}</div>
-          <div style="font-size: 12px; color: var(--ink-grey);">${new Date(s.createdAt).toLocaleString()}</div>
-        </div>
-      </div>
-      <div style="padding: 16px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; border-bottom: 1.5px solid var(--ink-black);">${escapeHtml(s.description)}</div>
-      <div style="padding: 12px 16px; display: flex; align-items: center; gap: 20px;">
-        <div style="font-weight: bold; color: var(--ink-black);">赞同: ${s.upvotes.length} | 反对: ${s.downvotes.length} | 分值: ${s.upvotes.length - s.downvotes.length}</div>
-        <div style="margin-left: auto; display: flex; gap: 10px;">
-          ${s.status === 'pending' ? `<button class="primary small-btn" onclick="completeSuggestion('${s.id}')">标记完成</button>` : ''}
-          <button class="danger small-btn" onclick="removeSuggestion('${s.id}')">永久移除</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
 }
 
-(window as any).completeSuggestion = async (id: string) => {
+async function completeSuggestion(id: string): Promise<void> {
   try {
     await request(`/gm/suggestions/${id}/complete`, { method: 'POST' });
     setStatus('建议已标记为完成');
@@ -714,9 +826,9 @@ function renderSuggestions(): void {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '操作失败', true);
   }
-};
+}
 
-(window as any).removeSuggestion = async (id: string) => {
+async function removeSuggestion(id: string): Promise<void> {
   if (!confirm('确定要移除这条建议吗？此操作不可撤销。')) return;
   try {
     await request(`/gm/suggestions/${id}`, { method: 'DELETE' });
@@ -725,7 +837,7 @@ function renderSuggestions(): void {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '移除失败', true);
   }
-};
+}
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers ?? {});
@@ -1393,18 +1505,6 @@ function renderSummary(data: GmStateRes): void {
     data.perf.networkOutBytes,
     data.perf.networkOutBuckets.reduce((sum, bucket) => sum + bucket.count, 0),
   )} · 均秒 ${formatBytesPerSecond(data.perf.networkOutBytes, elapsedSec)}`;
-  summaryNetInBreakdownEl.innerHTML = renderNetworkBucketList(
-    data.perf.networkInBytes,
-    data.perf.networkInBuckets,
-    elapsedSec,
-    '当前还没有累计上行事件。',
-  );
-  summaryNetOutBreakdownEl.innerHTML = renderNetworkBucketList(
-    data.perf.networkOutBytes,
-    data.perf.networkOutBuckets,
-    elapsedSec,
-    '当前还没有累计下行事件。',
-  );
   cpuCurrentPercentEl.textContent = `${Math.round(data.perf.cpuPercent)}%`;
   cpuProfileMetaEl.textContent = data.perf.cpu.profileStartedAt > 0
     ? `CPU 画像起点：${new Date(data.perf.cpu.profileStartedAt).toLocaleString()} · 已累计 ${formatDurationSeconds(data.perf.cpu.profileElapsedSec)}`
@@ -1421,7 +1521,7 @@ function renderSummary(data: GmStateRes): void {
   cpuHeapUsedEl.textContent = `${Math.round(data.perf.cpu.heapUsedMb)} MB`;
   cpuHeapTotalEl.textContent = `${Math.round(data.perf.cpu.heapTotalMb)} MB`;
   cpuExternalMemoryEl.textContent = `${Math.round(data.perf.cpu.externalMb)} MB`;
-  cpuBreakdownListEl.innerHTML = renderCpuBreakdownList(data);
+  renderPerfLists(data);
 }
 
 function renderPlayerList(data: GmStateRes): void {
@@ -1683,6 +1783,14 @@ function logout(message?: string): void {
   playerListEl.innerHTML = '';
   lastPlayerListStructureKey = null;
   clearEditorRenderCache();
+  lastSuggestionStructureKey = null;
+  lastNetworkInStructureKey = null;
+  lastNetworkOutStructureKey = null;
+  lastCpuBreakdownStructureKey = null;
+  suggestionListEl.innerHTML = '';
+  summaryNetInBreakdownEl.innerHTML = '';
+  summaryNetOutBreakdownEl.innerHTML = '';
+  cpuBreakdownListEl.innerHTML = '';
   playerJsonEl.value = '';
   playerPersistedJsonEl.value = '';
   mapEditor.reset();
@@ -2006,6 +2114,23 @@ editorContentEl.addEventListener('change', () => {
   if (detail && draftSnapshot) {
     editorMetaEl.innerHTML = getEditorMetaMarkup(detail);
     patchEditorPreview(detail, draftSnapshot);
+  }
+});
+
+suggestionListEl.addEventListener('click', (event) => {
+  const trigger = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-action]');
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-suggestion-id]');
+  const suggestionId = card?.dataset.suggestionId;
+  const action = trigger?.dataset.action;
+  if (!trigger || !suggestionId || !action) {
+    return;
+  }
+  if (action === 'complete-suggestion') {
+    completeSuggestion(suggestionId).catch(() => {});
+    return;
+  }
+  if (action === 'remove-suggestion') {
+    removeSuggestion(suggestionId).catch(() => {});
   }
 });
 
