@@ -3,20 +3,23 @@
  * 展示物品网格列表，支持分类筛选、使用/装备/丢弃操作与物品详情弹层
  */
 
-import { EquipmentEffectDef, Inventory, ItemStack, ItemType, PlayerState, createItemStackSignature } from '@mud/shared';
+import { EquipmentEffectDef, Inventory, ItemStack, PlayerState, createItemStackSignature } from '@mud/shared';
 import {
-  getAttrKeyLabel,
   getEquipSlotLabel,
   getItemTypeLabel,
-  getNumericScalarStatKeyLabel,
 } from '../../domain-labels';
+import { resolvePreviewItem } from '../../content/local-templates';
 import { detailModalHost } from '../detail-modal-host';
 import { FloatingTooltip } from '../floating-tooltip';
 import { buildItemTooltipPayload } from '../equipment-tooltip';
 import { preserveSelection } from '../selection-preserver';
+import { describePreviewBonuses } from '../stat-preview';
+import { INVENTORY_FILTER_TABS, InventoryFilter } from '../../constants/ui/inventory';
+import {
+  INVENTORY_PANEL_TOOLTIP_STYLE_ID,
+  INVENTORY_PANEL_USABLE_ITEM_TYPES,
+} from '../../constants/ui/inventory-panel';
 
-const TOOLTIP_STYLE_ID = 'inventory-panel-tooltip-style';
-type InventoryFilter = 'all' | ItemType;
 type InventoryActionKind = 'use' | 'drop' | 'destroy';
 
 interface InventoryActionDialogState {
@@ -24,26 +27,6 @@ interface InventoryActionDialogState {
   slotIndex: number;
   defaultCount: number;
   confirmDestroy: boolean;
-}
-
-const FILTER_TABS: Array<{ id: InventoryFilter; label: string }> = [
-  { id: 'all', label: '全部' },
-  { id: 'equipment', label: '装备' },
-  { id: 'material', label: '材料' },
-  { id: 'skill_book', label: '功法书' },
-  { id: 'consumable', label: '消耗品' },
-  { id: 'quest_item', label: '任务物' },
-];
-const USABLE_ITEM_TYPES: ReadonlySet<ItemType> = new Set(['consumable', 'skill_book']);
-
-function formatBonusValue(key: string, value: number): string {
-  if (key === 'critDamage') {
-    return `${value / 10}%`;
-  }
-  if (['qiRegenRate', 'hpRegenRate', 'auraCostReduce', 'auraPowerRate', 'playerExpRate', 'techniqueExpRate', 'lootRate', 'rareLootRate'].includes(key)) {
-    return `${value / 100}%`;
-  }
-  return `${value}`;
 }
 
 function formatEffectCondition(effect: EquipmentEffectDef): string {
@@ -75,23 +58,17 @@ function formatEffectCondition(effect: EquipmentEffectDef): string {
 }
 
 function formatItemEffects(item: ItemStack): string[] {
-  if (!item.effects || item.effects.length === 0) {
+  const previewItem = resolvePreviewItem(item);
+  if (!previewItem.effects || previewItem.effects.length === 0) {
     return [];
   }
-  return item.effects.map((effect) => {
+  return previewItem.effects.map((effect) => {
     const conditionText = formatEffectCondition(effect);
     switch (effect.type) {
       case 'stat_aura':
       case 'progress_boost': {
-        const attrParts = effect.attrs
-          ? Object.entries(effect.attrs).map(([key, value]) => `${getAttrKeyLabel(key)}+${value}`)
-          : [];
-        const statParts = effect.stats
-          ? Object.entries(effect.stats)
-            .filter(([, value]) => typeof value === 'number' && value !== 0)
-            .map(([key, value]) => `${getNumericScalarStatKeyLabel(key)}+${formatBonusValue(key, value as number)}`)
-          : [];
-        return `特效:${[...attrParts, ...statParts].join(' / ')}${conditionText}`;
+        const effectParts = describePreviewBonuses(effect.attrs, effect.stats, effect.valueStats);
+        return `特效:${effectParts.join(' / ') || '无数值变化'}${conditionText}`;
       }
       case 'periodic_cost': {
         const modeLabel = effect.mode === 'flat'
@@ -116,7 +93,8 @@ function formatItemEffects(item: ItemStack): string[] {
           on_time_segment_changed: '时段切换时',
           on_enter_map: '入图时',
         };
-        return `触发:${triggerMap[effect.trigger] ?? effect.trigger}获得 ${effect.buff.name} ${effect.buff.duration}息${conditionText}`;
+        const buffParts = describePreviewBonuses(effect.buff.attrs, effect.buff.stats, effect.buff.valueStats);
+        return `触发:${triggerMap[effect.trigger] ?? effect.trigger}获得 ${effect.buff.name} ${effect.buff.duration}息${conditionText}${buffParts.length > 0 ? `，效果:${buffParts.join(' / ')}` : ''}`;
       }
       default:
         return '';
@@ -203,7 +181,7 @@ export class InventoryPanel {
       </div>
       <div class="inventory-filter-tabs">`;
 
-    for (const tab of FILTER_TABS) {
+    for (const tab of INVENTORY_FILTER_TABS) {
       html += `<button class="inventory-filter-tab ${this.activeFilter === tab.id ? 'active' : ''}" data-filter-button="${tab.id}" data-filter="${tab.id}" type="button">${tab.label}</button>`;
     }
 
@@ -374,9 +352,9 @@ export class InventoryPanel {
   }
 
   private ensureTooltipStyle(): void {
-    if (document.getElementById(TOOLTIP_STYLE_ID)) return;
+    if (document.getElementById(INVENTORY_PANEL_TOOLTIP_STYLE_ID)) return;
     const style = document.createElement('style');
-    style.id = TOOLTIP_STYLE_ID;
+    style.id = INVENTORY_PANEL_TOOLTIP_STYLE_ID;
     style.textContent = `
       .inventory-tooltip {
         position: fixed;
@@ -437,16 +415,9 @@ export class InventoryPanel {
       return;
     }
 
-    const attrLines = item.equipAttrs
-      ? Object.entries(item.equipAttrs).map(([key, value]) => `${getAttrKeyLabel(key)} +${value}`)
-      : [];
-    const statLines = item.equipStats
-      ? Object.entries(item.equipStats)
-        .filter(([, value]) => typeof value === 'number' && value !== 0)
-        .map(([key, value]) => `${getNumericScalarStatKeyLabel(key)} +${formatBonusValue(key, value as number)}`)
-      : [];
+    const previewItem = resolvePreviewItem(item);
+    const bonusLines = describePreviewBonuses(previewItem.equipAttrs, previewItem.equipStats, previewItem.equipValueStats);
     const effectLines = formatItemEffects(item);
-    const bonusLines = [...attrLines, ...statLines];
     const primaryAction = this.getPrimaryAction(item);
     const canBatchUse = primaryAction?.kind === 'use' && this.canBatchUseItem(item);
     const canBatchDropOrDestroy = this.canBatchDropOrDestroy(item);
@@ -661,7 +632,7 @@ export class InventoryPanel {
     }
     titleNode.textContent = `背包 (${inventory.items.length}/${inventory.capacity})`;
 
-    for (const tab of FILTER_TABS) {
+    for (const tab of INVENTORY_FILTER_TABS) {
       const button = this.pane.querySelector<HTMLElement>(`[data-filter-button="${CSS.escape(tab.id)}"]`);
       if (!button) {
         return false;
@@ -761,7 +732,7 @@ export class InventoryPanel {
   }
 
   private canUseItem(item: ItemStack): boolean {
-    return USABLE_ITEM_TYPES.has(item.type);
+    return INVENTORY_PANEL_USABLE_ITEM_TYPES.has(item.type);
   }
 
   private canBatchUseItem(item: ItemStack): boolean {

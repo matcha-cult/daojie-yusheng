@@ -3,23 +3,13 @@
  * 展示 5 个装备槽位的当前装备与词条，支持卸下操作
  */
 
-import { EquipmentEffectDef, EquipmentSlots, EquipSlot, PlayerState } from '@mud/shared';
-import { getAttrKeyLabel, getEquipSlotLabel, getNumericScalarStatKeyLabel } from '../../domain-labels';
+import { EquipmentEffectDef, EquipmentSlots, EQUIP_SLOTS, EquipSlot, PlayerState } from '@mud/shared';
+import { getEquipSlotLabel } from '../../domain-labels';
+import { resolvePreviewItem } from '../../content/local-templates';
 import { preserveSelection } from '../selection-preserver';
 import { FloatingTooltip } from '../floating-tooltip';
 import { buildItemTooltipPayload } from '../equipment-tooltip';
-
-const SLOT_ORDER: EquipSlot[] = ['weapon', 'head', 'body', 'legs', 'accessory'];
-
-function formatBonusValue(key: string, value: number): string {
-  if (key === 'critDamage') {
-    return `${value / 10}%`;
-  }
-  if (['qiRegenRate', 'hpRegenRate', 'auraCostReduce', 'auraPowerRate', 'playerExpRate', 'techniqueExpRate', 'lootRate', 'rareLootRate'].includes(key)) {
-    return `${value / 100}%`;
-  }
-  return `${value}`;
-}
+import { describePreviewBonuses } from '../stat-preview';
 
 function formatEffectCondition(effect: EquipmentEffectDef): string {
   const conditions = effect?.conditions?.items ?? [];
@@ -50,23 +40,17 @@ function formatEffectCondition(effect: EquipmentEffectDef): string {
 }
 
 function formatItemEffects(item: EquipmentSlots[EquipSlot]): string[] {
-  if (!item?.effects?.length) {
+  const previewItem = item ? resolvePreviewItem(item) : null;
+  if (!previewItem?.effects?.length) {
     return [];
   }
-  return item.effects.map((effect) => {
+  return previewItem.effects.map((effect) => {
     const conditionText = formatEffectCondition(effect);
     switch (effect.type) {
       case 'stat_aura':
       case 'progress_boost': {
-        const attrParts = effect.attrs
-          ? Object.entries(effect.attrs).map(([key, value]) => `${getAttrKeyLabel(key)}+${value}`)
-          : [];
-        const statParts = effect.stats
-          ? Object.entries(effect.stats)
-            .filter(([, value]) => typeof value === 'number' && value !== 0)
-            .map(([key, value]) => `${getNumericScalarStatKeyLabel(key)}+${formatBonusValue(key, value as number)}`)
-          : [];
-        return `特效:${[...attrParts, ...statParts].join(' / ')}${conditionText}`;
+        const effectParts = describePreviewBonuses(effect.attrs, effect.stats, effect.valueStats);
+        return `特效:${effectParts.join(' / ') || '无数值变化'}${conditionText}`;
       }
       case 'periodic_cost': {
         const modeLabel = effect.mode === 'flat'
@@ -91,7 +75,8 @@ function formatItemEffects(item: EquipmentSlots[EquipSlot]): string[] {
           on_time_segment_changed: '时段切换时',
           on_enter_map: '入图时',
         };
-        return `触发:${triggerMap[effect.trigger] ?? effect.trigger}获得 ${effect.buff.name} ${effect.buff.duration}息${conditionText}`;
+        const buffParts = describePreviewBonuses(effect.buff.attrs, effect.buff.stats, effect.buff.valueStats);
+        return `触发:${triggerMap[effect.trigger] ?? effect.trigger}获得 ${effect.buff.name} ${effect.buff.duration}息${conditionText}${buffParts.length > 0 ? `，效果:${buffParts.join(' / ')}` : ''}`;
       }
       default:
         return '';
@@ -101,16 +86,10 @@ function formatItemEffects(item: EquipmentSlots[EquipSlot]): string[] {
 
 function formatItemBonuses(item: EquipmentSlots[EquipSlot]): string {
   if (!item) return '暂无词条';
-  const attrParts = item.equipAttrs
-    ? Object.entries(item.equipAttrs).map(([key, value]) => `${getAttrKeyLabel(key)}+${value}`)
-    : [];
-  const statParts = item.equipStats
-    ? Object.entries(item.equipStats)
-      .filter(([, value]) => typeof value === 'number' && value !== 0)
-      .map(([key, value]) => `${getNumericScalarStatKeyLabel(key)}+${formatBonusValue(key, value as number)}`)
-    : [];
+  const previewItem = resolvePreviewItem(item);
+  const bonusParts = describePreviewBonuses(previewItem.equipAttrs, previewItem.equipStats, previewItem.equipValueStats);
   const effectParts = formatItemEffects(item);
-  const parts = [...attrParts, ...statParts, ...effectParts];
+  const parts = [...bonusParts, ...effectParts];
   return parts.length > 0 ? parts.join(' / ') : '暂无词条';
 }
 
@@ -153,7 +132,7 @@ export class EquipmentPanel {
     let html = '<div class="panel-section">';
     html += '<div class="panel-section-title">装备栏</div>';
 
-    for (const slot of SLOT_ORDER) {
+    for (const slot of EQUIP_SLOTS) {
       const item = equipment[slot];
       if (item) {
         const bonusText = formatItemBonuses(item);

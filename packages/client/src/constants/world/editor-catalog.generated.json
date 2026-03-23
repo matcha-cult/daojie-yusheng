@@ -1,0 +1,4549 @@
+{
+  "techniques": [
+    {
+      "id": "redflame_art",
+      "name": "赤焰诀",
+      "grade": "yellow",
+      "skills": [
+        {
+          "id": "skill.fire_talisman",
+          "name": "离火符",
+          "desc": "符火先灼其表、再侵其脉，灼印叠得越多，后续火行越烈。",
+          "cooldown": 22,
+          "cost": 8,
+          "range": 3,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "fire",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.05
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.fire_talisman_burn",
+              "name": "灼印",
+              "desc": "火印未熄，法抗与化解被持续灼穿。",
+              "shortMark": "灼",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#ef6b3b",
+              "duration": 12,
+              "maxStacks": 10,
+              "valueStats": {
+                "spellDef": -3,
+                "resolvePower": -3
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.blazing_thread",
+          "name": "赤线灼脉",
+          "desc": "将离火牵成一线贯入敌阵，烧过之处更容易留下灼印。",
+          "cooldown": 26,
+          "cost": 9,
+          "range": 3,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "fire",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      22,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      },
+                      {
+                        "var": "target.buff.buff.fire_talisman_burn.stacks",
+                        "scale": 0.02
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.fire_talisman_burn",
+              "name": "灼印",
+              "desc": "火印未熄，法抗与化解被持续灼穿。",
+              "shortMark": "灼",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#ef6b3b",
+              "duration": 12,
+              "maxStacks": 10,
+              "valueStats": {
+                "spellDef": -3,
+                "resolvePower": -3
+              }
+            }
+          ],
+          "unlockLevel": 5
+        },
+        {
+          "id": "skill.burning_heart",
+          "name": "焚心诀",
+          "desc": "先前埋下的火意一并炸开，最适合拿来收尾压血线。",
+          "cooldown": 44,
+          "cost": 13,
+          "range": 4,
+          "targeting": {
+            "shape": "area",
+            "radius": 1,
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "fire",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      30,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.65
+                      },
+                      {
+                        "var": "target.maxHp",
+                        "scale": 0.02
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "target.buff.buff.fire_talisman_burn.stacks",
+                        "scale": 0.06
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 9
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 18,
+          "attrs": {
+            "spirit": 3
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 19,
+          "attrs": {
+            "spirit": 3
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 21,
+          "attrs": {
+            "spirit": 3
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 23,
+          "attrs": {
+            "spirit": 3
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 25,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 28,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 31,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 34,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 38,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 43,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 0,
+          "attrs": {
+            "spirit": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "frost_sutra",
+      "name": "寒魄经",
+      "grade": "mystic",
+      "skills": [
+        {
+          "id": "skill.frost_mark",
+          "name": "霜痕",
+          "desc": "先在目标体表凝出寒痕，再以后续寒诀层层压制。",
+          "cooldown": 22,
+          "cost": 8,
+          "range": 3,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "water",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      20,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.9
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.frost_mark_chill",
+              "name": "寒痕",
+              "desc": "寒意黏身，法抗、闪避与命中同步走低。",
+              "shortMark": "寒",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#63b9d7",
+              "duration": 14,
+              "maxStacks": 8,
+              "valueStats": {
+                "spellDef": -2,
+                "dodge": -4,
+                "hit": -3
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.ice_lock_art",
+          "name": "冰锁诀",
+          "desc": "先把寒意钉进经络，再让那股冷劲顺着旧痕继续蔓延。",
+          "cooldown": 28,
+          "cost": 9,
+          "range": 3,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "water",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2.1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "target.buff.buff.frost_mark_chill.stacks",
+                        "scale": 0.02
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.frost_mark_chill",
+              "name": "寒痕",
+              "desc": "寒意黏身，法抗、闪避与命中同步走低。",
+              "shortMark": "寒",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#63b9d7",
+              "duration": 14,
+              "maxStacks": 8,
+              "valueStats": {
+                "spellDef": -2,
+                "dodge": -4,
+                "hit": -3
+              }
+            }
+          ],
+          "unlockLevel": 5
+        },
+        {
+          "id": "skill.cold_moon_seal",
+          "name": "寒月印",
+          "desc": "凝寒月印覆压一片敌手，让寒痕迅速蔓延。",
+          "cooldown": 46,
+          "cost": 13,
+          "range": 4,
+          "targeting": {
+            "shape": "area",
+            "radius": 1,
+            "maxTargets": 5
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "water",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      28,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2.6
+                      },
+                      {
+                        "var": "target.maxHp",
+                        "scale": 0.025
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "target.buff.buff.frost_mark_chill.stacks",
+                        "scale": 0.05
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.cold_moon_bind",
+              "name": "寒凝",
+              "desc": "重寒压体，进一步削弱闪避与破招。",
+              "shortMark": "凝",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#7bd6f5",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "dodge": -5,
+                "breakPower": -5
+              }
+            }
+          ],
+          "unlockLevel": 9
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 37,
+          "attrs": {
+            "spirit": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 40,
+          "attrs": {
+            "spirit": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 43,
+          "attrs": {
+            "spirit": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 48,
+          "attrs": {
+            "spirit": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 53,
+          "attrs": {
+            "spirit": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 60,
+          "attrs": {
+            "spirit": 4,
+            "talent": 3
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 69,
+          "attrs": {
+            "spirit": 5,
+            "talent": 3
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 78,
+          "attrs": {
+            "spirit": 5,
+            "talent": 3
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 89,
+          "attrs": {
+            "spirit": 5,
+            "talent": 3
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 101,
+          "attrs": {
+            "spirit": 5,
+            "talent": 3
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 115,
+          "attrs": {
+            "spirit": 5,
+            "talent": 3
+          }
+        },
+        {
+          "level": 12,
+          "expFactor": 131,
+          "attrs": {
+            "spirit": 5,
+            "talent": 4
+          }
+        },
+        {
+          "level": 13,
+          "expFactor": 150,
+          "attrs": {
+            "spirit": 6,
+            "talent": 4
+          }
+        },
+        {
+          "level": 14,
+          "expFactor": 0,
+          "attrs": {
+            "spirit": 6,
+            "talent": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "thunder_palm",
+      "name": "惊雷掌",
+      "grade": "mystic",
+      "skills": [
+        {
+          "id": "skill.thunder_palm",
+          "name": "惊雷掌",
+          "desc": "雷势先蓄于掌，再借下一掌骤然炸开，越打越容易破招暴击。",
+          "cooldown": 34,
+          "cost": 10,
+          "range": 2,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "metal",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      20,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.2
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      },
+                      {
+                        "var": "caster.stat.breakPower",
+                        "scale": 0.008
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.thunder_palm_force",
+              "name": "雷势",
+              "desc": "掌中余雷未散，提高命中、破招与暴击。",
+              "shortMark": "雷",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#d6c34a",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "hit": 3,
+                "crit": 5,
+                "breakPower": 4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.rushing_thunder",
+          "name": "奔雷贯心",
+          "desc": "先以雷势逼出破绽，再把后继掌力整段贯进敌阵中央。",
+          "cooldown": 42,
+          "cost": 13,
+          "range": 3,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "metal",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      30,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.thunder_palm_force.stacks",
+                        "scale": 0.06
+                      },
+                      {
+                        "var": "caster.stat.breakPower",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 7
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 39,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 42,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 45,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 50,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 55,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 61,
+          "attrs": {
+            "constitution": 4,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 68,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 3,
+            "perception": 2
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 75,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 3,
+            "perception": 2
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 83,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 3,
+            "perception": 2
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 92,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 3,
+            "perception": 1
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 103,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 4,
+            "perception": 1
+          }
+        },
+        {
+          "level": 12,
+          "expFactor": 114,
+          "attrs": {
+            "constitution": 5,
+            "spirit": 4,
+            "perception": 1
+          }
+        },
+        {
+          "level": 13,
+          "expFactor": 127,
+          "attrs": {
+            "constitution": 6,
+            "spirit": 4,
+            "perception": 2
+          }
+        },
+        {
+          "level": 14,
+          "expFactor": 0,
+          "attrs": {
+            "constitution": 6,
+            "spirit": 4,
+            "perception": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "cloud_blade",
+      "name": "流云刀谱",
+      "grade": "yellow",
+      "skills": [
+        {
+          "id": "skill.cloud_cut",
+          "name": "流云断",
+          "desc": "先以云势起刀，再以步伐藏锋，越灵动，下一式越难防。",
+          "cooldown": 18,
+          "cost": 7,
+          "range": 2,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      22,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 0.6
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.08
+                      },
+                      {
+                        "var": "caster.stat.moveSpeed",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.mobility_flow",
+              "name": "风行",
+              "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+              "shortMark": "行",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#95c5a4",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "moveSpeed": 10,
+                "dodge": 5,
+                "crit": 4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.rift_step_slash",
+          "name": "踏隙斩",
+          "desc": "借落脚一瞬切开空隙再斩，刀意未尽时身法会自然续成流云。",
+          "cooldown": 24,
+          "cost": 8,
+          "range": 2,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 0.65
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      },
+                      {
+                        "var": "caster.buff.buff.mobility_flow.stacks",
+                        "scale": 0.04
+                      },
+                      {
+                        "var": "caster.stat.moveSpeed",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.mobility_flow",
+              "name": "风行",
+              "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+              "shortMark": "行",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#95c5a4",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "moveSpeed": 10,
+                "dodge": 5,
+                "crit": 4
+              }
+            }
+          ],
+          "unlockLevel": 5
+        },
+        {
+          "id": "skill.dragon_turn",
+          "name": "回龙转锋",
+          "desc": "借流云余势转身再斩，步法越疾，回锋越狠。",
+          "cooldown": 36,
+          "cost": 12,
+          "range": 3,
+          "targeting": {
+            "shape": "area",
+            "radius": 1,
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      28,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 0.95
+                      },
+                      {
+                        "var": "target.maxHp",
+                        "scale": 0.015
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.mobility_flow.stacks",
+                        "scale": 0.05
+                      },
+                      {
+                        "var": "caster.stat.moveSpeed",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 8
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 18,
+          "attrs": {
+            "perception": 3,
+            "constitution": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 20,
+          "attrs": {
+            "perception": 3,
+            "constitution": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 22,
+          "attrs": {
+            "perception": 3,
+            "constitution": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 24,
+          "attrs": {
+            "perception": 3,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 27,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 30,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 33,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 39,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 43,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 48,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 0,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "qingmu_sword",
+      "name": "青木剑诀",
+      "grade": "mortal",
+      "skills": [
+        {
+          "id": "skill.qingmu_slash",
+          "name": "青木斩",
+          "desc": "木脉剑气顺着伤口侵入经络，越斩越能削弱目标气机。",
+          "cooldown": 16,
+          "cost": 5,
+          "range": 1,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "wood",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      18,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.08
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.qingmu_mark",
+              "name": "青痕",
+              "desc": "木灵缠入经络，削弱法抗、闪避与化解。",
+              "shortMark": "青",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#68b96c",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "spellDef": -2,
+                "dodge": -3,
+                "resolvePower": -3
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.qingmu_pierce",
+          "name": "穿林式",
+          "desc": "沿先前斩开的气脉再递一剑，剑气更易顺着经络深扎。",
+          "cooldown": 26,
+          "cost": 7,
+          "range": 2,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 2
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "wood",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      22,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 5
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 13,
+          "attrs": {
+            "perception": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 14,
+          "attrs": {
+            "perception": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 16,
+          "attrs": {
+            "perception": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 18,
+          "attrs": {
+            "perception": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 21,
+          "attrs": {
+            "perception": 3,
+            "spirit": 2
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 23,
+          "attrs": {
+            "perception": 3,
+            "spirit": 2
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 27,
+          "attrs": {
+            "perception": 3,
+            "spirit": 2
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 31,
+          "attrs": {
+            "perception": 3,
+            "spirit": 2
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 0,
+          "attrs": {
+            "perception": 4,
+            "spirit": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "wind_step",
+      "name": "踏风步",
+      "grade": "yellow",
+      "skills": [
+        {
+          "id": "skill.wind_edge",
+          "name": "风痕",
+          "desc": "借步法切入身位，速度越快，这一击越像木叶掠风般轻灵狠准。",
+          "cooldown": 14,
+          "cost": 5,
+          "range": 2,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "wood",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      20,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 0.55
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.08
+                      },
+                      {
+                        "var": "caster.stat.moveSpeed",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.mobility_flow",
+              "name": "风行",
+              "desc": "身法入势，大幅提高移速，并少量带动闪避与暴击。",
+              "shortMark": "行",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#95c5a4",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "moveSpeed": 10,
+                "dodge": 5,
+                "crit": 4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.chasing_shadow",
+          "name": "逐影掠空",
+          "desc": "借踏风余势连续切位，越快越能把一道劲风拖成长线。",
+          "cooldown": 30,
+          "cost": 8,
+          "range": 3,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "wood",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.09
+                      },
+                      {
+                        "var": "caster.buff.buff.mobility_flow.stacks",
+                        "scale": 0.04
+                      },
+                      {
+                        "var": "caster.stat.moveSpeed",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 6
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 16,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 18,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 20,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 22,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 25,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 29,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 33,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 38,
+          "attrs": {
+            "perception": 4
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 44,
+          "attrs": {
+            "perception": 5
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 0,
+          "attrs": {
+            "perception": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "iron_bone_art",
+      "name": "铁骨功",
+      "grade": "yellow",
+      "skills": [
+        {
+          "id": "skill.iron_bone_strike",
+          "name": "铁骨崩拳",
+          "desc": "以内劲震骨，出拳同时叠起护体罡劲，越打越硬。",
+          "cooldown": 16,
+          "cost": 6,
+          "range": 1,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      14,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 0.8
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.08
+                      },
+                      {
+                        "var": "caster.buff.buff.iron_bone_guard.stacks",
+                        "scale": 0.03
+                      },
+                      {
+                        "var": "caster.stat.physDef",
+                        "scale": 0.006
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.iron_bone_guard",
+              "name": "罡劲",
+              "desc": "罡气绕体，提高护甲与化解，供后续重击借势。",
+              "shortMark": "罡",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#a28d74",
+              "duration": 14,
+              "maxStacks": 8,
+              "valueStats": {
+                "physDef": 2,
+                "resolvePower": 3
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.iron_guard_roar",
+          "name": "震罡怒吼",
+          "desc": "鼓荡护体罡气轰开身前敌群，吼声散后自身罡劲反而更沉一层。",
+          "cooldown": 36,
+          "cost": 10,
+          "range": 2,
+          "targeting": {
+            "shape": "area",
+            "radius": 1,
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      18,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 0.6
+                      },
+                      {
+                        "var": "caster.maxHp",
+                        "scale": 0.03
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.iron_bone_guard.stacks",
+                        "scale": 0.04
+                      },
+                      {
+                        "var": "caster.stat.physDef",
+                        "scale": 0.008
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.iron_bone_guard",
+              "name": "罡劲",
+              "desc": "罡气绕体，提高护甲与化解，供后续重击借势。",
+              "shortMark": "罡",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#a28d74",
+              "duration": 14,
+              "maxStacks": 8,
+              "valueStats": {
+                "physDef": 2,
+                "resolvePower": 3
+              }
+            }
+          ],
+          "unlockLevel": 4
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 16,
+          "attrs": {
+            "constitution": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 19,
+          "attrs": {
+            "constitution": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 24,
+          "attrs": {
+            "constitution": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 32,
+          "attrs": {
+            "constitution": 4,
+            "talent": 2
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 38,
+          "attrs": {
+            "constitution": 5,
+            "talent": 2
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 48,
+          "attrs": {
+            "constitution": 5,
+            "talent": 2
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 58,
+          "attrs": {
+            "constitution": 6,
+            "talent": 2
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 0,
+          "attrs": {
+            "constitution": 6,
+            "talent": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "starfall_spear",
+      "name": "陨星枪诀",
+      "grade": "mystic",
+      "skills": [
+        {
+          "id": "skill.starfall_thrust",
+          "name": "坠星刺",
+          "desc": "先校准枪势，再借坠势贯穿敌阵，越蓄越适合破强敌。",
+          "cooldown": 28,
+          "cost": 10,
+          "range": 3,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 1.5
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.starfall_momentum.stacks",
+                        "scale": 0.05
+                      },
+                      {
+                        "var": "caster.stat.hit",
+                        "scale": 0.008
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.starfall_momentum",
+              "name": "坠势",
+              "desc": "枪势下压，提高命中、破招与暴击。",
+              "shortMark": "坠",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#d6a86a",
+              "duration": 14,
+              "maxStacks": 6,
+              "valueStats": {
+                "hit": 3,
+                "breakPower": 3,
+                "crit": 4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.chasing_star",
+          "name": "追星步",
+          "desc": "踏前半步再补一枪，借冲势把前一式的坠意继续压实。",
+          "cooldown": 24,
+          "cost": 8,
+          "range": 3,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      22,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 1.35
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.starfall_momentum.stacks",
+                        "scale": 0.04
+                      },
+                      {
+                        "var": "caster.stat.hit",
+                        "scale": 0.007
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.starfall_momentum",
+              "name": "坠势",
+              "desc": "枪势下压，提高命中、破招与暴击。",
+              "shortMark": "坠",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#d6a86a",
+              "duration": 14,
+              "maxStacks": 6,
+              "valueStats": {
+                "hit": 3,
+                "breakPower": 3,
+                "crit": 4
+              }
+            }
+          ],
+          "unlockLevel": 5
+        },
+        {
+          "id": "skill.skybreaker_lance",
+          "name": "裂穹枪",
+          "desc": "将前段积下的枪势一次性贯成长线，最适合用来破开中段敌阵。",
+          "cooldown": 40,
+          "cost": 13,
+          "range": 4,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      28,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 2.4
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.11
+                      },
+                      {
+                        "var": "caster.buff.buff.starfall_momentum.stacks",
+                        "scale": 0.03
+                      },
+                      {
+                        "var": "caster.stat.hit",
+                        "scale": 0.01
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 9
+        },
+        {
+          "id": "skill.meteor_break",
+          "name": "陨焰破",
+          "desc": "借坠势与枪意同时爆开，对强敌与高血目标尤为致命。",
+          "cooldown": 56,
+          "cost": 18,
+          "range": 4,
+          "targeting": {
+            "shape": "area",
+            "radius": 1,
+            "maxTargets": 5
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "physical",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      36,
+                      {
+                        "var": "caster.stat.physAtk",
+                        "scale": 1.8
+                      },
+                      {
+                        "var": "target.maxHp",
+                        "scale": 0.03
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.12
+                      },
+                      {
+                        "var": "caster.buff.buff.starfall_momentum.stacks",
+                        "scale": 0.06
+                      },
+                      {
+                        "var": "caster.stat.breakPower",
+                        "scale": 0.012
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 12
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 41,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 44,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 47,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 50,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 54,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 59,
+          "attrs": {
+            "perception": 4,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 64,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 70,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 76,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 84,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 93,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 12,
+          "expFactor": 102,
+          "attrs": {
+            "perception": 5,
+            "constitution": 2,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 13,
+          "expFactor": 113,
+          "attrs": {
+            "perception": 5,
+            "constitution": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 14,
+          "expFactor": 126,
+          "attrs": {
+            "perception": 5,
+            "constitution": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 15,
+          "expFactor": 139,
+          "attrs": {
+            "perception": 5,
+            "constitution": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 16,
+          "expFactor": 155,
+          "attrs": {
+            "perception": 5,
+            "constitution": 3,
+            "spirit": 1
+          }
+        },
+        {
+          "level": 17,
+          "expFactor": 0,
+          "attrs": {
+            "perception": 6,
+            "constitution": 3,
+            "spirit": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "spirit_anchor",
+      "name": "镇灵篇",
+      "grade": "mystic",
+      "skills": [
+        {
+          "id": "skill.anchor_pulse",
+          "name": "镇灵冲",
+          "desc": "以神识先钉住气机，再借凝神之势衔接后续杀招。",
+          "cooldown": 28,
+          "cost": 9,
+          "range": 2,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "earth",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      22,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.anchor_focus",
+              "name": "镇灵凝神",
+              "desc": "凝聚心神，暂时提高法术攻击、暴击与化解。",
+              "shortMark": "凝",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#7f9cff",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "spellAtk": 3,
+                "crit": 5,
+                "resolvePower": 4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.soul_nail",
+          "name": "定魂钉",
+          "desc": "先以一点定住魂光，再顺着那一点牵出整段后继灵压。",
+          "cooldown": 32,
+          "cost": 10,
+          "range": 3,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "earth",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      24,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 1.4
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "caster.buff.buff.anchor_focus.stacks",
+                        "scale": 0.05
+                      },
+                      {
+                        "var": "caster.stat.resolvePower",
+                        "scale": 0.008
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "self",
+              "buffId": "buff.anchor_focus",
+              "name": "镇灵凝神",
+              "desc": "凝聚心神，暂时提高法术攻击、暴击与化解。",
+              "shortMark": "凝",
+              "category": "buff",
+              "visibility": "public",
+              "color": "#7f9cff",
+              "duration": 12,
+              "maxStacks": 6,
+              "valueStats": {
+                "spellAtk": 3,
+                "crit": 5,
+                "resolvePower": 4
+              }
+            }
+          ],
+          "unlockLevel": 6
+        },
+        {
+          "id": "skill.soul_chain",
+          "name": "缚魄锁",
+          "desc": "以灵链束住魂魄与气机，让被锁之敌更难招架后续神识压制。",
+          "cooldown": 46,
+          "cost": 15,
+          "range": 4,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 4
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "earth",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      32,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2.5
+                      },
+                      {
+                        "var": "target.maxHp",
+                        "scale": 0.03
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.11
+                      },
+                      {
+                        "var": "caster.buff.buff.anchor_focus.stacks",
+                        "scale": 0.05
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.soul_chain_bind",
+              "name": "缚魄",
+              "desc": "魂魄被锁，法抗、闪避与化解一并下滑。",
+              "shortMark": "锁",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#9280c6",
+              "duration": 14,
+              "maxStacks": 6,
+              "valueStats": {
+                "spellDef": -2,
+                "dodge": -4,
+                "resolvePower": -4
+              }
+            }
+          ],
+          "unlockLevel": 10
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 41,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 44,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 47,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 50,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 54,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 59,
+          "attrs": {
+            "spirit": 4,
+            "talent": 1
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 64,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 69,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 75,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 85,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 93,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 12,
+          "expFactor": 101,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 13,
+          "expFactor": 111,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 14,
+          "expFactor": 121,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 15,
+          "expFactor": 133,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 16,
+          "expFactor": 146,
+          "attrs": {
+            "spirit": 5,
+            "talent": 1
+          }
+        },
+        {
+          "level": 17,
+          "expFactor": 0,
+          "attrs": {
+            "spirit": 6,
+            "talent": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "stillheart",
+      "name": "止念诀",
+      "grade": "mystic",
+      "skills": [
+        {
+          "id": "skill.stillheart_seal",
+          "name": "止念印",
+          "desc": "神识先压住对手心神，再让其术念与化解一并迟滞。",
+          "cooldown": 44,
+          "cost": 12,
+          "range": 4,
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "earth",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      26,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2.1
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.1
+                      },
+                      {
+                        "var": "target.buff.buff.stillheart_suppress.stacks",
+                        "scale": 0.05
+                      },
+                      {
+                        "var": "target.stat.resolvePower",
+                        "scale": 0.004
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "type": "buff",
+              "target": "target",
+              "buffId": "buff.stillheart_suppress",
+              "name": "止念",
+              "desc": "神识遭镇，法攻、破招与化解皆被压住。",
+              "shortMark": "念",
+              "category": "debuff",
+              "visibility": "public",
+              "color": "#8f8a70",
+              "duration": 14,
+              "maxStacks": 6,
+              "valueStats": {
+                "spellAtk": -3,
+                "breakPower": -3,
+                "resolvePower": -4
+              }
+            }
+          ],
+          "unlockLevel": 1
+        },
+        {
+          "id": "skill.mind_break_spike",
+          "name": "断识锥",
+          "desc": "趁对方念头受阻时以神识直凿其识海，越会化解反而越难完全避开。",
+          "cooldown": 38,
+          "cost": 11,
+          "range": 4,
+          "targeting": {
+            "shape": "line",
+            "maxTargets": 3
+          },
+          "effects": [
+            {
+              "type": "damage",
+              "damageKind": "spell",
+              "element": "earth",
+              "formula": {
+                "op": "mul",
+                "args": [
+                  {
+                    "op": "add",
+                    "args": [
+                      30,
+                      {
+                        "var": "caster.stat.spellAtk",
+                        "scale": 2.8
+                      }
+                    ]
+                  },
+                  {
+                    "op": "add",
+                    "args": [
+                      1,
+                      {
+                        "var": "techLevel",
+                        "scale": 0.11
+                      },
+                      {
+                        "var": "target.buff.buff.stillheart_suppress.stacks",
+                        "scale": 0.06
+                      },
+                      {
+                        "var": "target.stat.resolvePower",
+                        "scale": 0.006
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "unlockLevel": 8
+        }
+      ],
+      "layers": [
+        {
+          "level": 1,
+          "expFactor": 39,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 2,
+          "expFactor": 42,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 3,
+          "expFactor": 45,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 4,
+          "expFactor": 48,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 5,
+          "expFactor": 52,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 6,
+          "expFactor": 56,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 7,
+          "expFactor": 61,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 8,
+          "expFactor": 66,
+          "attrs": {
+            "spirit": 4
+          }
+        },
+        {
+          "level": 9,
+          "expFactor": 74,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 10,
+          "expFactor": 82,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 11,
+          "expFactor": 91,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 12,
+          "expFactor": 101,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 13,
+          "expFactor": 113,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 14,
+          "expFactor": 126,
+          "attrs": {
+            "spirit": 5
+          }
+        },
+        {
+          "level": 15,
+          "expFactor": 140,
+          "attrs": {
+            "spirit": 6
+          }
+        },
+        {
+          "level": 16,
+          "expFactor": 0,
+          "attrs": {
+            "spirit": 6
+          }
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "itemId": "book.redflame_art",
+      "name": "《赤焰诀》",
+      "type": "skill_book",
+      "desc": "残缺的火行法门，能御使离火符。"
+    },
+    {
+      "itemId": "book.frost_sutra",
+      "name": "《寒魄经》",
+      "type": "skill_book",
+      "desc": "引寒入脉的残篇，兼具杀伐与凝神。"
+    },
+    {
+      "itemId": "book_thunder_palm",
+      "name": "《惊雷掌》残卷",
+      "type": "skill_book",
+      "desc": "残存雷纹的掌法札记，威力不俗。"
+    },
+    {
+      "itemId": "book.cloud_blade",
+      "name": "《流云刀谱》",
+      "type": "skill_book",
+      "desc": "从江湖刀法演化而来的灵动刀谱。"
+    },
+    {
+      "itemId": "book.qingmu_sword",
+      "name": "《青木剑诀》",
+      "type": "skill_book",
+      "desc": "记载基础御剑吐纳之法，使用后学会青木剑诀。"
+    },
+    {
+      "itemId": "book_wind_step",
+      "name": "《踏风步》",
+      "type": "skill_book",
+      "desc": "轻身挪步之法，可在战斗中快速切入。"
+    },
+    {
+      "itemId": "book.iron_bone_art",
+      "name": "《铁骨功》",
+      "type": "skill_book",
+      "desc": "武者锻体法门，强调硬桥硬马之道。"
+    },
+    {
+      "itemId": "book.starfall_spear",
+      "name": "《陨星枪诀》",
+      "type": "skill_book",
+      "desc": "残破星纹玉简中记载的高阶枪诀。"
+    },
+    {
+      "itemId": "book.spirit_anchor",
+      "name": "《镇灵篇》",
+      "type": "skill_book",
+      "desc": "古修遗留的御神法门，可压制异兽灵识。"
+    },
+    {
+      "itemId": "book_stillheart",
+      "name": "《止念诀》",
+      "type": "skill_book",
+      "desc": "收束心神、以念压敌的法门。"
+    },
+    {
+      "itemId": "equip.gather_qi_pendant",
+      "name": "采气木坠",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "accessory",
+      "desc": "刻着简陋聚气纹的木坠，聊胜于无。",
+      "equipValueStats": {
+        "maxQi": 1.5,
+        "techniqueExpRate": 5
+      }
+    },
+    {
+      "itemId": "equip.starfall_spear",
+      "name": "残星乌铁枪",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 5,
+      "equipSlot": "weapon",
+      "desc": "枪杆以乌铁重熔，枪锋残留一点旧星砂寒芒，是凡人篇末段少见的过渡重器。",
+      "equipValueStats": {
+        "physAtk": 13,
+        "spellAtk": 8,
+        "hit": 4,
+        "breakPower": 4
+      }
+    },
+    {
+      "itemId": "equip.remnant_array_crown",
+      "name": "残阵束冠",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "head",
+      "desc": "束冠上的阵眼早已断裂，只剩一点护识的余韵。",
+      "equipAttrs": {
+        "spirit": 1
+      },
+      "equipValueStats": {
+        "spellDef": 5,
+        "viewRange": 1
+      }
+    },
+    {
+      "itemId": "pure_yang_pill",
+      "name": "纯阳丹",
+      "type": "consumable",
+      "desc": "以烈阳药引炼制，可在恶战后快速回气。"
+    },
+    {
+      "itemId": "bamboo_heart",
+      "name": "翠竹心",
+      "type": "material",
+      "desc": "竹灵聚气形成的核心髓结。"
+    },
+    {
+      "itemId": "major_qi_pill",
+      "name": "大还灵丹",
+      "type": "consumable",
+      "desc": "药力浑厚，适合中阶修士快速恢复。"
+    },
+    {
+      "itemId": "equip.broken_rune_blade",
+      "name": "断碑纹剑",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "weapon",
+      "desc": "剑脊嵌着未熄的残纹，挥动时像是在拖着半截旧阵。",
+      "equipValueStats": {
+        "physAtk": 9,
+        "spellAtk": 6,
+        "hit": 3
+      }
+    },
+    {
+      "itemId": "equip.road_cleaver",
+      "name": "断道柴刀",
+      "type": "equipment",
+      "grade": "mortal",
+      "level": 1,
+      "equipSlot": "weapon",
+      "desc": "从断道废车旁捡来的厚背柴刀，砍路障比砍人更顺手。",
+      "equipValueStats": {
+        "physAtk": 3,
+        "hit": 1
+      }
+    },
+    {
+      "itemId": "equip.rune_robe",
+      "name": "断纹法袍",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "body",
+      "desc": "遗迹残纹织就的法袍，能稳固神识。",
+      "equipValueStats": {
+        "maxQi": 4.5,
+        "spellAtk": 8,
+        "spellDef": 6
+      }
+    },
+    {
+      "itemId": "rune_shard",
+      "name": "断纹石片",
+      "type": "material",
+      "desc": "遗迹傀儡体内剥落的残纹。"
+    },
+    {
+      "itemId": "bandit_insignia",
+      "name": "匪徒腰牌",
+      "type": "material",
+      "desc": "荒野匪徒身份的金属牌。"
+    },
+    {
+      "itemId": "equip.blood_burn_rope",
+      "name": "焚脉黑绳",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "accessory",
+      "desc": "以焦血浸过的黑绳缠腕，行功时会反噬经脉，却也逼得气机转得更快。",
+      "tags": [
+        "fanren",
+        "evil_path",
+        "cultivation"
+      ],
+      "effects": [
+        {
+          "effectId": "blood-burn-drain",
+          "type": "periodic_cost",
+          "trigger": "on_cultivation_tick",
+          "resource": "hp",
+          "mode": "max_ratio_bp",
+          "value": 80,
+          "minRemain": 1
+        },
+        {
+          "effectId": "blood-burn-growth",
+          "type": "progress_boost",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "is_cultivating",
+                "value": true
+              }
+            ]
+          },
+          "valueStats": {
+            "techniqueExpPerTick": 10,
+            "realmExpPerTick": 2
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "equip.grassbound_shoes",
+      "name": "赶路草鞋",
+      "type": "equipment",
+      "grade": "mortal",
+      "level": 1,
+      "equipSlot": "legs",
+      "desc": "麻绳紧扎，踩泥不易滑，穷人赶夜路时常见。",
+      "equipValueStats": {
+        "moveSpeed": 8,
+        "dodge": 1
+      }
+    },
+    {
+      "itemId": "map.ancient_ruins",
+      "name": "古遗迹残图",
+      "type": "consumable",
+      "desc": "残缺却仍可辨认主要遗迹轮廓。使用后可永久解锁古遗迹地图。"
+    },
+    {
+      "itemId": "valley_emperor_fang",
+      "name": "谷皇獠牙",
+      "type": "quest_item",
+      "desc": "兽谷皇级妖兽的本命獠牙。"
+    },
+    {
+      "itemId": "serpent_scale",
+      "name": "谷蛇逆鳞",
+      "type": "material",
+      "desc": "兽谷异蛇的逆鳞碎片。"
+    },
+    {
+      "itemId": "equip.celestial_crown",
+      "name": "观脉骨冠",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "head",
+      "desc": "以异兽头骨和旧纹骨钉束成的骨冠，戴上后对气脉流转会更敏锐。",
+      "equipAttrs": {
+        "spirit": 2
+      },
+      "equipValueStats": {
+        "viewRange": 1,
+        "spellDef": 5
+      }
+    },
+    {
+      "itemId": "frost_heart_paste",
+      "name": "寒心膏",
+      "type": "consumable",
+      "desc": "寒性药膏，稳固经脉并恢复气血。"
+    },
+    {
+      "itemId": "map.black_iron_mine",
+      "name": "黑铁矿脉图",
+      "type": "consumable",
+      "desc": "矿道分布与竖井方位都被誊录其上。使用后可永久解锁黑铁矿洞地图。"
+    },
+    {
+      "itemId": "equip.blackiron_brigandine",
+      "name": "黑铁束身甲",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "body",
+      "desc": "以旧矿卫残片拼出来的束身甲，缝里还残留着铁腥味。",
+      "equipValueStats": {
+        "maxHp": 3.17,
+        "physDef": 6,
+        "resolvePower": 3
+      }
+    },
+    {
+      "itemId": "equip.wasteland_cap",
+      "name": "荒路皮帽",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "head",
+      "desc": "帽檐压得很低，风沙里能保住眼睛。",
+      "equipValueStats": {
+        "dodge": 2,
+        "viewRange": 1
+      }
+    },
+    {
+      "itemId": "map.wildlands",
+      "name": "荒原游猎图",
+      "type": "consumable",
+      "desc": "标注荒原地貌、营地遗迹与危险通路。使用后可永久解锁荒原地图。"
+    },
+    {
+      "itemId": "pill.minor_heal",
+      "name": "回春散",
+      "type": "consumable",
+      "desc": "疗养筋骨，恢复少量气血。"
+    },
+    {
+      "itemId": "soul_ink",
+      "name": "魂墨",
+      "type": "material",
+      "desc": "古碑残魂凝结出的墨色灵液。"
+    },
+    {
+      "itemId": "crystal_dust",
+      "name": "晶尘",
+      "type": "material",
+      "desc": "晶背蝠掉落的微光粉末。"
+    },
+    {
+      "itemId": "equip.wellward_talisman",
+      "name": "井语避邪符",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 4,
+      "equipSlot": "accessory",
+      "desc": "旧井边求来的黄符，纸色已旧，仍能替人压下几分邪气与惊悸。",
+      "equipValueStats": {
+        "spellDef": 5,
+        "resolvePower": 3,
+        "hpRegenRate": 0.6
+      }
+    },
+    {
+      "itemId": "equip.bound_chest",
+      "name": "旧皮绑胸",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "body",
+      "desc": "流匪和脚夫都爱穿，护不住命，但能多扛两下。",
+      "equipValueStats": {
+        "maxHp": 2.33,
+        "resolvePower": 2
+      }
+    },
+    {
+      "itemId": "equip.rust_saber",
+      "name": "旧铁长刀",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "weapon",
+      "desc": "镇防旧库翻出的制式长刀。",
+      "equipValueStats": {
+        "physAtk": 6,
+        "hit": 2
+      }
+    },
+    {
+      "itemId": "colossus_heart",
+      "name": "巨像核心",
+      "type": "quest_item",
+      "desc": "矿脉巨像的驱动核心。"
+    },
+    {
+      "itemId": "equip.porter_jacket",
+      "name": "扛包短褂",
+      "type": "equipment",
+      "grade": "mortal",
+      "level": 1,
+      "equipSlot": "body",
+      "desc": "南市脚行穿的短褂，领口粗糙，胜在耐磨。",
+      "equipValueStats": {
+        "maxHp": 1.67,
+        "physDef": 2
+      }
+    },
+    {
+      "itemId": "equip.threshold_boots",
+      "name": "叩门行靴",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "legs",
+      "desc": "专给叩门前夜赶路的人做的轻靴，既要走得快，也要留得住回旋的余地。",
+      "equipValueStats": {
+        "moveSpeed": 16,
+        "cooldownSpeed": 5,
+        "dodge": 2
+      }
+    },
+    {
+      "itemId": "quest.miner_token",
+      "name": "矿洞令牌",
+      "type": "quest_item",
+      "desc": "证明你被允许深入矿洞与古修遗迹。"
+    },
+    {
+      "itemId": "mine_crystal_core",
+      "name": "矿晶核",
+      "type": "quest_item",
+      "desc": "矿洞深层晶簇凝结出的核心。"
+    },
+    {
+      "itemId": "equip.orevein_ring",
+      "name": "矿脉扣环",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "accessory",
+      "desc": "矿工拿来记矿脉方位的铁环，久了也能养出一点破势。",
+      "equipValueStats": {
+        "breakPower": 3,
+        "lootRate": 4
+      }
+    },
+    {
+      "itemId": "equip.miner_helmet",
+      "name": "矿卫盔",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "head",
+      "desc": "旧矿卫制式铁盔，防护结实。",
+      "equipValueStats": {
+        "maxHp": 2,
+        "physDef": 7,
+        "resolvePower": 3
+      }
+    },
+    {
+      "itemId": "equip.orebreak_hammer",
+      "name": "矿卫破岩锤",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "weapon",
+      "desc": "锤头沉得惊人，砸石和砸骨头时都带着同一种闷响。",
+      "equipValueStats": {
+        "physAtk": 10,
+        "breakPower": 4,
+        "hit": 2
+      }
+    },
+    {
+      "itemId": "wolf_fang",
+      "name": "狼牙",
+      "type": "material",
+      "desc": "噬灵狼的利牙。"
+    },
+    {
+      "itemId": "equip.hunter_cap",
+      "name": "猎风帽",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "head",
+      "desc": "荒野猎户常用的轻便头具。",
+      "equipValueStats": {
+        "dodge": 4,
+        "crit": 2
+      }
+    },
+    {
+      "itemId": "equip.bone_dagger",
+      "name": "猎户骨匕",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "weapon",
+      "desc": "用野兽腿骨打磨的短匕，轻巧狠辣。",
+      "equipValueStats": {
+        "physAtk": 5,
+        "crit": 3
+      }
+    },
+    {
+      "itemId": "equip.valley_fang_blade",
+      "name": "裂齿斩骨刀",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "weapon",
+      "desc": "刀背厚重，刃口带着兽谷妖骨磨出的细裂纹，专走压血断势一路。",
+      "equipValueStats": {
+        "physAtk": 12,
+        "crit": 3,
+        "breakPower": 4
+      }
+    },
+    {
+      "itemId": "equip.ridge_calm_robe",
+      "name": "灵脊镇息袍",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "body",
+      "desc": "灵脊冷风里晒出的袍子，穿在身上后，行功时那股浮躁会慢慢沉下去。",
+      "equipValueStats": {
+        "maxQi": 3,
+        "spellDef": 6,
+        "qiRegenRate": 0.7
+      }
+    },
+    {
+      "itemId": "spirit_ridge_sigil",
+      "name": "灵岭行令",
+      "type": "quest_item",
+      "desc": "灵岭守关者留下的通行令符。"
+    },
+    {
+      "itemId": "map.spirit_ridge",
+      "name": "灵脉山岭图",
+      "type": "consumable",
+      "desc": "绘有山脊、灵穴与险峻通路。使用后可永久解锁灵脉山岭地图。"
+    },
+    {
+      "itemId": "spirit_stone",
+      "name": "灵石",
+      "type": "consumable",
+      "desc": "内蕴温和灵机，捏碎后可滋养脚下地脉。使用时为当前所处地块增加 100 点灵力，可批量使用。"
+    },
+    {
+      "itemId": "spirit_iron_fragment",
+      "name": "灵铁碎片",
+      "type": "material",
+      "desc": "蕴灵玄铁的碎片。"
+    },
+    {
+      "itemId": "ridge_beast_claw",
+      "name": "岭兽爪",
+      "type": "material",
+      "desc": "灵岭猛兽留下的巨大爪痕骨。"
+    },
+    {
+      "itemId": "equip.ash_tread",
+      "name": "炉灰踏靴",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "legs",
+      "desc": "鞋底结了层灰壳，踩在碎石和熄火矿渣上比常鞋稳。",
+      "equipValueStats": {
+        "moveSpeed": 10,
+        "physDef": 2
+      }
+    },
+    {
+      "itemId": "equip.gate_headcloth",
+      "name": "门丁裹头巾",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "head",
+      "desc": "值夜门丁常用的厚布头巾，夜里守门的人比白日看得更细。",
+      "equipValueStats": {
+        "resolvePower": 2,
+        "hpRegenRate": 0.25
+      },
+      "effects": [
+        {
+          "effectId": "night-watch",
+          "type": "stat_aura",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "time_segment",
+                "in": [
+                  "dusk",
+                  "first_night",
+                  "night",
+                  "late_night",
+                  "before_dawn",
+                  "deep_night"
+                ]
+              }
+            ]
+          },
+          "valueStats": {
+            "hit": 2,
+            "viewRange": 1
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "equip.nanshi_token",
+      "name": "南市木牌",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "accessory",
+      "desc": "脚店记工用的木牌，拿在手里时，总会逼着人多跑几趟。",
+      "equipValueStats": {
+        "maxHp": 1,
+        "playerExpRate": 4
+      }
+    },
+    {
+      "itemId": "equip.bamboo_split_blade",
+      "name": "青竹分水刃",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "weapon",
+      "desc": "刀身细窄，专为林路斜切和借身转步而造。",
+      "equipValueStats": {
+        "physAtk": 7,
+        "dodge": 2,
+        "hit": 2
+      }
+    },
+    {
+      "itemId": "map.bamboo_forest",
+      "name": "青竹林野图",
+      "type": "consumable",
+      "desc": "记载青竹林野地势与出入口。使用后可永久解锁竹林地图。"
+    },
+    {
+      "itemId": "map.beast_valley",
+      "name": "群兽谷行图",
+      "type": "consumable",
+      "desc": "专为猎妖者整理的谷地行图。使用后可永久解锁群兽谷地图。"
+    },
+    {
+      "itemId": "mine_signal_core",
+      "name": "失落信标核心",
+      "type": "quest_item",
+      "desc": "矿洞旧阵的核心部件。"
+    },
+    {
+      "itemId": "equip.pattern_picker_ring",
+      "name": "拾纹指环",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "accessory",
+      "desc": "曾有人戴着它在断碑间抄录阵纹，指环内壁还留着细小刻痕。",
+      "equipAttrs": {
+        "comprehension": 1
+      },
+      "equipValueStats": {
+        "techniqueExpRate": 6,
+        "spellAtk": 3
+      }
+    },
+    {
+      "itemId": "equip.soul_devour_token",
+      "name": "噬元骨牌",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "accessory",
+      "desc": "骨牌内封着一缕不肯散去的残意，静修时吸血夺元，杀敌时反能回涌一口浊气。",
+      "tags": [
+        "fanren",
+        "evil_path",
+        "cultivation"
+      ],
+      "effects": [
+        {
+          "effectId": "soul-devour-drain",
+          "type": "periodic_cost",
+          "trigger": "on_cultivation_tick",
+          "resource": "hp",
+          "mode": "current_ratio_bp",
+          "value": 120,
+          "minRemain": 1
+        },
+        {
+          "effectId": "soul-devour-growth",
+          "type": "progress_boost",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "is_cultivating",
+                "value": true
+              }
+            ]
+          },
+          "valueStats": {
+            "techniqueExpPerTick": 16,
+            "realmExpPerTick": 4
+          }
+        },
+        {
+          "effectId": "soul-devour-feast",
+          "type": "timed_buff",
+          "trigger": "on_kill",
+          "target": "self",
+          "cooldown": 6,
+          "buff": {
+            "buffId": "equip.soul_devour_feast",
+            "name": "食煞回元",
+            "desc": "斩杀后残意反涌，短时间内灵力回复与功法运转更快。",
+            "duration": 8,
+            "shortMark": "煞",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#8a3f2d",
+            "valueStats": {
+              "qiRegenRate": 1.6,
+              "techniqueExpRate": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "valley_core",
+      "name": "兽谷核心",
+      "type": "quest_item",
+      "desc": "谷底裂隙孕出的异质核心。"
+    },
+    {
+      "itemId": "rat_tail",
+      "name": "鼠尾",
+      "type": "material",
+      "desc": "灰尾鼠的尾巴。"
+    },
+    {
+      "itemId": "frost_essence",
+      "name": "霜华精粹",
+      "type": "material",
+      "desc": "极寒灵气凝结的蓝白晶滴。"
+    },
+    {
+      "itemId": "equip.trace_pattern_boots",
+      "name": "踏纹履",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "legs",
+      "desc": "顺着残纹步点走时，真气会短暂变得更流畅。",
+      "equipValueStats": {
+        "moveSpeed": 14,
+        "cooldownSpeed": 4
+      }
+    },
+    {
+      "itemId": "equip.cloud_boots",
+      "name": "踏云履",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "legs",
+      "desc": "鞋底镶有浮云阵纹，行走轻灵。",
+      "equipValueStats": {
+        "moveSpeed": 18,
+        "dodge": 2,
+        "hit": 1
+      }
+    },
+    {
+      "itemId": "mantis_blade",
+      "name": "螳锋",
+      "type": "material",
+      "desc": "刃螳前臂外骨，可作刀坯。"
+    },
+    {
+      "itemId": "sky_seal_core",
+      "name": "天封核心",
+      "type": "quest_item",
+      "desc": "封印天宫裂隙所需的核心组件。"
+    },
+    {
+      "itemId": "map.sky_ruins",
+      "name": "天阙遗墟图",
+      "type": "consumable",
+      "desc": "记载高阶遗墟的主要路径与坍塌区域。使用后可永久解锁天阙遗墟地图。"
+    },
+    {
+      "itemId": "sky_pattern_page",
+      "name": "天纹残页",
+      "type": "material",
+      "desc": "记录古天宫阵纹的残页。"
+    },
+    {
+      "itemId": "equip.windhear_crown",
+      "name": "听风兽皮冠",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 4,
+      "equipSlot": "head",
+      "desc": "兽皮毛向顺风压平，林响一近便能先一步听出动静。",
+      "equipValueStats": {
+        "dodge": 3,
+        "crit": 2,
+        "viewRange": 1
+      }
+    },
+    {
+      "itemId": "equip.soot_lamp_hood",
+      "name": "熄火矿灯冠",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "head",
+      "desc": "矿灯虽然熄了，旧灯罩仍能帮人摸清黑暗里的轮廓。",
+      "equipValueStats": {
+        "viewRange": 1,
+        "resolvePower": 2,
+        "maxHp": 1.33
+      },
+      "effects": [
+        {
+          "effectId": "mine-sight",
+          "type": "stat_aura",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "map",
+                "mapIds": [
+                  "black_iron_mine"
+                ]
+              }
+            ]
+          },
+          "valueStats": {
+            "viewRange": 1,
+            "hit": 2
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "minor_qi_pill",
+      "name": "小还灵丹",
+      "type": "consumable",
+      "desc": "温养经脉，恢复较多气血。"
+    },
+    {
+      "itemId": "star_metal",
+      "name": "星陨金",
+      "type": "material",
+      "desc": "坠星坑深处采得的高纯灵金。"
+    },
+    {
+      "itemId": "void_shard",
+      "name": "虚蚀碎片",
+      "type": "material",
+      "desc": "虚空妖物躯壳剥落的暗晶。"
+    },
+    {
+      "itemId": "black_iron_chunk",
+      "name": "玄铁矿块",
+      "type": "material",
+      "desc": "可用于炼器的粗矿。"
+    },
+    {
+      "itemId": "equip.black_iron_sword",
+      "name": "玄铁长剑",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 3,
+      "equipSlot": "weapon",
+      "desc": "经矿洞灵铁锻造，兼具锋锐与韧性。",
+      "equipValueStats": {
+        "physAtk": 11,
+        "spellAtk": 4,
+        "hit": 4
+      }
+    },
+    {
+      "itemId": "blood_feather",
+      "name": "血羽",
+      "type": "material",
+      "desc": "血羽鸦留下的邪异翎羽。"
+    },
+    {
+      "itemId": "equip.spirit_ring",
+      "name": "养灵木戒",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 4,
+      "equipSlot": "accessory",
+      "desc": "谷外旧修士留下的木戒，导气时能帮人把散乱灵息拢得更稳。",
+      "equipValueStats": {
+        "maxQi": 2,
+        "qiRegenRate": 0.6,
+        "maxQiOutputPerTick": 3
+      }
+    },
+    {
+      "itemId": "demon_wolf_bone",
+      "name": "妖狼骨",
+      "type": "material",
+      "desc": "兽谷妖狼的坚骨。"
+    },
+    {
+      "itemId": "mat.beast_bone",
+      "name": "妖兽骨",
+      "type": "material",
+      "desc": "山野妖兽遗骨，可留作后用。"
+    },
+    {
+      "itemId": "equip.herb_basket_charm",
+      "name": "药篓挂坠",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "accessory",
+      "desc": "篓口系下来的小木坠，药气浸久了，多少沾些回生味。",
+      "equipValueStats": {
+        "hpRegenRate": 0.5,
+        "lootRate": 3
+      }
+    },
+    {
+      "itemId": "equip.herb_mist_robe",
+      "name": "药烟轻袍",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "body",
+      "desc": "晒药时沾过苦烟的薄袍，能稍稍护住气海。",
+      "equipValueStats": {
+        "maxQi": 2.25,
+        "spellDef": 4,
+        "qiRegenRate": 0.4
+      }
+    },
+    {
+      "itemId": "equip.crow_night_mask",
+      "name": "夜鸦面",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "head",
+      "desc": "镇外守夜人留下的旧面具，白天沉闷，入夜后反而看得更远。",
+      "tags": [
+        "fanren",
+        "night_walk"
+      ],
+      "effects": [
+        {
+          "effectId": "crow-night-sight",
+          "type": "stat_aura",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "time_segment",
+                "in": [
+                  "late_night",
+                  "before_dawn",
+                  "first_night",
+                  "night",
+                  "deep_night",
+                  "dusk"
+                ]
+              }
+            ]
+          },
+          "valueStats": {
+            "viewRange": 1,
+            "hit": 2
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "ruin_keystone",
+      "name": "遗迹钥石",
+      "type": "quest_item",
+      "desc": "可驱动古修阵门的钥石。"
+    },
+    {
+      "itemId": "spider_silk",
+      "name": "阴沼丝",
+      "type": "material",
+      "desc": "沼泽妖蛛吐出的坚韧蛛丝。"
+    },
+    {
+      "itemId": "equip.guiding_marrow_pendant",
+      "name": "引灵髓坠",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "accessory",
+      "desc": "坠芯以兽髓和细纹骨粉压成，引气时不算多快，但能明显稳住导气节奏。",
+      "equipAttrs": {
+        "comprehension": 1
+      },
+      "equipValueStats": {
+        "maxQiOutputPerTick": 5,
+        "maxQi": 2.25
+      }
+    },
+    {
+      "itemId": "equip.dewstep_boots",
+      "name": "引露行靴",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "legs",
+      "desc": "晨露未干时最显轻灵，踏步后脚尖总像还留着一层滑意。",
+      "equipValueStats": {
+        "moveSpeed": 16,
+        "crit": 2
+      },
+      "effects": [
+        {
+          "effectId": "dewstep-dash",
+          "type": "timed_buff",
+          "trigger": "on_move",
+          "target": "self",
+          "cooldown": 3,
+          "buff": {
+            "buffId": "equip.dewstep_dash",
+            "name": "露痕",
+            "desc": "步法尚未散尽，短时间内身法更快。",
+            "duration": 2,
+            "shortMark": "露",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#8fb7c9",
+            "valueStats": {
+              "moveSpeed": 8,
+              "dodge": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "equip.leather_vest",
+      "name": "硬皮护衣",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "body",
+      "desc": "由粗皮与铜扣缝制的护身衣。",
+      "equipValueStats": {
+        "maxHp": 3,
+        "physDef": 5
+      }
+    },
+    {
+      "itemId": "equip.step_boots",
+      "name": "游侠靴",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "legs",
+      "desc": "鞋底附有防滑纹路，适合野外奔袭。",
+      "equipValueStats": {
+        "moveSpeed": 12,
+        "dodge": 1
+      }
+    },
+    {
+      "itemId": "equip.trench_runner_boots",
+      "name": "越沟快靴",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 2,
+      "equipSlot": "legs",
+      "desc": "鞋跟窄而硬，踩沟跃坎时比寻常鞋更利索。",
+      "equipValueStats": {
+        "moveSpeed": 14,
+        "hit": 2
+      },
+      "effects": [
+        {
+          "effectId": "runner-step",
+          "type": "timed_buff",
+          "trigger": "on_move",
+          "target": "self",
+          "cooldown": 2,
+          "buff": {
+            "buffId": "equip.runner_step",
+            "name": "借步",
+            "desc": "借着余势调整步点，短时间内更易抢到先手。",
+            "duration": 2,
+            "shortMark": "步",
+            "category": "buff",
+            "visibility": "public",
+            "color": "#8aa06d",
+            "valueStats": {
+              "dodge": 2,
+              "hit": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "map.spawn",
+      "name": "云来初境图",
+      "type": "consumable",
+      "desc": "描摹新手区域的基础地图。使用后可永久解锁云来初境的完整舆图。"
+    },
+    {
+      "itemId": "lizard_scale",
+      "name": "泽鳞",
+      "type": "material",
+      "desc": "泽鳞蜥脱落的鳞片。"
+    },
+    {
+      "itemId": "equip.void_talisman",
+      "name": "镇脉玄纹佩",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 5,
+      "equipSlot": "accessory",
+      "desc": "佩面刻着细碎玄纹，佩久了能缓住气海波动，适合叩门前最后稳一口气。",
+      "equipAttrs": {
+        "spirit": 1,
+        "comprehension": 1
+      },
+      "equipValueStats": {
+        "techniqueExpRate": 7,
+        "qiRegenRate": 0.6
+      }
+    },
+    {
+      "itemId": "equip.rift_guard_armor",
+      "name": "镇煞护心甲",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "body",
+      "desc": "甲心嵌着旧镇煞片，护得住胸口那一口气，也护得住人不乱。",
+      "equipValueStats": {
+        "maxHp": 3.5,
+        "physDef": 7,
+        "spellDef": 5,
+        "resolvePower": 3
+      }
+    },
+    {
+      "itemId": "boar_tusk",
+      "name": "彘牙",
+      "type": "material",
+      "desc": "獠牙野彘的尖牙。"
+    },
+    {
+      "itemId": "equip.bamboo_hat",
+      "name": "竹骨斗笠",
+      "type": "equipment",
+      "grade": "yellow",
+      "level": 3,
+      "equipSlot": "head",
+      "desc": "青竹骨架压得极薄，进林后能把风响听得更清。",
+      "equipValueStats": {
+        "dodge": 3,
+        "viewRange": 1
+      },
+      "effects": [
+        {
+          "effectId": "bamboo-forest-read",
+          "type": "stat_aura",
+          "conditions": {
+            "mode": "all",
+            "items": [
+              {
+                "type": "map",
+                "mapIds": [
+                  "bamboo_forest"
+                ]
+              }
+            ]
+          },
+          "valueStats": {
+            "hit": 2
+          }
+        }
+      ]
+    },
+    {
+      "itemId": "serpent_gall",
+      "name": "竹蛇胆",
+      "type": "material",
+      "desc": "青鳞竹蛇的胆囊。"
+    },
+    {
+      "itemId": "equip.moonshadow_boots",
+      "name": "逐月疾靴",
+      "type": "equipment",
+      "grade": "mystic",
+      "level": 4,
+      "equipSlot": "legs",
+      "desc": "靴帮收得极窄，贴地疾行时像是顺着月影滑出去的一步。",
+      "equipValueStats": {
+        "moveSpeed": 18,
+        "dodge": 3,
+        "crit": 2
+      }
+    }
+  ],
+  "realmLevels": [
+    {
+      "realmLv": 1,
+      "displayName": "凡胎",
+      "name": "凡胎",
+      "review": "尘根未醒"
+    },
+    {
+      "realmLv": 2,
+      "displayName": "炼皮",
+      "name": "炼皮",
+      "review": "皮坚肉紧"
+    },
+    {
+      "realmLv": 3,
+      "displayName": "锻骨",
+      "name": "锻骨",
+      "review": "骨沉如铁"
+    },
+    {
+      "realmLv": 4,
+      "displayName": "易筋",
+      "name": "易筋",
+      "review": "筋开力长"
+    },
+    {
+      "realmLv": 5,
+      "displayName": "洗髓",
+      "name": "洗髓",
+      "review": "洗垢生新"
+    },
+    {
+      "realmLv": 6,
+      "displayName": "养气",
+      "name": "养气",
+      "review": "一气养周天"
+    },
+    {
+      "realmLv": 7,
+      "displayName": "通脉",
+      "name": "通脉",
+      "review": "百脉始归流"
+    },
+    {
+      "realmLv": 8,
+      "displayName": "瑶光",
+      "name": "瑶光",
+      "review": "星火照命门"
+    },
+    {
+      "realmLv": 9,
+      "displayName": "开阳",
+      "name": "开阳",
+      "review": "开阳悬胆，锋意渐生"
+    },
+    {
+      "realmLv": 10,
+      "displayName": "玉衡",
+      "name": "玉衡",
+      "review": "玉衡定步，进退有章"
+    },
+    {
+      "realmLv": 11,
+      "displayName": "天权",
+      "name": "天权",
+      "review": "一念权衡定去留"
+    },
+    {
+      "realmLv": 12,
+      "displayName": "天玑",
+      "name": "天玑",
+      "review": "玄机暗转藏锋处"
+    },
+    {
+      "realmLv": 13,
+      "displayName": "天璇",
+      "name": "天璇",
+      "review": "天璇照骨，气走八荒"
+    },
+    {
+      "realmLv": 14,
+      "displayName": "天枢",
+      "name": "天枢",
+      "review": "北斗归枢，我身为轴"
+    },
+    {
+      "realmLv": 15,
+      "displayName": "宗师",
+      "name": "宗师",
+      "review": "开宗立势，名动一方"
+    },
+    {
+      "realmLv": 16,
+      "displayName": "大宗师",
+      "name": "大宗师",
+      "review": "满堂风雨，不折其锋"
+    },
+    {
+      "realmLv": 17,
+      "displayName": "临渊",
+      "name": "临渊",
+      "review": "临渊羡鱼"
+    },
+    {
+      "realmLv": 18,
+      "displayName": "叩仙门",
+      "name": "叩仙门",
+      "review": "回首人间再叩天"
+    },
+    {
+      "realmLv": 19,
+      "displayName": "练气前期",
+      "name": "练气",
+      "phaseName": "前期",
+      "review": "灵息入海"
+    },
+    {
+      "realmLv": 20,
+      "displayName": "练气中期",
+      "name": "练气",
+      "phaseName": "中期",
+      "review": "气海起微澜"
+    },
+    {
+      "realmLv": 21,
+      "displayName": "练气后期",
+      "name": "练气",
+      "phaseName": "后期",
+      "review": "一缕真炁绕周身"
+    },
+    {
+      "realmLv": 22,
+      "displayName": "练气巅峰",
+      "name": "练气",
+      "phaseName": "巅峰",
+      "review": "气走百脉，念动成锋"
+    },
+    {
+      "realmLv": 23,
+      "displayName": "练气大圆满",
+      "name": "练气",
+      "phaseName": "大圆满",
+      "review": "周天无漏，灵泉自生"
+    },
+    {
+      "realmLv": 24,
+      "displayName": "半步筑基",
+      "name": "练气",
+      "phaseName": "半步筑基",
+      "review": "道基只待一念成"
+    },
+    {
+      "realmLv": 25,
+      "displayName": "筑基前期",
+      "name": "筑基",
+      "phaseName": "前期",
+      "review": "道台初立"
+    },
+    {
+      "realmLv": 26,
+      "displayName": "筑基中期",
+      "name": "筑基",
+      "phaseName": "中期",
+      "review": "真基稳如岳"
+    },
+    {
+      "realmLv": 27,
+      "displayName": "筑基后期",
+      "name": "筑基",
+      "phaseName": "后期",
+      "review": "灵台澄澈照尘寰"
+    },
+    {
+      "realmLv": 28,
+      "displayName": "筑基巅峰",
+      "name": "筑基",
+      "phaseName": "巅峰",
+      "review": "基成无缺，法起无滞"
+    },
+    {
+      "realmLv": 29,
+      "displayName": "筑基大圆满",
+      "name": "筑基",
+      "phaseName": "大圆满",
+      "review": "道骨已成，百脉齐鸣"
+    },
+    {
+      "realmLv": 30,
+      "displayName": "半步金丹",
+      "name": "筑基",
+      "phaseName": "半步金丹",
+      "review": "丹光隐现候天时"
+    },
+    {
+      "realmLv": 31,
+      "displayName": "金丹前期",
+      "name": "金丹",
+      "phaseName": "前期",
+      "review": "一丹在腹"
+    },
+    {
+      "realmLv": 32,
+      "displayName": "金丹中期",
+      "name": "金丹",
+      "phaseName": "中期",
+      "review": "丹华照五脏"
+    },
+    {
+      "realmLv": 33,
+      "displayName": "金丹后期",
+      "name": "金丹",
+      "phaseName": "后期",
+      "review": "金辉流转映灵台"
+    },
+    {
+      "realmLv": 34,
+      "displayName": "金丹巅峰",
+      "name": "金丹",
+      "phaseName": "巅峰",
+      "review": "丹转九息，内景如昼"
+    },
+    {
+      "realmLv": 35,
+      "displayName": "金丹大圆满",
+      "name": "金丹",
+      "phaseName": "大圆满",
+      "review": "金性圆明，照彻形神"
+    },
+    {
+      "realmLv": 36,
+      "displayName": "半步元婴",
+      "name": "金丹",
+      "phaseName": "半步元婴",
+      "review": "紫气东来孕婴神"
+    },
+    {
+      "realmLv": 37,
+      "displayName": "元婴前期",
+      "name": "元婴",
+      "phaseName": "前期",
+      "review": "婴神初坐"
+    },
+    {
+      "realmLv": 38,
+      "displayName": "元婴中期",
+      "name": "元婴",
+      "phaseName": "中期",
+      "review": "紫府开新天"
+    },
+    {
+      "realmLv": 39,
+      "displayName": "元婴后期",
+      "name": "元婴",
+      "phaseName": "后期",
+      "review": "一念神游越千山"
+    },
+    {
+      "realmLv": 40,
+      "displayName": "元婴巅峰",
+      "name": "元婴",
+      "phaseName": "巅峰",
+      "review": "婴照四极，念覆八荒"
+    },
+    {
+      "realmLv": 41,
+      "displayName": "元婴大圆满",
+      "name": "元婴",
+      "phaseName": "大圆满",
+      "review": "神婴无瑕，心映万象"
+    },
+    {
+      "realmLv": 42,
+      "displayName": "半步化神",
+      "name": "元婴",
+      "phaseName": "半步化神",
+      "review": "神火将燃蜕旧身"
+    },
+    {
+      "realmLv": 43,
+      "displayName": "化神前期",
+      "name": "化神",
+      "phaseName": "前期",
+      "review": "神意离壳"
+    },
+    {
+      "realmLv": 44,
+      "displayName": "化神中期",
+      "name": "化神",
+      "phaseName": "中期",
+      "review": "一念化万形"
+    },
+    {
+      "realmLv": 45,
+      "displayName": "化神后期",
+      "name": "化神",
+      "phaseName": "后期",
+      "review": "神机入微驭诸法"
+    },
+    {
+      "realmLv": 46,
+      "displayName": "化神巅峰",
+      "name": "化神",
+      "phaseName": "巅峰",
+      "review": "元神高举，天地共鸣"
+    },
+    {
+      "realmLv": 47,
+      "displayName": "化神大圆满",
+      "name": "化神",
+      "phaseName": "大圆满",
+      "review": "神明澄彻，虚妄皆明"
+    },
+    {
+      "realmLv": 48,
+      "displayName": "半步炼虚",
+      "name": "化神",
+      "phaseName": "半步炼虚",
+      "review": "身返于虚开界隙"
+    },
+    {
+      "realmLv": 49,
+      "displayName": "炼虚前期",
+      "name": "炼虚",
+      "phaseName": "前期",
+      "review": "虚境初开"
+    },
+    {
+      "realmLv": 50,
+      "displayName": "炼虚中期",
+      "name": "炼虚",
+      "phaseName": "中期",
+      "review": "形神两相忘"
+    },
+    {
+      "realmLv": 51,
+      "displayName": "炼虚后期",
+      "name": "炼虚",
+      "phaseName": "后期",
+      "review": "一念入空万相轻"
+    },
+    {
+      "realmLv": 52,
+      "displayName": "炼虚巅峰",
+      "name": "炼虚",
+      "phaseName": "巅峰",
+      "review": "虚实互映，法界徐开"
+    },
+    {
+      "realmLv": 53,
+      "displayName": "炼虚大圆满",
+      "name": "炼虚",
+      "phaseName": "大圆满",
+      "review": "炼尽有形，真我独存"
+    },
+    {
+      "realmLv": 54,
+      "displayName": "半步合体",
+      "name": "炼虚",
+      "phaseName": "半步合体",
+      "review": "身道将合同天心"
+    },
+    {
+      "realmLv": 55,
+      "displayName": "合体前期",
+      "name": "合体",
+      "phaseName": "前期",
+      "review": "身神相契"
+    },
+    {
+      "realmLv": 56,
+      "displayName": "合体中期",
+      "name": "合体",
+      "phaseName": "中期",
+      "review": "三元归一处"
+    },
+    {
+      "realmLv": 57,
+      "displayName": "合体后期",
+      "name": "合体",
+      "phaseName": "后期",
+      "review": "精炁神合镇山河"
+    },
+    {
+      "realmLv": 58,
+      "displayName": "合体巅峰",
+      "name": "合体",
+      "phaseName": "巅峰",
+      "review": "内外无间，道体初圆"
+    },
+    {
+      "realmLv": 59,
+      "displayName": "合体大圆满",
+      "name": "合体",
+      "phaseName": "大圆满",
+      "review": "天人相抱，万象同流"
+    },
+    {
+      "realmLv": 60,
+      "displayName": "半步大乘",
+      "name": "合体",
+      "phaseName": "半步大乘",
+      "review": "法舟已满待长风"
+    },
+    {
+      "realmLv": 61,
+      "displayName": "大乘前期",
+      "name": "大乘",
+      "phaseName": "前期",
+      "review": "大道载身"
+    },
+    {
+      "realmLv": 62,
+      "displayName": "大乘中期",
+      "name": "大乘",
+      "phaseName": "中期",
+      "review": "举念契天机"
+    },
+    {
+      "realmLv": 63,
+      "displayName": "大乘后期",
+      "name": "大乘",
+      "phaseName": "后期",
+      "review": "身若乾坤吞山海"
+    },
+    {
+      "realmLv": 64,
+      "displayName": "大乘巅峰",
+      "name": "大乘",
+      "phaseName": "巅峰",
+      "review": "大乘法满，诸界侧目"
+    },
+    {
+      "realmLv": 65,
+      "displayName": "大乘大圆满",
+      "name": "大乘",
+      "phaseName": "大圆满",
+      "review": "圆融无碍，近道而行"
+    },
+    {
+      "realmLv": 66,
+      "displayName": "半步渡劫",
+      "name": "大乘",
+      "phaseName": "半步渡劫",
+      "review": "雷门将启照心关"
+    },
+    {
+      "realmLv": 67,
+      "displayName": "渡劫前期",
+      "name": "渡劫",
+      "phaseName": "前期",
+      "review": "劫云初压"
+    },
+    {
+      "realmLv": 68,
+      "displayName": "渡劫中期",
+      "name": "渡劫",
+      "phaseName": "中期",
+      "review": "雷火洗真身"
+    },
+    {
+      "realmLv": 69,
+      "displayName": "渡劫后期",
+      "name": "渡劫",
+      "phaseName": "后期",
+      "review": "万劫加身道更坚"
+    },
+    {
+      "realmLv": 70,
+      "displayName": "渡劫巅峰",
+      "name": "渡劫",
+      "phaseName": "巅峰",
+      "review": "天威尽落，我意长明"
+    },
+    {
+      "realmLv": 71,
+      "displayName": "渡劫大圆满",
+      "name": "渡劫",
+      "phaseName": "大圆满",
+      "review": "劫数已尽，道果将成"
+    },
+    {
+      "realmLv": 72,
+      "displayName": "半步飞升",
+      "name": "渡劫",
+      "phaseName": "半步飞升",
+      "review": "旧界难留待登天"
+    },
+    {
+      "realmLv": 73,
+      "displayName": "飞升",
+      "name": "飞升",
+      "review": "一朝拔界去"
+    },
+    {
+      "realmLv": 74,
+      "displayName": "人仙",
+      "name": "人仙",
+      "review": "仙籍初留名"
+    },
+    {
+      "realmLv": 75,
+      "displayName": "地仙",
+      "name": "地仙",
+      "review": "厚土承仙命"
+    },
+    {
+      "realmLv": 76,
+      "displayName": "天仙",
+      "name": "天仙",
+      "review": "乘风上青冥"
+    },
+    {
+      "realmLv": 77,
+      "displayName": "真仙",
+      "name": "真仙",
+      "review": "真性无尘，仙光自满"
+    },
+    {
+      "realmLv": 78,
+      "displayName": "玄仙",
+      "name": "玄仙",
+      "review": "玄理在握驭天机"
+    },
+    {
+      "realmLv": 79,
+      "displayName": "金仙",
+      "name": "金仙",
+      "review": "金性不朽，岁月难侵"
+    },
+    {
+      "realmLv": 80,
+      "displayName": "太乙",
+      "name": "太乙",
+      "review": "太一含元镇万灵"
+    },
+    {
+      "realmLv": 81,
+      "displayName": "圣胎",
+      "name": "圣胎",
+      "review": "圣机初孕"
+    },
+    {
+      "realmLv": 82,
+      "displayName": "入圣",
+      "name": "入圣",
+      "review": "一步入圣门"
+    },
+    {
+      "realmLv": 83,
+      "displayName": "大圣",
+      "name": "大圣",
+      "review": "圣威如海镇八荒"
+    },
+    {
+      "realmLv": 84,
+      "displayName": "圣王",
+      "name": "圣王",
+      "review": "诸圣拱服，王座初成"
+    },
+    {
+      "realmLv": 85,
+      "displayName": "少帝",
+      "name": "少帝",
+      "review": "帝气初生"
+    },
+    {
+      "realmLv": 86,
+      "displayName": "帝君",
+      "name": "帝君",
+      "review": "君临一域定山河"
+    },
+    {
+      "realmLv": 87,
+      "displayName": "大帝",
+      "name": "大帝",
+      "review": "帝威横世，万族低首"
+    },
+    {
+      "realmLv": 88,
+      "displayName": "古帝",
+      "name": "古帝",
+      "review": "古意临今压诸天"
+    },
+    {
+      "realmLv": 89,
+      "displayName": "天帝",
+      "name": "天帝",
+      "review": "高坐九霄，俯瞰万界"
+    },
+    {
+      "realmLv": 90,
+      "displayName": "帝尊",
+      "name": "帝尊",
+      "review": "尊在诸帝上"
+    },
+    {
+      "realmLv": 91,
+      "displayName": "恒古",
+      "name": "恒古",
+      "review": "身横岁月贯古今"
+    },
+    {
+      "realmLv": 92,
+      "displayName": "太上",
+      "name": "太上",
+      "review": "太上忘形，道意独尊"
+    },
+    {
+      "realmLv": 93,
+      "displayName": "无上",
+      "name": "无上",
+      "review": "举世无并照寰宇"
+    },
+    {
+      "realmLv": 94,
+      "displayName": "万古",
+      "name": "万古",
+      "review": "万古唯一"
+    },
+    {
+      "realmLv": 95,
+      "displayName": "诸天共主",
+      "name": "诸天共主",
+      "review": "诸天俯首，万界同尊"
+    },
+    {
+      "realmLv": 96,
+      "displayName": "临道",
+      "name": "临道",
+      "review": "立尽长天只问道"
+    }
+  ]
+}

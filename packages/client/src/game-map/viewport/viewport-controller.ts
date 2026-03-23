@@ -1,7 +1,6 @@
 import { updateDisplayMetrics } from '../../display';
 import type { MapSafeAreaInsets } from '../types';
-
-const MAX_DPR = 2;
+import { MAX_DPR } from '../../constants/visuals/viewport';
 
 export interface ViewportSnapshot {
   cssWidth: number;

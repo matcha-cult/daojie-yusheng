@@ -3,13 +3,7 @@
  */
 
 import { Direction } from '@mud/shared';
-
-const KEY_MAP: Record<string, Direction> = {
-  ArrowUp: Direction.North,
-  ArrowDown: Direction.South,
-  ArrowRight: Direction.East,
-  ArrowLeft: Direction.West,
-};
+import { KEY_TO_DIRECTION_MAP } from '../constants/input/keyboard';
 
 /** 键盘输入，将方向键映射为移动方向并回调 */
 export class KeyboardInput {
@@ -20,7 +14,7 @@ export class KeyboardInput {
   private onKeyDown(e: KeyboardEvent) {
     // 忽略输入框内的按键
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    const dir = KEY_MAP[e.key];
+    const dir = KEY_TO_DIRECTION_MAP[e.key];
     if (dir === undefined) return;
     this.onPath([dir]);
   }

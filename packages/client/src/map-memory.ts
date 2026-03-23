@@ -2,11 +2,15 @@
  * 地图记忆持久化 —— 将玩家已探索的地块和标记缓存到 localStorage，跨会话保留
  */
 
-import { MapMinimapMarker, Tile, TileType, VisibleTile } from '@mud/shared';
-
-const MAP_MEMORY_STORAGE_KEY = 'mud:map-memory:v2';
-const MAP_MEMORY_FORMAT_VERSION = 3;
-const MAP_MEMORY_PERSIST_DEBOUNCE_MS = 1500;
+import {
+  MAP_MEMORY_FORMAT_VERSION,
+  MAP_MEMORY_PERSIST_DEBOUNCE_MS,
+  MAP_MEMORY_STORAGE_KEY,
+  MapMinimapMarker,
+  Tile,
+  TileType,
+  VisibleTile,
+} from '@mud/shared';
 
 type RememberedTile = Pick<Tile, 'type' | 'walkable' | 'blocksSight' | 'aura'>;
 type RememberedMarker = Pick<MapMinimapMarker, 'id' | 'kind' | 'x' | 'y' | 'label' | 'detail'>;

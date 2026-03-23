@@ -1,10 +1,9 @@
+import { ACCOUNT_MIN_LENGTH, PASSWORD_MIN_LENGTH } from '@mud/shared';
+
 /**
  * 账号与角色信息的前端校验规则
  * 用于登录、注册、设置页面的即时输入校验
  */
-
-export const ACCOUNT_MIN_LENGTH = 1;
-export const PASSWORD_MIN_LENGTH = 6;
 
 function hasWhitespace(value: string): boolean {
   return /\s/.test(value);

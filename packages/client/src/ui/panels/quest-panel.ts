@@ -3,30 +3,12 @@
 import { PlayerState, QuestState } from '@mud/shared';
 import { detailModalHost } from '../detail-modal-host';
 import { preserveSelection } from '../selection-preserver';
-
-const STATUS_TEXT: Record<QuestState['status'], string> = {
-  available: '可接取',
-  active: '进行中',
-  ready: '可交付',
-  completed: '已完成',
-};
-
-const STATUS_CLASS: Record<QuestState['status'], string> = {
-  available: 'status-available',
-  active: 'status-active',
-  ready: 'status-ready',
-  completed: 'status-completed',
-};
-
-const LINE_TEXT: Record<QuestState['line'], string> = {
-  main: '主线',
-  side: '支线',
-  daily: '日常',
-  encounter: '奇遇',
-};
-
-const LINE_ORDER: QuestState['line'][] = ['main', 'side', 'daily', 'encounter'];
-const STATUS_PRIORITY = { ready: 0, active: 1, available: 2, completed: 3 } as const;
+import { getQuestLineLabel, getQuestStatusLabel } from '../../domain-labels';
+import {
+  LINE_ORDER,
+  STATUS_CLASS,
+  STATUS_PRIORITY,
+} from '../../constants/ui/quest-panel';
 
 function escapeHtml(value: string): string {
   return value
@@ -106,7 +88,7 @@ export class QuestPanel {
 
     const tabs = LINE_ORDER.map((line) => {
       const active = this.activeLine === line ? 'active' : '';
-      return `<button class="quest-subtab-btn ${active}" data-quest-line="${line}" type="button">${LINE_TEXT[line]}<span class="quest-subtab-count" data-quest-line-count="${line}">${counts[line]}</span></button>`;
+      return `<button class="quest-subtab-btn ${active}" data-quest-line="${line}" type="button">${getQuestLineLabel(line)}<span class="quest-subtab-count" data-quest-line-count="${line}">${counts[line]}</span></button>`;
     }).join('');
 
     let html = `<div class="panel-section">
@@ -114,7 +96,7 @@ export class QuestPanel {
       <div class="quest-subtabs">${tabs}</div>`;
 
     if (visibleQuests.length === 0) {
-      html += `<div class="empty-hint" data-quest-empty="true">当前没有${LINE_TEXT[this.activeLine]}任务</div></div>`;
+      html += `<div class="empty-hint" data-quest-empty="true">当前没有${getQuestLineLabel(this.activeLine)}任务</div></div>`;
       preserveSelection(this.pane, () => {
         this.pane.innerHTML = html;
       });
@@ -128,7 +110,7 @@ export class QuestPanel {
       html += `<button class="quest-card quest-card-toggle" data-quest-id="${escapeHtml(quest.id)}" type="button">
         <div class="quest-title-row">
           <span class="quest-title" data-quest-title="true">${escapeHtml(quest.title)}</span>
-          <span class="quest-status ${STATUS_CLASS[quest.status]}" data-quest-status="true">${STATUS_TEXT[quest.status]}</span>
+      <span class="quest-status ${STATUS_CLASS[quest.status]}" data-quest-status="true">${getQuestStatusLabel(quest.status)}</span>
         </div>
         <div class="quest-meta ${quest.chapter ? '' : 'hidden'}" data-quest-chapter="true">章节：${escapeHtml(quest.chapter ?? '')}</div>
         <div class="quest-desc" data-quest-desc="true">${escapeHtml(quest.desc)}</div>
@@ -198,7 +180,7 @@ export class QuestPanel {
       if (!emptyNode) {
         return false;
       }
-      emptyNode.textContent = `当前没有${LINE_TEXT[this.activeLine]}任务`;
+      emptyNode.textContent = `当前没有${getQuestLineLabel(this.activeLine)}任务`;
       this.lastStructureKey = this.buildStructureKey(quests);
       return true;
     }
@@ -221,7 +203,7 @@ export class QuestPanel {
 
       const percent = quest.required > 0 ? Math.min(100, Math.floor((quest.progress / quest.required) * 100)) : 0;
       titleNode.textContent = quest.title;
-      statusNode.textContent = STATUS_TEXT[quest.status];
+      statusNode.textContent = getQuestStatusLabel(quest.status);
       statusNode.className = `quest-status ${STATUS_CLASS[quest.status]}`;
       chapterNode.textContent = `章节：${quest.chapter ?? ''}`;
       chapterNode.classList.toggle('hidden', !quest.chapter);
@@ -263,7 +245,7 @@ export class QuestPanel {
       ownerId: QuestPanel.MODAL_OWNER,
       variantClass: 'detail-modal--quest',
       title: quest.title,
-      subtitle: `${LINE_TEXT[quest.line]} · ${STATUS_TEXT[quest.status]}`,
+      subtitle: `${getQuestLineLabel(quest.line)} · ${getQuestStatusLabel(quest.status)}`,
       bodyHtml: `
         <div class="quest-detail-section ${quest.chapter ? '' : 'hidden'}" data-quest-modal-chapter-section="true"><strong>章节</strong><span data-quest-modal-chapter="true">${escapeHtml(quest.chapter ?? '')}</span></div>
         <div class="quest-detail-section"><strong>任务描述</strong><span data-quest-modal-desc="true">${escapeHtml(quest.desc)}</span></div>
@@ -371,7 +353,7 @@ export class QuestPanel {
       : quest.giverMapName ?? '未知';
 
     titleNode.textContent = quest.title;
-    subtitleNode.textContent = `${LINE_TEXT[quest.line]} · ${STATUS_TEXT[quest.status]}`;
+    subtitleNode.textContent = `${getQuestLineLabel(quest.line)} · ${getQuestStatusLabel(quest.status)}`;
     chapterSection.classList.toggle('hidden', !quest.chapter);
     chapterNode.textContent = quest.chapter ?? '';
     descNode.textContent = quest.desc;

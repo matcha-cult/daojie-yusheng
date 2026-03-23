@@ -3,44 +3,17 @@
  * 提供角落缩略图、全屏地图弹窗、地图目录切换、缩放平移、点击前往等功能
  */
 
-import { getTileTypeFromMapChar, GroundItemPileView, isTileTypeWalkable, MapMeta, MapMinimapMarker, MapMinimapSnapshot, Tile, TileType } from '@mud/shared';
+import { getTileTypeFromMapChar, GroundItemPileView, isTileTypeWalkable, MapMeta, MapMinimapMarker, MapMinimapSnapshot, MINIMAP_MARKER_COLORS, Tile, TILE_MINIMAP_COLORS, TileType } from '@mud/shared';
 import { deleteRememberedMap, getRememberedMarkers, getRememberedTiles, listRememberedMapIds } from '../map-memory';
 import { getCachedMapMeta, getCachedMapSnapshot, listCachedUnlockedMapSummaries } from '../map-static-cache';
 import { getMinimapMarkerKindLabel, getTileTypeLabel } from '../domain-labels';
 import { detailModalHost } from './detail-modal-host';
-
-const TILE_MINIMAP_COLOR: Record<TileType, string> = {
-  [TileType.Floor]: '#bdb6aa',
-  [TileType.Road]: '#b58f63',
-  [TileType.Trail]: '#97714a',
-  [TileType.Wall]: '#2d2a28',
-  [TileType.Door]: '#8b6c47',
-  [TileType.Window]: '#7ba3ba',
-  [TileType.BrokenWindow]: '#8f969a',
-  [TileType.Portal]: '#69458f',
-  [TileType.Stairs]: '#9b7438',
-  [TileType.Grass]: '#79915d',
-  [TileType.Hill]: '#8c7358',
-  [TileType.Mud]: '#6e5740',
-  [TileType.Swamp]: '#526243',
-  [TileType.Water]: '#4f7696',
-  [TileType.Tree]: '#365133',
-  [TileType.Stone]: '#605c58',
-};
-
-const MARKER_COLOR: Record<MapMinimapMarker['kind'], string> = {
-  landmark: '#f0d38a',
-  container: '#d7a35c',
-  npc: '#7ad9e8',
-  monster_spawn: '#ff7a6b',
-  portal: '#b48cff',
-  stairs: '#ffd38c',
-};
-
-const EMPTY_VISIBLE_TILES = new Set<string>();
-const EMPTY_GROUND_PILES = new Map<string, GroundItemPileView>();
-const MIN_MODAL_ZOOM = 1;
-const MAX_MODAL_ZOOM = 8;
+import {
+  EMPTY_GROUND_PILES,
+  EMPTY_VISIBLE_TILES,
+  MAX_MODAL_ZOOM,
+  MIN_MODAL_ZOOM,
+} from '../constants/visuals/minimap';
 
 type CatalogFilter = 'all' | 'memory' | 'unlock';
 
@@ -801,7 +774,7 @@ export class Minimap {
         const row = display.snapshot.terrainRows[y] ?? '';
         for (let x = 0; x < row.length; x += 1) {
           const type = getTileTypeFromMapChar(row[x] ?? '.');
-          this.baseCtx.fillStyle = TILE_MINIMAP_COLOR[type] ?? '#888';
+          this.baseCtx.fillStyle = TILE_MINIMAP_COLORS[type] ?? '#888';
           this.baseCtx.fillRect(x, y, 1, 1);
         }
       }
@@ -820,7 +793,7 @@ export class Minimap {
       ) {
         continue;
       }
-      this.baseCtx.fillStyle = TILE_MINIMAP_COLOR[tile.type] ?? '#888';
+      this.baseCtx.fillStyle = TILE_MINIMAP_COLORS[tile.type] ?? '#888';
       this.baseCtx.fillRect(point.x, point.y, 1, 1);
     }
   }
@@ -1209,7 +1182,7 @@ export class Minimap {
         if (!point || !tile) {
           continue;
         }
-        ctx.fillStyle = TILE_MINIMAP_COLOR[tile.type] ?? '#888';
+        ctx.fillStyle = TILE_MINIMAP_COLORS[tile.type] ?? '#888';
         ctx.fillRect(
           metrics.offsetX + point.x * metrics.scale,
           metrics.offsetY + point.y * metrics.scale,
@@ -1303,7 +1276,7 @@ export class Minimap {
     const half = markerSize / 2;
 
     ctx.save();
-    ctx.fillStyle = MARKER_COLOR[marker.kind];
+    ctx.fillStyle = MINIMAP_MARKER_COLORS[marker.kind];
     ctx.strokeStyle = 'rgba(15, 10, 8, 0.92)';
     ctx.lineWidth = Math.max(1, metrics.scale * 0.18);
 

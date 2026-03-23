@@ -2,12 +2,8 @@
  * 摄像机 —— 跟随玩家平滑移动，提供世界坐标到屏幕坐标的转换
  */
 
-import { PlayerState } from '@mud/shared';
+import { CAMERA_DELAY_SECONDS, CAMERA_SMOOTH_SPEED, PlayerState } from '@mud/shared';
 import { getCellSize } from '../display';
-/** lerp 速度因子，越大越快 */
-const SMOOTH_SPEED = 8;
-/** 检测到偏移后延迟多久开始移动（秒） */
-const CAMERA_DELAY = 1.0;
 
 /** 游戏摄像机，带延迟启动的平滑追踪 */
 export class Camera {
@@ -42,9 +38,9 @@ export class Camera {
     }
 
     const elapsed = (performance.now() - this.divergeTime) / 1000;
-    if (elapsed < CAMERA_DELAY) return;
+    if (elapsed < CAMERA_DELAY_SECONDS) return;
 
-    const t = 1 - Math.exp(-SMOOTH_SPEED * dt);
+    const t = 1 - Math.exp(-CAMERA_SMOOTH_SPEED * dt);
     this.x += dx * t;
     this.y += dy * t;
     if (Math.abs(this.x - this.targetX) < 0.1) this.x = this.targetX;

@@ -14,8 +14,7 @@ import type {
   MapSceneSnapshot,
 } from '../types';
 import { ViewportController } from '../viewport/viewport-controller';
-
-const DEFAULT_SAFE_AREA: MapSafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+import { DEFAULT_SAFE_AREA } from '../../constants/world/map-runtime';
 
 export class MapRuntime implements MapRuntimeApi {
   private readonly store = new MapStore();

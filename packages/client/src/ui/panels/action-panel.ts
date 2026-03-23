@@ -7,21 +7,11 @@ import { ActionDef, AutoBattleSkillConfig, PlayerState, SkillDef } from '@mud/sh
 import { FloatingTooltip } from '../floating-tooltip';
 import { buildSkillTooltipContent } from '../skill-tooltip';
 import { preserveSelection } from '../selection-preserver';
+import { getActionTypeLabel } from '../../domain-labels';
+import { ACTION_SHORTCUTS_KEY } from '../../constants/ui/action';
 
 type ActionMainTab = 'dialogue' | 'skill' | 'toggle';
 type SkillSubTab = 'auto' | 'manual';
-
-const TYPE_NAMES: Record<string, string> = {
-  skill: '技能',
-  gather: '采集',
-  interact: '交互',
-  battle: '战斗',
-  toggle: '行动',
-  quest: '任务',
-  travel: '传送',
-  breakthrough: '突破',
-};
-const ACTION_SHORTCUTS_KEY = 'mud.action.shortcuts.v1';
 
 function normalizeShortcutKey(key: string): string | null {
   if (key.length !== 1) return null;
@@ -220,7 +210,7 @@ export class ActionPanel {
             continue;
           }
           html += `<div class="panel-section">
-            <div class="panel-section-title">${TYPE_NAMES[type] || type}</div>`;
+      <div class="panel-section-title">${getActionTypeLabel(type)}</div>`;
           for (const action of entries) {
             html += this.renderActionItem(action);
           }
@@ -507,7 +497,7 @@ export class ActionPanel {
       <div class="action-copy ${skillContext ? 'action-copy-tooltip' : ''}"${tooltipAttrs}>
         <div>
           <span class="action-name">${escapeHtml(action.name)}</span>
-          <span class="action-type">[${TYPE_NAMES[action.type] || action.type}]</span>
+          <span class="action-type">[${getActionTypeLabel(action.type)}]</span>
           ${typeof action.range === 'number' ? `<span class="action-type">射程 ${action.range}</span>` : ''}
           ${isAutoBattleSkill
             ? `<span class="action-type ${autoBattleEnabled ? 'auto-battle-enabled' : 'auto-battle-disabled'}" data-action-auto-state="${action.id}">${autoBattleEnabled ? '自动已启用' : '自动已停用'}</span>

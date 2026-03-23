@@ -14,10 +14,25 @@ import {
   GmUpdateMapReq,
   Tile,
   TileType,
+  TILE_TYPE_LABELS,
+  TILE_VISUAL_BG_COLORS,
+  TILE_VISUAL_GLYPHS,
+  TILE_VISUAL_GLYPH_COLORS,
   getMapCharFromTileType,
   getTileTypeFromMapChar,
   isTileTypeWalkable,
 } from '@mud/shared';
+import {
+  AURA_BRUSH_LEVELS,
+  EDITOR_BASE_CELL_SIZE,
+  EDITOR_ZOOM_LEVELS,
+  DEFAULT_EDITOR_ZOOM_INDEX,
+  MAX_UNDO_STEPS,
+  INSPECTOR_TABS,
+  TOOL_OPTIONS,
+  PAINT_TILE_TYPES,
+  PAINT_LAYER_OPTIONS,
+} from './constants/editor/map-editor';
 
 type RequestFn = <T>(path: string, init?: RequestInit) => Promise<T>;
 type StatusFn = (message: string, isError?: boolean) => void;
@@ -50,127 +65,6 @@ type EditorUndoEntry = {
   resizeFillTileType: TileType;
   dirty: boolean;
 };
-
-const PAINT_TILE_TYPES: TileType[] = [
-  TileType.Floor,
-  TileType.Road,
-  TileType.Trail,
-  TileType.Wall,
-  TileType.Door,
-  TileType.Window,
-  TileType.BrokenWindow,
-  TileType.Grass,
-  TileType.Hill,
-  TileType.Mud,
-  TileType.Swamp,
-  TileType.Water,
-  TileType.Tree,
-  TileType.Stone,
-];
-
-export const TILE_LABELS: Record<TileType, string> = {
-  [TileType.Floor]: '地面',
-  [TileType.Road]: '大路',
-  [TileType.Trail]: '小路',
-  [TileType.Wall]: '墙体',
-  [TileType.Door]: '门',
-  [TileType.Window]: '窗户',
-  [TileType.BrokenWindow]: '破窗',
-  [TileType.Portal]: '传送阵',
-  [TileType.Stairs]: '楼梯',
-  [TileType.Grass]: '草地',
-  [TileType.Hill]: '山地',
-  [TileType.Mud]: '泥地',
-  [TileType.Swamp]: '沼泽',
-  [TileType.Water]: '水域',
-  [TileType.Tree]: '树木',
-  [TileType.Stone]: '岩石',
-};
-
-export const TILE_BG: Record<TileType, string> = {
-  [TileType.Floor]: '#ddd8cf',
-  [TileType.Road]: '#cdb89c',
-  [TileType.Trail]: '#b4946f',
-  [TileType.Wall]: '#3e3a35',
-  [TileType.Door]: '#8b7355',
-  [TileType.Window]: '#8bb6cf',
-  [TileType.BrokenWindow]: '#9aa7b0',
-  [TileType.Portal]: '#5c3d7a',
-  [TileType.Stairs]: '#7f5a34',
-  [TileType.Grass]: '#b8c98b',
-  [TileType.Hill]: '#b7a17f',
-  [TileType.Mud]: '#8b6a4c',
-  [TileType.Swamp]: '#556b3f',
-  [TileType.Water]: '#6e9ab8',
-  [TileType.Tree]: '#4d6b3a',
-  [TileType.Stone]: '#7a7570',
-};
-
-export const TILE_CHAR: Record<TileType, string> = {
-  [TileType.Floor]: '·',
-  [TileType.Road]: '路',
-  [TileType.Trail]: '径',
-  [TileType.Wall]: '▓',
-  [TileType.Door]: '门',
-  [TileType.Window]: '窗',
-  [TileType.BrokenWindow]: '裂',
-  [TileType.Portal]: '阵',
-  [TileType.Stairs]: '阶',
-  [TileType.Grass]: '草',
-  [TileType.Hill]: '坡',
-  [TileType.Mud]: '泥',
-  [TileType.Swamp]: '沼',
-  [TileType.Water]: '水',
-  [TileType.Tree]: '木',
-  [TileType.Stone]: '石',
-};
-
-export const CHAR_COLOR: Record<TileType, string> = {
-  [TileType.Floor]: 'rgba(0,0,0,0.15)',
-  [TileType.Road]: 'rgba(90,55,24,0.35)',
-  [TileType.Trail]: 'rgba(84,52,28,0.42)',
-  [TileType.Wall]: 'rgba(255,255,255,0.2)',
-  [TileType.Door]: '#f0e0c0',
-  [TileType.Window]: '#e6f8ff',
-  [TileType.BrokenWindow]: '#d8dde2',
-  [TileType.Portal]: '#d0b0f0',
-  [TileType.Stairs]: '#f3d19c',
-  [TileType.Grass]: 'rgba(50,80,30,0.35)',
-  [TileType.Hill]: 'rgba(92,60,32,0.36)',
-  [TileType.Mud]: 'rgba(250,240,220,0.34)',
-  [TileType.Swamp]: 'rgba(220,240,180,0.4)',
-  [TileType.Water]: 'rgba(30,50,80,0.4)',
-  [TileType.Tree]: 'rgba(20,40,15,0.5)',
-  [TileType.Stone]: 'rgba(40,35,30,0.35)',
-};
-
-const TOOL_OPTIONS: Array<{ value: MapTool; label: string; note: string }> = [
-  { value: 'select', label: '选取', note: '检查当前格与对象' },
-  { value: 'paint', label: '绘制', note: '左键拖拽刷地块' },
-  { value: 'pan', label: '平移', note: '左键拖动画布' },
-];
-
-const PAINT_LAYER_OPTIONS: Array<{ value: PaintLayer; label: string }> = [
-  { value: 'tile', label: '地块' },
-  { value: 'aura', label: '灵气' },
-];
-
-const AURA_BRUSH_LEVELS = [0, 1, 2, 3, 4, 5, 6] as const;
-
-const INSPECTOR_TABS: Array<{ value: InspectorTabId; label: string }> = [
-  { value: 'selection', label: '选区' },
-  { value: 'meta', label: '地图' },
-  { value: 'portal', label: '传送点' },
-  { value: 'npc', label: 'NPC' },
-  { value: 'monster', label: '怪物' },
-  { value: 'aura', label: '灵气' },
-  { value: 'landmark', label: '地标' },
-];
-
-const EDITOR_BASE_CELL_SIZE = 32;
-const EDITOR_ZOOM_LEVELS = [0.25, 0.5, 1, 2, 3] as const;
-const DEFAULT_EDITOR_ZOOM_INDEX = 3;
-const MAX_UNDO_STEPS = 50;
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -580,7 +474,7 @@ export class GmMapEditor {
     this.tilePaletteEl.innerHTML = this.paintLayer === 'tile'
       ? PAINT_TILE_TYPES.map((tileType) => `
         <button class="map-tile-btn ${this.paintTileType === tileType ? 'active' : ''}" data-tile-type="${tileType}" type="button">
-          ${escapeHtml(TILE_LABELS[tileType])}
+          ${escapeHtml(TILE_TYPE_LABELS[tileType])}
         </button>
       `).join('')
       : AURA_BRUSH_LEVELS.map((value) => `
@@ -744,7 +638,7 @@ export class GmMapEditor {
         <div class="map-form-grid compact">
           ${readonlyField('当前格', selectedCell ? `(${selectedCell.x}, ${selectedCell.y})` : '未选择')}
           ${readonlyField('悬停格', this.hoveredCell ? `(${this.hoveredCell.x}, ${this.hoveredCell.y})` : '无')}
-          ${readonlyField('地块', selectedTileType ? TILE_LABELS[selectedTileType] : '无')}
+          ${readonlyField('地块', selectedTileType ? TILE_TYPE_LABELS[selectedTileType] : '无')}
           ${readonlyField('灵气', selectedAura ? String(selectedAura.value) : '0')}
           ${readonlyField('当前工具', this.getCurrentTool() === 'paint' ? `绘制 · ${this.paintLayer === 'tile' ? '地块' : '灵气'}` : this.getCurrentTool() === 'pan' ? '平移' : '选取')}
           ${readonlyField('选中对象', this.describeSelectedEntity())}
@@ -790,7 +684,7 @@ export class GmMapEditor {
             <span>扩展填充值</span>
             <select data-map-ui="resizeFill">
               ${PAINT_TILE_TYPES.map((tileType) => `
-                <option value="${tileType}" ${this.resizeFillTileType === tileType ? 'selected' : ''}>${escapeHtml(TILE_LABELS[tileType])}</option>
+                <option value="${tileType}" ${this.resizeFillTileType === tileType ? 'selected' : ''}>${escapeHtml(TILE_TYPE_LABELS[tileType])}</option>
               `).join('')}
             </select>
           </label>
@@ -1627,15 +1521,15 @@ export class GmMapEditor {
         }
 
         const type = this.getTileTypeAt(gx, gy);
-        ctx.fillStyle = TILE_BG[type];
+        ctx.fillStyle = TILE_VISUAL_BG_COLORS[type];
         ctx.fillRect(sx, sy, cellSize, cellSize);
         ctx.strokeStyle = 'rgba(0,0,0,0.1)';
         ctx.lineWidth = 0.5;
         ctx.strokeRect(sx, sy, cellSize, cellSize);
 
-        const ch = TILE_CHAR[type];
+        const ch = TILE_VISUAL_GLYPHS[type];
         if (ch) {
-          ctx.fillStyle = CHAR_COLOR[type];
+          ctx.fillStyle = TILE_VISUAL_GLYPH_COLORS[type];
           ctx.fillText(ch, sx + cellSize / 2, sy + cellSize / 2 + 1);
         }
 
@@ -1825,7 +1719,7 @@ export class GmMapEditor {
   private sampleTileAt(x: number, y: number): void {
     const nextType = this.getTileTypeAt(x, y);
     this.paintTileType = nextType;
-    this.setStatus(`已吸取地块 ${TILE_LABELS[nextType]} (${x}, ${y})`);
+    this.setStatus(`已吸取地块 ${TILE_TYPE_LABELS[nextType]} (${x}, ${y})`);
     this.renderToolControls();
   }
 

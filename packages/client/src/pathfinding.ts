@@ -2,7 +2,7 @@
  * 客户端 A* 寻路 —— 基于地块通行代价的最短路径搜索
  */
 
-import { CARDINAL_DIRECTION_STEPS, deltaToDirection, Direction, getTileTraversalCost, manhattanDistance, Tile } from '@mud/shared';
+import { CARDINAL_DIRECTION_STEPS, deltaToDirection, Direction, getTileTraversalCost, manhattanDistance, PATHFINDING_MIN_STEP_COST, Tile } from '@mud/shared';
 
 interface HeapNode {
   index: number;
@@ -61,8 +61,6 @@ class MinHeap {
   }
 }
 
-const MIN_STEP_COST = 1;
-
 /** A* 寻路，返回 Direction[] 路径；不可达返回 null */
 export function findPath(
   tiles: Tile[][],
@@ -77,7 +75,7 @@ export function findPath(
   if (ey < 0 || ey >= rows || ex < 0 || ex >= cols) return null;
   if (!tiles[ey]?.[ex]?.walkable) return null;
 
-  const heuristic = (x: number, y: number) => manhattanDistance({ x, y }, { x: ex, y: ey }) * MIN_STEP_COST;
+  const heuristic = (x: number, y: number) => manhattanDistance({ x, y }, { x: ex, y: ey }) * PATHFINDING_MIN_STEP_COST;
   const total = rows * cols;
   const startIndex = sy * cols + sx;
   const goalIndex = ey * cols + ex;

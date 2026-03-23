@@ -5,17 +5,16 @@
 
 import {
   EquipmentEffectDef,
+  formatBuffMaxStacks,
   ItemStack,
-  NUMERIC_SCALAR_STAT_KEYS,
 } from '@mud/shared';
 import {
-  getAttrKeyLabel,
-  getElementKeyLabel,
   getEquipSlotLabel,
   getItemTypeLabel,
-  getNumericScalarStatKeyLabel,
 } from '../domain-labels';
+import { resolvePreviewItem } from '../content/local-templates';
 import { SkillTooltipAsideCard, SkillTooltipContent } from './skill-tooltip';
+import { describePreviewBonuses } from './stat-preview';
 
 function escapeHtml(value: string): string {
   return value
@@ -40,29 +39,6 @@ function formatNumber(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/, '');
 }
 
-function formatSignedValue(value: number): string {
-  return `${value >= 0 ? '+' : ''}${formatNumber(value)}`;
-}
-
-function formatBonusValue(key: string, value: number): string {
-  if (key === 'critDamage') {
-    return `${value / 10}%`;
-  }
-  if ([
-    'qiRegenRate',
-    'hpRegenRate',
-    'auraCostReduce',
-    'auraPowerRate',
-    'playerExpRate',
-    'techniqueExpRate',
-    'lootRate',
-    'rareLootRate',
-  ].includes(key)) {
-    return `${value / 100}%`;
-  }
-  return `${value}`;
-}
-
 function normalizeBuffMark(name: string, shortMark?: string): string {
   const value = shortMark?.trim();
   if (value) return [...value][0] ?? value;
@@ -77,35 +53,10 @@ function buildBuffInlineBadge(name: string, shortMark?: string, category?: 'buff
 
 function describeBuffStats(
   attrs?: NonNullable<ItemStack['equipAttrs']>,
-  stats?: NonNullable<NonNullable<ItemStack['effects']>[number] extends infer _T ? ItemStack['equipStats'] : never>,
+  stats?: ItemStack['equipStats'],
+  valueStats?: ItemStack['equipValueStats'],
 ): string[] {
-  const lines: string[] = [];
-  if (attrs) {
-    for (const [key, value] of Object.entries(attrs)) {
-      if (typeof value !== 'number' || value === 0) continue;
-      lines.push(`${getAttrKeyLabel(key)} ${formatSignedValue(value)}`);
-    }
-  }
-  if (stats) {
-    for (const key of NUMERIC_SCALAR_STAT_KEYS) {
-      const value = stats[key];
-      if (typeof value !== 'number' || value === 0) continue;
-      lines.push(`${getNumericScalarStatKeyLabel(key)} ${formatSignedValue(value)}`);
-    }
-    if (stats.elementDamageBonus) {
-      for (const [key, value] of Object.entries(stats.elementDamageBonus)) {
-        if (typeof value !== 'number' || value === 0) continue;
-        lines.push(`${getElementKeyLabel(key)}行增伤 ${formatSignedValue(value)}`);
-      }
-    }
-    if (stats.elementDamageReduce) {
-      for (const [key, value] of Object.entries(stats.elementDamageReduce)) {
-        if (typeof value !== 'number' || value === 0) continue;
-        lines.push(`${getElementKeyLabel(key)}行减伤 ${formatSignedValue(value)}`);
-      }
-    }
-  }
-  return lines;
+  return describePreviewBonuses(attrs, stats, valueStats);
 }
 
 function formatConditionText(effect: EquipmentEffectDef): string[] {
@@ -150,9 +101,10 @@ function formatTriggerLabel(trigger: EquipmentEffectDef extends infer _T ? strin
 }
 
 function buildTimedBuffAsideCard(effect: Extract<EquipmentEffectDef, { type: 'timed_buff' }>): SkillTooltipAsideCard {
-  const stackText = effect.buff.maxStacks && effect.buff.maxStacks > 1 ? ` · 最多 ${effect.buff.maxStacks} 层` : '';
+  const stackLimit = formatBuffMaxStacks(effect.buff.maxStacks);
+  const stackText = stackLimit ? ` · 最多 ${stackLimit} 层` : '';
   const conditionLines = formatConditionText(effect);
-  const buffLines = describeBuffStats(effect.buff.attrs, effect.buff.stats);
+  const buffLines = describeBuffStats(effect.buff.attrs, effect.buff.stats, effect.buff.valueStats);
   const lines = [
     `${formatTriggerLabel(effect.trigger)} · ${effect.target === 'target' ? '目标' : '自身'} · ${effect.buff.duration} 息${stackText}`,
     ...(effect.cooldown !== undefined ? [`冷却：${effect.cooldown} 息`] : []),
@@ -173,7 +125,7 @@ function buildEffectSummary(effect: EquipmentEffectDef): { lines: string[]; asid
   const conditionLines = formatConditionText(effect);
   switch (effect.type) {
     case 'stat_aura': {
-      const effectLines = describeBuffStats(effect.attrs, effect.stats);
+      const effectLines = describeBuffStats(effect.attrs, effect.stats, effect.valueStats);
       return {
         lines: [
           renderPlainLine('常驻特效', effectLines.length > 0 ? effectLines.join('，') : '无数值变化'),
@@ -182,7 +134,7 @@ function buildEffectSummary(effect: EquipmentEffectDef): { lines: string[]; asid
       };
     }
     case 'progress_boost': {
-      const effectLines = describeBuffStats(effect.attrs, effect.stats);
+      const effectLines = describeBuffStats(effect.attrs, effect.stats, effect.valueStats);
       return {
         lines: [
           renderPlainLine('推进特效', effectLines.length > 0 ? effectLines.join('，') : '无数值变化'),
@@ -204,7 +156,8 @@ function buildEffectSummary(effect: EquipmentEffectDef): { lines: string[]; asid
       };
     }
     case 'timed_buff': {
-      const stackText = effect.buff.maxStacks && effect.buff.maxStacks > 1 ? `，最多 ${effect.buff.maxStacks} 层` : '';
+      const stackLimit = formatBuffMaxStacks(effect.buff.maxStacks);
+      const stackText = stackLimit ? `，最多 ${stackLimit} 层` : '';
       const meta: string[] = [
         formatTriggerLabel(effect.trigger),
         effect.target === 'target' ? '目标' : '自身',
@@ -234,13 +187,14 @@ export interface ItemTooltipPayload {
 }
 
 export function buildItemTooltipPayload(item: ItemStack): ItemTooltipPayload {
-  if (item.type !== 'equipment') {
+  const previewItem = resolvePreviewItem(item);
+  if (previewItem.type !== 'equipment') {
     const lines = [
-      item.desc,
-      `类型：${getItemTypeLabel(item.type)}`,
+      previewItem.desc,
+      `类型：${getItemTypeLabel(previewItem.type)}`,
     ].filter((line) => line.length > 0);
     return {
-      title: item.name,
+      title: previewItem.name,
       lines,
       asideCards: [],
       allowHtml: false,
@@ -248,13 +202,13 @@ export function buildItemTooltipPayload(item: ItemStack): ItemTooltipPayload {
   }
 
   const staticLines = [
-    ...describeBuffStats(item.equipAttrs, item.equipStats),
+    ...describeBuffStats(previewItem.equipAttrs, previewItem.equipStats, previewItem.equipValueStats),
   ];
-  const effectSummaries = (item.effects ?? []).map((effect) => buildEffectSummary(effect));
+  const effectSummaries = (previewItem.effects ?? []).map((effect) => buildEffectSummary(effect));
   const lines: string[] = [
-    `<span class="skill-tooltip-desc">${escapeHtml(item.desc ?? '')}</span>`,
-    renderPlainLine('类型', getItemTypeLabel(item.type)),
-    ...(item.equipSlot ? [renderPlainLine('部位', getEquipSlotLabel(item.equipSlot))] : []),
+    `<span class="skill-tooltip-desc">${escapeHtml(previewItem.desc ?? '')}</span>`,
+    renderPlainLine('类型', getItemTypeLabel(previewItem.type)),
+    ...(previewItem.equipSlot ? [renderPlainLine('部位', getEquipSlotLabel(previewItem.equipSlot))] : []),
     ...(staticLines.length > 0 ? [renderPlainLine('静态词条', staticLines.join('，'))] : []),
     ...effectSummaries.flatMap((entry) => entry.lines),
   ];
@@ -263,7 +217,7 @@ export function buildItemTooltipPayload(item: ItemStack): ItemTooltipPayload {
     .filter((entry): entry is SkillTooltipAsideCard => Boolean(entry));
 
   return {
-    title: item.name,
+    title: previewItem.name,
     lines,
     asideCards,
     allowHtml: true,

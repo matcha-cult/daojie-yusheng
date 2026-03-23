@@ -17,6 +17,7 @@ import {
   TechniqueState,
 } from '@mud/shared';
 import { ATTR_KEY_LABELS, getTechniqueGradeLabel, getTechniqueRealmLabel } from '../../domain-labels';
+import { resolvePreviewTechnique, resolvePreviewTechniques } from '../../content/local-templates';
 import { FloatingTooltip } from '../floating-tooltip';
 import { detailModalHost } from '../detail-modal-host';
 import { buildSkillTooltipContent } from '../skill-tooltip';
@@ -137,7 +138,7 @@ export class TechniquePanel {
   }
 
   private renderList(): void {
-    const { techniques } = this.lastState;
+    const techniques = resolvePreviewTechniques(this.lastState.techniques);
     if (techniques.length === 0) {
       this.clear();
       return;
@@ -187,7 +188,7 @@ export class TechniquePanel {
       this.closeModal();
       return;
     }
-    const tech = this.lastState.techniques.find((entry) => entry.techId === this.openTechId);
+    const tech = this.findPreviewTechnique(this.openTechId);
     if (!tech) {
       this.closeModal();
       return;
@@ -410,7 +411,7 @@ export class TechniquePanel {
         return;
       }
       this.openTechId = techId;
-      const openedTech = this.lastState.techniques.find((entry) => entry.techId === techId);
+      const openedTech = this.findPreviewTechnique(techId);
       this.openLayerLevel = openedTech?.level ?? null;
       this.renderModal();
     });
@@ -459,13 +460,14 @@ export class TechniquePanel {
       const skillId = node.dataset.skillTooltipSkillId ?? '';
       const unlockLevel = Number(node.dataset.skillTooltipUnlockLevel ?? '0') || undefined;
       node.addEventListener('pointerenter', (event) => {
-        const technique = this.lastState.techniques.find((entry) => entry.skills.some((skill) => skill.id === skillId));
+        const techniques = resolvePreviewTechniques(this.lastState.techniques);
+        const technique = techniques.find((entry) => entry.skills.some((skill) => skill.id === skillId));
         const skill = technique?.skills.find((entry) => entry.id === skillId);
         const tooltip = skill ? buildSkillTooltipContent(skill, {
           unlockLevel,
           techLevel: technique?.level,
           player: this.lastState.previewPlayer,
-          knownSkills: this.lastState.techniques.flatMap((entry) => entry.skills),
+          knownSkills: techniques.flatMap((entry) => entry.skills),
         }) : { lines: [], asideCards: [] };
         this.tooltip.show(title, tooltip.lines, event.clientX, event.clientY, {
           allowHtml: rich,
@@ -490,7 +492,8 @@ export class TechniquePanel {
   }
 
   private patchList(): boolean {
-    const { techniques, cultivatingTechId } = this.lastState;
+    const techniques = resolvePreviewTechniques(this.lastState.techniques);
+    const { cultivatingTechId } = this.lastState;
     if (techniques.length === 0) {
       return false;
     }
@@ -536,7 +539,7 @@ export class TechniquePanel {
     if (!detailModalHost.isOpenFor(TechniquePanel.MODAL_OWNER)) {
       return false;
     }
-    const tech = this.lastState.techniques.find((entry) => entry.techId === this.openTechId);
+    const tech = this.findPreviewTechnique(this.openTechId);
     if (!tech) {
       return false;
     }
@@ -731,5 +734,10 @@ export class TechniquePanel {
     exp.textContent = expText;
     layerAttrsNode.textContent = layerAttrs;
     totalAttrsNode.textContent = totalAttrs;
+  }
+
+  private findPreviewTechnique(techId: string): TechniqueState | undefined {
+    const technique = this.lastState.techniques.find((entry) => entry.techId === techId);
+    return technique ? resolvePreviewTechnique(technique) : undefined;
   }
 }

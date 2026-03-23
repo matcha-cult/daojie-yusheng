@@ -7,90 +7,31 @@ import {
   DEFAULT_AURA_LEVEL_BASE_VALUE,
   GameTimeState,
   NpcQuestMarker,
+  TILE_VISUAL_BG_COLORS,
+  TILE_VISUAL_GLYPHS,
+  TILE_VISUAL_GLYPH_COLORS,
   normalizeAuraLevelBaseValue,
   SENSE_QI_OVERLAY_STYLE,
   Tile,
-  TileType,
   TimePhaseId,
   VisibleBuffState,
 } from '@mud/shared';
 import { Camera } from './camera';
 import { getCellSize } from '../display';
-
-const TILE_BG: Record<TileType, string> = {
-  [TileType.Floor]: '#ddd8cf',
-  [TileType.Road]: '#cdb89c',
-  [TileType.Trail]: '#b4946f',
-  [TileType.Wall]: '#3e3a35',
-  [TileType.Door]: '#8b7355',
-  [TileType.Window]: '#8bb6cf',
-  [TileType.BrokenWindow]: '#9aa7b0',
-  [TileType.Portal]: '#5c3d7a',
-  [TileType.Stairs]: '#7f5a34',
-  [TileType.Grass]: '#b8c98b',
-  [TileType.Hill]: '#b7a17f',
-  [TileType.Mud]: '#8b6a4c',
-  [TileType.Swamp]: '#556b3f',
-  [TileType.Water]: '#6e9ab8',
-  [TileType.Tree]: '#4d6b3a',
-  [TileType.Stone]: '#7a7570',
-};
-
-const TILE_CHAR: Record<TileType, string> = {
-  [TileType.Floor]: '·',
-  [TileType.Road]: '路',
-  [TileType.Trail]: '径',
-  [TileType.Wall]: '▓',
-  [TileType.Door]: '门',
-  [TileType.Window]: '窗',
-  [TileType.BrokenWindow]: '裂',
-  [TileType.Portal]: '阵',
-  [TileType.Stairs]: '阶',
-  [TileType.Grass]: '草',
-  [TileType.Hill]: '坡',
-  [TileType.Mud]: '泥',
-  [TileType.Swamp]: '沼',
-  [TileType.Water]: '水',
-  [TileType.Tree]: '木',
-  [TileType.Stone]: '石',
-};
-
-const CHAR_COLOR: Record<TileType, string> = {
-  [TileType.Floor]: 'rgba(0,0,0,0.15)',
-  [TileType.Road]: 'rgba(90,55,24,0.35)',
-  [TileType.Trail]: 'rgba(84,52,28,0.42)',
-  [TileType.Wall]: 'rgba(255,255,255,0.2)',
-  [TileType.Door]: '#f0e0c0',
-  [TileType.Window]: '#e6f8ff',
-  [TileType.BrokenWindow]: '#d8dde2',
-  [TileType.Portal]: '#d0b0f0',
-  [TileType.Stairs]: '#f3d19c',
-  [TileType.Grass]: 'rgba(50,80,30,0.35)',
-  [TileType.Hill]: 'rgba(92,60,32,0.36)',
-  [TileType.Mud]: 'rgba(250,240,220,0.34)',
-  [TileType.Swamp]: 'rgba(220,240,180,0.4)',
-  [TileType.Water]: 'rgba(30,50,80,0.4)',
-  [TileType.Tree]: 'rgba(20,40,15,0.5)',
-  [TileType.Stone]: 'rgba(40,35,30,0.35)',
-};
-
-const PATH_FILL_COLOR = 'rgba(88, 180, 214, 0.24)';
-const PATH_STROKE_COLOR = 'rgba(151, 236, 255, 0.78)';
-const PATH_ARROW_COLOR = 'rgba(179, 244, 255, 0.95)';
-const PATH_TARGET_FILL_COLOR = 'rgba(244, 144, 64, 0.34)';
-const PATH_TARGET_STROKE_COLOR = 'rgba(255, 216, 138, 0.96)';
-const PATH_TARGET_CORE_COLOR = 'rgba(255, 244, 219, 0.98)';
-const TILE_HIDDEN_FADE_MS = 220;
-const TIME_FILTER_LERP = 0.12;
-
-interface TimeAtmosphereProfile {
-  overlayBoost: number;
-  skyTint: string;
-  skyAlpha: number;
-  horizonTint: string;
-  horizonAlpha: number;
-  vignetteAlpha: number;
-}
+import {
+  PATH_ARROW_COLOR,
+  PATH_FILL_COLOR,
+  PATH_STROKE_COLOR,
+  PATH_TARGET_CORE_COLOR,
+  PATH_TARGET_FILL_COLOR,
+  PATH_TARGET_STROKE_COLOR,
+} from '../constants/visuals/path-highlight';
+import {
+  TILE_HIDDEN_FADE_MS,
+  TIME_FILTER_LERP,
+  TIME_ATMOSPHERE_PROFILES,
+  type TimeAtmosphereProfile,
+} from '../constants/visuals/time-atmosphere';
 
 interface TimeAtmosphereState {
   initialized: boolean;
@@ -99,18 +40,6 @@ interface TimeAtmosphereState {
   horizon: [number, number, number, number];
   vignetteAlpha: number;
 }
-
-const TIME_ATMOSPHERE_PROFILES: Record<TimePhaseId, TimeAtmosphereProfile> = {
-  deep_night: { overlayBoost: 1.08, skyTint: '#081221', skyAlpha: 0.34, horizonTint: '#1a3555', horizonAlpha: 0.16, vignetteAlpha: 0.28 },
-  late_night: { overlayBoost: 1.04, skyTint: '#0e1b2e', skyAlpha: 0.28, horizonTint: '#274666', horizonAlpha: 0.14, vignetteAlpha: 0.24 },
-  before_dawn: { overlayBoost: 1.02, skyTint: '#1a2740', skyAlpha: 0.2, horizonTint: '#516b8b', horizonAlpha: 0.14, vignetteAlpha: 0.16 },
-  dawn: { overlayBoost: 0.94, skyTint: '#8ea6c9', skyAlpha: 0.11, horizonTint: '#f0ba80', horizonAlpha: 0.22, vignetteAlpha: 0.06 },
-  day: { overlayBoost: 0.7, skyTint: '#fff0c8', skyAlpha: 0.03, horizonTint: '#fff9ea', horizonAlpha: 0.06, vignetteAlpha: 0.02 },
-  dusk: { overlayBoost: 1.02, skyTint: '#7d5c58', skyAlpha: 0.14, horizonTint: '#dd8c54', horizonAlpha: 0.24, vignetteAlpha: 0.1 },
-  first_night: { overlayBoost: 1.02, skyTint: '#33425f', skyAlpha: 0.16, horizonTint: '#8a6a81', horizonAlpha: 0.13, vignetteAlpha: 0.14 },
-  night: { overlayBoost: 1.04, skyTint: '#1c2944', skyAlpha: 0.23, horizonTint: '#44587b', horizonAlpha: 0.12, vignetteAlpha: 0.2 },
-  midnight: { overlayBoost: 1.06, skyTint: '#121b30', skyAlpha: 0.3, horizonTint: '#2e4968', horizonAlpha: 0.14, vignetteAlpha: 0.25 },
-};
 
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
@@ -287,7 +216,7 @@ export class TextRenderer implements IRenderer {
         if (!tile && !isVisible) continue;
 
         if (tile) {
-          ctx.fillStyle = TILE_BG[tile.type] ?? '#333';
+          ctx.fillStyle = TILE_VISUAL_BG_COLORS[tile.type] ?? '#333';
           ctx.fillRect(sx, sy, cellSize, cellSize);
 
           // 路径高亮
@@ -310,9 +239,9 @@ export class TextRenderer implements IRenderer {
           ctx.lineWidth = 0.5;
           ctx.strokeRect(sx, sy, cellSize, cellSize);
 
-          const ch = TILE_CHAR[tile.type];
+          const ch = TILE_VISUAL_GLYPHS[tile.type];
           if (ch) {
-            ctx.fillStyle = CHAR_COLOR[tile.type] ?? 'rgba(0,0,0,0.2)';
+            ctx.fillStyle = TILE_VISUAL_GLYPH_COLORS[tile.type] ?? 'rgba(0,0,0,0.2)';
             ctx.font = `${cellSize * 0.6}px "Ma Shan Zheng", cursive`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';

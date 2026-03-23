@@ -4,6 +4,7 @@
  */
 
 import {
+  ACCESS_TOKEN_STORAGE_KEY,
   AccountUpdateDisplayNameReq,
   AccountUpdateDisplayNameRes,
   AccountUpdatePasswordReq,
@@ -12,10 +13,13 @@ import {
   AuthRefreshReq,
   AuthTokenRes,
   DisplayNameAvailabilityRes,
+  REFRESH_TOKEN_STORAGE_KEY,
 } from '@mud/shared';
 
-export const ACCESS_TOKEN_KEY = 'accessToken';
-export const REFRESH_TOKEN_KEY = 'refreshToken';
+export {
+  ACCESS_TOKEN_STORAGE_KEY as ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_STORAGE_KEY as REFRESH_TOKEN_KEY,
+};
 
 /** HTTP 请求失败时抛出，携带状态码 */
 export class RequestError extends Error {
@@ -33,24 +37,24 @@ type RequestOptions = {
 
 /** 从 localStorage 读取 accessToken */
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
 }
 
 /** 从 localStorage 读取 refreshToken */
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
 /** 将 token 对写入 localStorage */
 export function storeTokens(data: AuthTokenRes): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, data.accessToken);
+  localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refreshToken);
 }
 
 /** 清除 localStorage 中的 token */
 export function clearStoredTokens(): void {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
 /** 通用 JSON 请求，自动处理 body 序列化与 Bearer 鉴权 */

@@ -2,9 +2,7 @@
  * 地图静态缓存 —— 将地图元信息和小地图快照持久化到 localStorage，减少重复请求
  */
 
-import { MapMeta, MapMinimapArchiveEntry, MapMinimapSnapshot } from '@mud/shared';
-
-const MAP_STATIC_CACHE_KEY = 'mud:map-static-cache:v2';
+import { MAP_STATIC_CACHE_STORAGE_KEY, MapMeta, MapMinimapArchiveEntry, MapMinimapSnapshot } from '@mud/shared';
 
 type CachedMapMeta = Pick<
   MapMeta,
@@ -143,7 +141,7 @@ function ensureLoaded(): void {
     return;
   }
 
-  const raw = storage.getItem(MAP_STATIC_CACHE_KEY);
+  const raw = storage.getItem(MAP_STATIC_CACHE_STORAGE_KEY);
   if (!raw) {
     return;
   }
@@ -181,7 +179,7 @@ function persist(): void {
   }
 
   try {
-    storage.setItem(MAP_STATIC_CACHE_KEY, JSON.stringify(payload));
+    storage.setItem(MAP_STATIC_CACHE_STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // 静态地图缓存失败时直接退回仅内存模式。
   }

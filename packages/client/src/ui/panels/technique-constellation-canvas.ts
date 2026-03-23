@@ -1,3 +1,5 @@
+import { TECHNIQUE_CONSTELLATION_NODE_NAMES } from '../../constants/ui/technique-constellation';
+
 type TechniqueConstellationMilestone = '小成' | '大成' | '圆满';
 
 type TechniqueConstellationNode = {
@@ -50,8 +52,6 @@ type Particle = {
   baseAlpha: number;
   phase: number;
 };
-
-const NODE_NAMES = ['天枢', '天璇', '天玑', '天权', '玉衡', '开阳', '摇光', '太微', '紫微', '天市', '少微', '玄戈', '北落', '南门', '角宿', '心宿'];
 
 const cyrb53 = (str: string, seed = 0): number => {
   let h1 = 0xdeadbeef ^ seed;
@@ -235,7 +235,7 @@ export class TechniqueConstellationCanvas {
       rawNodes.push({
         index,
         level: node.level,
-        name: `第${node.level}层 · ${nodeRng.pick(NODE_NAMES)}`,
+        name: `第${node.level}层 · ${nodeRng.pick(TECHNIQUE_CONSTELLATION_NODE_NAMES)}`,
         x: cx,
         y: cy,
         baseRadius: node.milestone ? nodeRng.nextRange(8, 11) : nodeRng.nextRange(3.5, 5.5),

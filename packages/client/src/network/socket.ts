@@ -16,6 +16,8 @@ import {
   S2C_TileRuntimeDetail,
   S2C_Error, decodeServerEventPayload, encodeClientEventPayload,
   AutoBattleSkillConfig, Direction, EquipSlot, PLAYER_HEARTBEAT_INTERVAL_MS,
+  SOCKET_CONNECT_TIMEOUT_MS, SOCKET_RECONNECTION_ATTEMPTS, SOCKET_RECONNECTION_DELAY_MS,
+  SOCKET_RECONNECTION_DELAY_MAX_MS, SOCKET_TRANSPORTS,
 } from '@mud/shared';
 
 /** 客户端 Socket.IO 连接管理，负责协议编解码与事件分发 */
@@ -50,12 +52,12 @@ export class SocketManager {
       auth: { token },
       // Swarm rolling updates and reverse proxies can route polling requests
       // to a different task, while a single WebSocket connection avoids SID drift.
-      transports: ['websocket'],
+      transports: [...SOCKET_TRANSPORTS],
       reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 8000,
+      reconnectionAttempts: SOCKET_RECONNECTION_ATTEMPTS,
+      reconnectionDelay: SOCKET_RECONNECTION_DELAY_MS,
+      reconnectionDelayMax: SOCKET_RECONNECTION_DELAY_MAX_MS,
+      timeout: SOCKET_CONNECT_TIMEOUT_MS,
     });
 
     this.socket.on('connect', () => {

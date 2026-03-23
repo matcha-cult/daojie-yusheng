@@ -2,15 +2,14 @@
  * 显示参数管理 —— 缩放倍率、格子像素尺寸与可视范围计算
  */
 
-const BASE_CELL_SIZE = 32;
+import { BASE_CELL_SIZE, DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './constants/visuals/display';
+
 let zoom = 2;
-const DEFAULT_ZOOM = 1;
-export const MIN_ZOOM = 0.5;
-export const MAX_ZOOM = 4;
-const ZOOM_STEP = 0.1;
 let cellSize = BASE_CELL_SIZE * zoom;
 let displayRangeX = 10;
 let displayRangeY = 10;
+
+export { MAX_ZOOM, MIN_ZOOM };
 
 function clampZoom(value: number): number {
   const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));

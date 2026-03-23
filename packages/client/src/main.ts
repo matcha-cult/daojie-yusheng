@@ -23,17 +23,22 @@ import { ChangelogPanel } from './ui/changelog-panel';
 import { initializeUiStyleConfig } from './ui/ui-style-config';
 import { createClientPanelSystem } from './ui/panel-system/bootstrap';
 import { createMapRuntime } from './game-map/runtime/map-runtime';
-import { getAttrKeyLabel, getEntityKindLabel, getNumericScalarStatKeyLabel, getTileTypeLabel } from './domain-labels';
+import { getEntityKindLabel, getTileTypeLabel } from './domain-labels';
+import { MAP_FALLBACK } from './constants/world/world-panel';
 
 import { FloatingTooltip } from './ui/floating-tooltip';
 import { detailModalHost } from './ui/detail-modal-host';
+import { describePreviewBonuses } from './ui/stat-preview';
 import { MAX_ZOOM, MIN_ZOOM, getDisplayRangeX, getDisplayRangeY, getZoom, setZoom } from './display';
 import { getAccessToken } from './ui/auth-api';
 import {
   ActionDef,
   computeAffectedCellsFromAnchor,
+  CONNECTION_RECOVERY_RETRY_MS,
+  CURRENT_TIME_REFRESH_MS,
   DEFAULT_AURA_LEVEL_BASE_VALUE,
   Direction,
+  formatBuffMaxStacks,
   encodeTileTargetRef,
   GAME_TIME_PHASES,
   GameTimeState,
@@ -47,7 +52,6 @@ import {
   TickRenderEntity,
   TechniqueUpdateEntry,
   ActionUpdateEntry,
-  NUMERIC_SCALAR_STAT_KEYS,
   SkillDef,
   Tile,
   TileType,
@@ -55,6 +59,8 @@ import {
   S2C_Init,
   S2C_TileRuntimeDetail,
   S2C_Tick,
+  SERVER_PING_INTERVAL_MS,
+  SOCKET_PING_TIMEOUT_MS,
   TargetingGeometrySpec,
   TargetingShape,
   VisibleBuffState,
@@ -87,10 +93,6 @@ const pingHundredsEl = pingValueEl?.querySelector<HTMLElement>('[data-ping-part=
 const pingTensEl = pingValueEl?.querySelector<HTMLElement>('[data-ping-part="tens"]');
 const pingOnesEl = pingValueEl?.querySelector<HTMLElement>('[data-ping-part="ones"]');
 
-const CONNECTION_RECOVERY_RETRY_MS = 1200;
-const SERVER_PING_INTERVAL_MS = 5000;
-const SOCKET_PING_TIMEOUT_MS = 4000;
-const CURRENT_TIME_REFRESH_MS = 250;
 let auraLevelBaseValue = DEFAULT_AURA_LEVEL_BASE_VALUE;
 let activeObservedTile:
   | {
@@ -829,39 +831,8 @@ function formatBuffDuration(buff: VisibleBuffState): string {
   return `${Math.max(0, Math.round(buff.remainingTicks))} / ${Math.max(1, Math.round(buff.duration))} 息`;
 }
 
-function formatSignedValue(value: number): string {
-  return `${value >= 0 ? '+' : ''}${Math.round(value * 100) / 100}`;
-}
-
 function buildBuffEffectLines(buff: VisibleBuffState): string[] {
-  const lines: string[] = [];
-  if (buff.attrs) {
-    for (const [key, value] of Object.entries(buff.attrs)) {
-      if (typeof value !== 'number' || value === 0) continue;
-      const label = getAttrKeyLabel(key);
-      lines.push(`${label} ${formatSignedValue(value)}`);
-    }
-  }
-  if (buff.stats) {
-    for (const key of NUMERIC_SCALAR_STAT_KEYS) {
-      const value = buff.stats[key];
-      if (typeof value !== 'number' || value === 0) continue;
-      lines.push(`${getNumericScalarStatKeyLabel(key)} ${formatSignedValue(value)}`);
-    }
-    if (buff.stats.elementDamageBonus) {
-      for (const [key, value] of Object.entries(buff.stats.elementDamageBonus)) {
-        if (typeof value !== 'number' || value === 0) continue;
-        lines.push(`${key}行增伤 ${formatSignedValue(value)}`);
-      }
-    }
-    if (buff.stats.elementDamageReduce) {
-      for (const [key, value] of Object.entries(buff.stats.elementDamageReduce)) {
-        if (typeof value !== 'number' || value === 0) continue;
-        lines.push(`${key}行减伤 ${formatSignedValue(value)}`);
-      }
-    }
-  }
-  return lines;
+  return describePreviewBonuses(buff.attrs, buff.stats);
 }
 
 function buildBuffTooltipLines(buff: VisibleBuffState): string[] {
@@ -869,8 +840,9 @@ function buildBuffTooltipLines(buff: VisibleBuffState): string[] {
     `类别：${buff.category === 'debuff' ? '减益' : '增益'}`,
     `剩余：${formatBuffDuration(buff)}`,
   ];
-  if (buff.maxStacks > 1) {
-    lines.push(`层数：${buff.stacks} / ${buff.maxStacks}`);
+  const stackLimit = formatBuffMaxStacks(buff.maxStacks);
+  if (stackLimit) {
+    lines.push(`层数：${buff.stacks} / ${stackLimit}`);
   }
   if (buff.sourceSkillName || buff.sourceSkillId) {
     lines.push(`来源：${buff.sourceSkillName ?? buff.sourceSkillId}`);
@@ -1506,17 +1478,6 @@ let latestActionMap = new Map<string, ActionDef>();
 let latestEntities: ObservedEntity[] = [];
 let latestEntityMap = new Map<string, ObservedEntity>();
 let pendingLayoutViewportSync = false;
-
-const MAP_FALLBACK: Record<string, { danger: number; recommendedRealm: string }> = {
-  spawn: { danger: 1, recommendedRealm: '锻体到后天' },
-  bamboo_forest: { danger: 2, recommendedRealm: '后天到先天' },
-  wildlands: { danger: 2, recommendedRealm: '后天到先天' },
-  black_iron_mine: { danger: 3, recommendedRealm: '先天到练气前夜' },
-  ancient_ruins: { danger: 3, recommendedRealm: '先天圆熟到练气启蒙' },
-  beast_valley: { danger: 5, recommendedRealm: '练气期' },
-  spirit_ridge: { danger: 4, recommendedRealm: '先天到练气' },
-  sky_ruins: { danger: 5, recommendedRealm: '练气到筑基' },
-};
 
 function showToast(message: string, kind: 'system' | 'chat' | 'quest' | 'combat' | 'loot' = 'system') {
   const el = document.getElementById('toast');

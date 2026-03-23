@@ -4,6 +4,7 @@
  */
 
 import {
+  ATTR_KEYS,
   ATTR_TO_PERCENT_NUMERIC_WEIGHTS,
   ATTR_TO_NUMERIC_WEIGHTS,
   AttrBonus,
@@ -23,90 +24,18 @@ import {
 import { ATTR_KEY_LABELS, ELEMENT_KEY_LABELS } from '../../domain-labels';
 import { FloatingTooltip } from '../floating-tooltip';
 import { preserveSelection } from '../selection-preserver';
+import {
+  ATTR_COLORS,
+  ATTR_TAB_LABELS,
+  ELEMENT_COLORS,
+  NUMERIC_TOOLTIP_DESCRIPTIONS,
+  NUMERIC_TOOLTIP_LABELS,
+  RATE_BP_KEYS,
+  TOOLTIP_STYLE_ID,
+  type AttrTab,
+  type NumericCardKey,
+} from '../../constants/ui/attr-panel';
 
-type AttrTab = 'base' | 'root' | 'combat' | 'qi' | 'special';
-type NumericCardKey = Exclude<keyof NumericStats, 'elementDamageBonus' | 'elementDamageReduce'>;
-
-const ATTR_KEYS: AttrKey[] = ['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'];
-
-const ATTR_TAB_LABELS: Record<AttrTab, string> = {
-  base: '六维',
-  root: '灵根',
-  combat: '斗法',
-  qi: '灵力',
-  special: '特殊',
-};
-
-const ATTR_COLORS = ['#ff8a65', '#ffd54f', '#4fc3f7', '#4db6ac', '#ba68c8', '#f06292'];
-const ELEMENT_COLORS = ['#f9a825', '#7cb342', '#039be5', '#e53935', '#6d4c41'];
-
-const TOOLTIP_STYLE_ID = 'attr-panel-tooltip-style';
-const RATE_BP_KEYS = new Set<NumericCardKey>([
-  'qiRegenRate',
-  'hpRegenRate',
-  'auraCostReduce',
-  'auraPowerRate',
-  'playerExpRate',
-  'techniqueExpRate',
-  'lootRate',
-  'rareLootRate',
-]);
-const NUMERIC_TOOLTIP_LABELS: Partial<Record<NumericCardKey, string>> = {
-  maxHp: '最大生命值',
-  maxQi: '最大灵力值',
-  physAtk: '物理攻击',
-  spellAtk: '法术攻击',
-  physDef: '物理防御',
-  spellDef: '法术防御',
-  hit: '命中',
-  dodge: '闪避',
-  crit: '暴击',
-  critDamage: '暴击伤害',
-  breakPower: '破招',
-  resolvePower: '化解',
-  maxQiOutputPerTick: '灵力输出速率',
-  qiRegenRate: '灵力回复',
-  hpRegenRate: '生命回复',
-  cooldownSpeed: '冷却速度',
-  auraCostReduce: '光环消耗缩减',
-  auraPowerRate: '光环效果增强',
-  playerExpRate: '角色经验',
-  techniqueExpRate: '功法经验',
-  realmExpPerTick: '每息境界经验',
-  techniqueExpPerTick: '每息功法经验',
-  lootRate: '掉落增幅',
-  rareLootRate: '稀有掉落',
-  moveSpeed: '移动速度',
-  viewRange: '视野范围',
-};
-const NUMERIC_TOOLTIP_DESCRIPTIONS: Partial<Record<NumericCardKey, string>> = {
-  maxHp: '决定你在战斗中的生存上限。',
-  maxQi: '决定你可承载的灵力总量。',
-  physAtk: '影响物理系技能；普通攻击会取物理攻击与法术攻击中的较高值结算。',
-  spellAtk: '影响法术系技能与灵术伤害；普通攻击会取物理攻击与法术攻击中的较高值结算。',
-  physDef: '降低受到的物理伤害，化解触发时会按双倍防御重新计算减伤。',
-  spellDef: '降低受到的法术伤害，化解触发时会按双倍防御重新计算减伤。',
-  hit: '提高攻击命中目标的能力。',
-  dodge: '提高闪避攻击的概率。',
-  crit: '提高暴击触发概率。',
-  critDamage: '决定暴击命中后的伤害倍率。',
-  breakPower: '压低目标化解概率；超出目标化解的部分会按概率触发破招，使本次命中与暴击判定翻倍。',
-  resolvePower: '提高化解来招的概率；化解触发时会按双倍防御重新结算本次减伤。',
-  maxQiOutputPerTick: '限制每息可稳定输出的灵力上限。',
-  qiRegenRate: '决定每息自动回复的灵力比例。',
-  hpRegenRate: '决定每息自动回复的生命比例。',
-  cooldownSpeed: '提高技能与效果的冷却流转速度。',
-  auraCostReduce: '降低光环或阵法持续消耗。',
-  auraPowerRate: '提高光环或阵法提供的效果。',
-  playerExpRate: '提高角色经验获取效率。',
-  techniqueExpRate: '提高功法经验获取效率。',
-  realmExpPerTick: '决定修炼状态下每息获得的境界经验。',
-  techniqueExpPerTick: '决定修炼状态下每息获得的功法经验。',
-  lootRate: '提高常规掉落收益。',
-  rareLootRate: '提高稀有掉落收益。',
-  moveSpeed: '决定每息获得的移动预算。大路、小路、草地、泥地与沼泽会按不同消耗结算，因此地形会直接影响赶路效率。',
-  viewRange: '决定地图上的可见范围。',
-};
 
 function formatRateBp(value: number): string {
   const percent = value / 100;

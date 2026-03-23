@@ -4,6 +4,8 @@
  */
 
 import {
+  GM_WORLD_DEFAULT_ZOOM,
+  GM_WORLD_POLL_INTERVAL_MS,
   type GmMapListRes,
   type GmMapRuntimeRes,
   type GmMapSummary,
@@ -12,25 +14,16 @@ import {
   type GmUpdateMapTimeReq,
   type Tile,
   type TileType,
+  ENTITY_KIND_LABELS,
+  TILE_TYPE_LABELS,
 } from '@mud/shared';
 import { TextRenderer } from './renderer/text';
 import { Camera } from './renderer/camera';
 import { getCellSize, setZoom, updateDisplayMetrics } from './display';
-import { TILE_LABELS } from './gm-map-editor';
+import { GM_WORLD_VIEW_MAX } from './constants/world/gm-world-viewer';
 
 type RequestFn = <T>(path: string, init?: RequestInit) => Promise<T>;
 type StatusFn = (message: string, isError?: boolean) => void;
-
-const MAX_VIEW = 20;
-const POLL_INTERVAL_MS = 2000;
-const DEFAULT_ZOOM = 1.5;
-
-const ENTITY_KIND_LABELS: Record<string, string> = {
-  player: '玩家',
-  monster: '怪物',
-  npc: 'NPC',
-  container: '容器',
-};
 
 function escapeHtml(s: string): string {
   return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -101,7 +94,7 @@ export class GmWorldViewer {
     this.mounted = true;
     this.renderer.init(this.canvas);
     this.resizeCanvas();
-    setZoom(DEFAULT_ZOOM);
+    setZoom(GM_WORLD_DEFAULT_ZOOM);
     this.bindEvents();
     window.addEventListener('resize', this.handleResize);
   }
@@ -145,7 +138,7 @@ export class GmWorldViewer {
       if (this.currentMapId) {
         this.loadRuntime().then(() => this.renderAll()).catch(() => {});
       }
-    }, POLL_INTERVAL_MS);
+    }, GM_WORLD_POLL_INTERVAL_MS);
     this.startRaf();
   }
 
@@ -243,8 +236,8 @@ export class GmWorldViewer {
 
   private getViewport(): { startX: number; startY: number; w: number; h: number } {
     const cellSize = getCellSize();
-    const tilesX = Math.min(MAX_VIEW, Math.ceil(this.canvas.width / cellSize) + 2);
-    const tilesY = Math.min(MAX_VIEW, Math.ceil(this.canvas.height / cellSize) + 2);
+    const tilesX = Math.min(GM_WORLD_VIEW_MAX, Math.ceil(this.canvas.width / cellSize) + 2);
+    const tilesY = Math.min(GM_WORLD_VIEW_MAX, Math.ceil(this.canvas.height / cellSize) + 2);
     const halfX = Math.floor(tilesX / 2);
     const halfY = Math.floor(tilesY / 2);
     return {
@@ -281,7 +274,7 @@ export class GmWorldViewer {
     if (!this.runtimeData || !this.mounted) return;
 
     const cellSize = getCellSize();
-    updateDisplayMetrics(this.canvas.width, this.canvas.height, MAX_VIEW);
+    updateDisplayMetrics(this.canvas.width, this.canvas.height, GM_WORLD_VIEW_MAX);
 
     // 构建 visibleTiles（上帝视角，全部可见）
     const visibleTiles = new Set<string>();
@@ -296,8 +289,8 @@ export class GmWorldViewer {
       visibleTiles,
       this.viewX,
       this.viewY,
-      MAX_VIEW,
-      MAX_VIEW,
+      GM_WORLD_VIEW_MAX,
+      GM_WORLD_VIEW_MAX,
       this.runtimeData.time,
     );
     this.renderer.renderEntities(this.camera);
@@ -373,7 +366,7 @@ export class GmWorldViewer {
     const delta = e.deltaY < 0 ? 0.25 : -0.25;
     const next = Math.max(0.5, Math.min(4, current + delta));
     setZoom(next);
-    updateDisplayMetrics(this.canvas.width, this.canvas.height, MAX_VIEW);
+    updateDisplayMetrics(this.canvas.width, this.canvas.height, GM_WORLD_VIEW_MAX);
     this.snapCamera();
     this.loadRuntime().then(() => this.renderAll()).catch(() => {});
   };
@@ -410,7 +403,7 @@ export class GmWorldViewer {
     const rect = parent.getBoundingClientRect();
     this.canvas.width = rect.width;
     this.canvas.height = rect.height;
-    updateDisplayMetrics(rect.width, rect.height, MAX_VIEW);
+    updateDisplayMetrics(rect.width, rect.height, GM_WORLD_VIEW_MAX);
   }
 
   // ===== 地图列表 =====
@@ -658,7 +651,7 @@ export class GmWorldViewer {
         <div class="panel-section">
           <div class="panel-section-title">选中格 (${this.selectedCell.x}, ${this.selectedCell.y})</div>
           ${tile ? `
-            <div class="panel-row"><span class="panel-label">地块</span><span class="panel-value">${TILE_LABELS[tile.type] ?? tile.type}</span></div>
+          <div class="panel-row"><span class="panel-label">地块</span><span class="panel-value">${TILE_TYPE_LABELS[tile.type] ?? tile.type}</span></div>
             <div class="panel-row"><span class="panel-label">可行走</span><span class="panel-value">${tile.walkable ? '是' : '否'}</span></div>
             <div class="panel-row"><span class="panel-label">灵气</span><span class="panel-value">${tile.aura ?? 0}</span></div>
           ` : '<div class="empty-hint">无地块数据</div>'}

@@ -6,14 +6,20 @@ import {
   type BasicOkRes,
   Direction,
   type GmChangePasswordReq,
+  GM_ACCESS_TOKEN_STORAGE_KEY,
+  GM_APPLY_DELAY_MS,
+  GM_PANEL_POLL_INTERVAL_MS,
   type GmCpuSectionSnapshot,
   type GmEditorCatalogRes,
   type GmEditorItemOption,
   type GmEditorTechniqueOption,
-  TechniqueRealm,
-  type AttrKey,
+  ATTR_KEYS,
+  ATTR_KEY_LABELS,
   type AutoBattleSkillConfig,
   type EquipmentSlots,
+  type EquipSlot,
+  EQUIP_SLOTS,
+  EQUIP_SLOT_LABELS,
   type GmNetworkBucket,
   type GmManagedPlayerSummary,
   type GmPlayerDetailRes,
@@ -25,59 +31,28 @@ import {
   type GmStateRes,
   type GmUpdatePlayerReq,
   type ItemStack,
+  ITEM_TYPES,
+  ITEM_TYPE_LABELS,
   type PlayerState,
   type QuestState,
+  QUEST_LINE_LABELS,
+  QUEST_STATUS_LABELS,
   type Suggestion,
   type TechniqueState,
+  TECHNIQUE_GRADE_LABELS,
+  TECHNIQUE_REALM_LABELS,
+  TechniqueRealm,
   type TemporaryBuffState,
 } from '@mud/shared';
+import {
+  GM_FACING_OPTIONS,
+  GM_QUEST_LINE_OPTIONS,
+  GM_QUEST_OBJECTIVE_TYPE_OPTIONS,
+  GM_QUEST_STATUS_OPTIONS,
+  GM_TECHNIQUE_REALM_OPTIONS,
+} from './constants/world/gm';
+import { getLocalEditorCatalog } from './content/editor-catalog';
 import { GmWorldViewer } from './gm-world-viewer';
-
-const TOKEN_KEY = 'mud:gm-access-token';
-const POLL_INTERVAL_MS = 5000;
-const APPLY_DELAY_MS = 1200;
-
-const ATTR_KEYS: AttrKey[] = ['constitution', 'spirit', 'perception', 'talent', 'comprehension', 'luck'];
-const ATTR_LABELS: Record<AttrKey, string> = {
-  constitution: '体魄',
-  spirit: '神识',
-  perception: '身法',
-  talent: '根骨',
-  comprehension: '悟性',
-  luck: '气运',
-};
-const EQUIP_SLOTS = ['weapon', 'head', 'body', 'legs', 'accessory'] as const;
-const EQUIP_SLOT_LABELS: Record<(typeof EQUIP_SLOTS)[number], string> = {
-  weapon: '武器',
-  head: '头部',
-  body: '身体',
-  legs: '腿部',
-  accessory: '饰品',
-};
-const ITEM_TYPES = ['consumable', 'equipment', 'material', 'quest_item', 'skill_book'] as const;
-const ITEM_TYPE_LABELS: Record<(typeof ITEM_TYPES)[number], string> = {
-  consumable: '消耗品',
-  equipment: '装备',
-  material: '材料',
-  quest_item: '任务物',
-  skill_book: '功法书',
-};
-const QUEST_LINES = ['main', 'side', 'daily', 'encounter'] as const;
-const QUEST_STATUSES = ['available', 'active', 'ready', 'completed'] as const;
-const QUEST_OBJECTIVE_TYPES = ['kill', 'learn_technique', 'realm_progress', 'realm_stage'] as const;
-const FACING_OPTIONS = [
-  { value: Direction.North, label: '北' },
-  { value: Direction.South, label: '南' },
-  { value: Direction.East, label: '东' },
-  { value: Direction.West, label: '西' },
-];
-const TECHNIQUE_REALM_OPTIONS = [
-  { value: TechniqueRealm.Entry, label: '入门' },
-  { value: TechniqueRealm.Minor, label: '小成' },
-  { value: TechniqueRealm.Major, label: '大成' },
-  { value: TechniqueRealm.Perfection, label: '圆满' },
-];
-const TECHNIQUE_GRADE_OPTIONS = ['mortal', 'yellow', 'mystic', 'earth', 'heaven', 'spirit', 'saint', 'emperor'] as const;
 
 const loginOverlay = document.getElementById('login-overlay') as HTMLDivElement;
 const gmShell = document.getElementById('gm-shell') as HTMLDivElement;
@@ -165,7 +140,7 @@ const suggestionTabBtn = document.getElementById('gm-tab-suggestions') as HTMLBu
 const worldTabBtn = document.getElementById('gm-tab-world') as HTMLButtonElement;
 const suggestionListEl = document.getElementById('gm-suggestion-list') as HTMLElement;
 
-let token = sessionStorage.getItem(TOKEN_KEY) ?? '';
+let token = sessionStorage.getItem(GM_ACCESS_TOKEN_STORAGE_KEY) ?? '';
 let state: GmStateRes | null = null;
 let suggestions: Suggestion[] = [];
 let editorCatalog: GmEditorCatalogRes | null = null;
@@ -388,7 +363,7 @@ function getTechniqueCardTitle(technique: TechniqueState | undefined, index: num
 
 function getTechniqueCardMeta(technique: TechniqueState | undefined): string {
   if (!technique) return '';
-  return `${technique.techId || '未填写功法 ID'} · 等级 ${technique.level} · ${TECHNIQUE_REALM_OPTIONS.find((option) => option.value === technique.realm)?.label ?? technique.realm}`;
+  return `${technique.techId || '未填写功法 ID'} · 等级 ${technique.level} · ${TECHNIQUE_REALM_LABELS[technique.realm] ?? technique.realm}`;
 }
 
 function getQuestCardTitle(quest: QuestState | undefined, index: number): string {
@@ -397,11 +372,11 @@ function getQuestCardTitle(quest: QuestState | undefined, index: number): string
 
 function getQuestCardMeta(quest: QuestState | undefined): string {
   if (!quest) return '';
-  return `${quest.id || '未填写任务 ID'} · ${quest.line} · ${quest.status}`;
+  return `${quest.id || '未填写任务 ID'} · ${QUEST_LINE_LABELS[quest.line] ?? quest.line} · ${QUEST_STATUS_LABELS[quest.status] ?? quest.status}`;
 }
 
 function getTechniqueOptionLabel(option: GmEditorTechniqueOption): string {
-  return `${option.name}${option.grade ? ` · ${option.grade}` : ''}`;
+  return `${option.name}${option.grade ? ` · ${TECHNIQUE_GRADE_LABELS[option.grade] ?? option.grade}` : ''}`;
 }
 
 function getItemOptionLabel(option: GmEditorItemOption): string {
@@ -502,6 +477,7 @@ function createItemFromCatalog(itemId: string, count = 1): ItemStack {
     equipSlot: option.equipSlot,
     equipAttrs: option.equipAttrs ? clone(option.equipAttrs) : undefined,
     equipStats: option.equipStats ? clone(option.equipStats) : undefined,
+    equipValueStats: option.equipValueStats ? clone(option.equipValueStats) : undefined,
     tags: option.tags ? [...option.tags] : undefined,
     effects: option.effects ? clone(option.effects) : undefined,
   };
@@ -523,7 +499,7 @@ function getTechniqueEditorControls(index: number, technique: TechniqueState): s
   return `
     <div class="editor-grid compact">
       ${selectField('功法', `techniques.${index}.techId`, technique.techId, getTechniqueCatalogOptions())}
-      ${selectField('功法境界', `techniques.${index}.realm`, technique.realm, TECHNIQUE_REALM_OPTIONS)}
+      ${selectField('功法境界', `techniques.${index}.realm`, technique.realm, GM_TECHNIQUE_REALM_OPTIONS)}
       ${numberField('等级', `techniques.${index}.level`, technique.level)}
       ${numberField('经验', `techniques.${index}.exp`, technique.exp)}
       ${numberField('升级所需经验', `techniques.${index}.expToNext`, technique.expToNext)}
@@ -974,7 +950,7 @@ async function loadSuggestions(): Promise<void> {
 }
 
 async function loadEditorCatalog(): Promise<void> {
-  editorCatalog = await request<GmEditorCatalogRes>('/gm/editor-catalog');
+  editorCatalog = getLocalEditorCatalog();
 }
 
 function renderSuggestions(): void {
@@ -1183,7 +1159,7 @@ function createDefaultPlayerSnapshot(source?: PlayerState): PlayerState {
 
 function readCatalogSelectValue(
   kind: 'technique' | 'inventory-item' | 'equipment',
-  slot?: (typeof EQUIP_SLOTS)[number],
+  slot?: EquipSlot,
 ): string {
   const selector = kind === 'equipment'
     ? `select[data-catalog-select="${kind}"][data-slot="${slot}"]`
@@ -1483,9 +1459,9 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         <div class="editor-grid compact">
           ${textField('任务 ID', `quests.${index}.id`, quest.id)}
           ${textField('标题', `quests.${index}.title`, quest.title)}
-          ${selectField('任务线', `quests.${index}.line`, quest.line, QUEST_LINES.map((value) => ({ value, label: value })))}
-          ${selectField('状态', `quests.${index}.status`, quest.status, QUEST_STATUSES.map((value) => ({ value, label: value })))}
-          ${selectField('目标类型', `quests.${index}.objectiveType`, quest.objectiveType, QUEST_OBJECTIVE_TYPES.map((value) => ({ value, label: value })))}
+          ${selectField('任务线', `quests.${index}.line`, quest.line, GM_QUEST_LINE_OPTIONS)}
+          ${selectField('状态', `quests.${index}.status`, quest.status, GM_QUEST_STATUS_OPTIONS)}
+          ${selectField('目标类型', `quests.${index}.objectiveType`, quest.objectiveType, GM_QUEST_OBJECTIVE_TYPE_OPTIONS)}
           ${nullableTextField('章节', `quests.${index}.chapter`, quest.chapter, 'undefined')}
           ${nullableTextField('剧情段落', `quests.${index}.story`, quest.story, 'undefined')}
           ${numberField('当前进度', `quests.${index}.progress`, quest.progress)}
@@ -1529,7 +1505,7 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         ${selectField('地图', 'mapId', draft.mapId, mapIds.map((mapId) => ({ value: mapId, label: mapId })))}
         ${numberField('X', 'x', draft.x)}
         ${numberField('Y', 'y', draft.y)}
-        ${selectField('朝向', 'facing', draft.facing, FACING_OPTIONS)}
+        ${selectField('朝向', 'facing', draft.facing, GM_FACING_OPTIONS)}
         ${numberField('视野', 'viewRange', draft.viewRange)}
         ${selectField('主修功法', 'cultivatingTechId', draft.cultivatingTechId ?? '', getLearnedTechniqueOptions(techniques, true))}
         ${numberField('HP', 'hp', draft.hp)}
@@ -1560,7 +1536,7 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         </div>
       </div>
       <div class="editor-stat-grid">
-        ${ATTR_KEYS.map((key) => numberField(ATTR_LABELS[key], `baseAttrs.${key}`, draft.baseAttrs[key])).join('')}
+        ${ATTR_KEYS.map((key) => numberField(ATTR_KEY_LABELS[key], `baseAttrs.${key}`, draft.baseAttrs[key])).join('')}
       </div>
       <div class="editor-grid compact" style="margin-top: 10px;">
         ${stringArrayField('已揭示突破条件 ID', 'revealedBreakthroughRequirementIds', draft.revealedBreakthroughRequirementIds, 'wide')}
@@ -1916,7 +1892,7 @@ function applyCatalogBindingChange(path: string, value: string): boolean {
 
   const equipmentMatch = path.match(/^equipment\.(weapon|head|body|legs|accessory)\.itemId$/);
   if (equipmentMatch) {
-    const slot = equipmentMatch[1] as (typeof EQUIP_SLOTS)[number];
+    const slot = equipmentMatch[1] as EquipSlot;
     draftSnapshot.equipment[slot] = createItemFromCatalog(value);
     changed = true;
   }
@@ -2006,7 +1982,7 @@ function startPolling(): void {
     loadState(true).catch((error: unknown) => {
       setStatus(error instanceof Error ? error.message : '刷新失败', true);
     });
-  }, POLL_INTERVAL_MS);
+  }, GM_PANEL_POLL_INTERVAL_MS);
 }
 
 function showShell(): void {
@@ -2028,7 +2004,7 @@ function logout(message?: string): void {
   draftSnapshot = null;
   editorDirty = false;
   draftSourcePlayerId = null;
-  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(GM_ACCESS_TOKEN_STORAGE_KEY);
   if (pollTimer !== null) {
     window.clearInterval(pollTimer);
     pollTimer = null;
@@ -2056,7 +2032,7 @@ function logout(message?: string): void {
 
 async function delayRefresh(message: string): Promise<void> {
   setStatus(message);
-  await new Promise((resolve) => window.setTimeout(resolve, APPLY_DELAY_MS));
+  await new Promise((resolve) => window.setTimeout(resolve, GM_APPLY_DELAY_MS));
   await loadState(true, true);
   setStatus(`${message}，已完成同步`);
 }
@@ -2077,7 +2053,7 @@ async function login(): Promise<void> {
       body: JSON.stringify({ password } satisfies GmLoginReq),
     });
     token = result.accessToken;
-    sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem(GM_ACCESS_TOKEN_STORAGE_KEY, token);
     showShell();
     await loadEditorCatalog();
     await loadState();
@@ -2283,7 +2259,7 @@ function handleEditorAction(action: string, trigger: HTMLElement): void {
   if (!draftSnapshot) return;
 
   const index = Number(trigger.dataset.index ?? '-1');
-  const slot = trigger.dataset.slot as (typeof EQUIP_SLOTS)[number] | undefined;
+  const slot = trigger.dataset.slot as EquipSlot | undefined;
 
   switch (action) {
     case 'add-bonus':

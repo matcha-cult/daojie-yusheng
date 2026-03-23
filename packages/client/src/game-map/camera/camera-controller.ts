@@ -1,7 +1,5 @@
+import { CAMERA_DELAY_SECONDS, CAMERA_SMOOTH_SPEED } from '@mud/shared';
 import type { MapSafeAreaInsets } from '../types';
-
-const SMOOTH_SPEED = 8;
-const CAMERA_DELAY = 1.0;
 
 export interface CameraState {
   x: number;
@@ -63,11 +61,11 @@ export class CameraController {
     }
 
     const elapsed = (performance.now() - this.divergeTime) / 1000;
-    if (elapsed < CAMERA_DELAY) {
+    if (elapsed < CAMERA_DELAY_SECONDS) {
       return;
     }
 
-    const t = 1 - Math.exp(-SMOOTH_SPEED * dt);
+    const t = 1 - Math.exp(-CAMERA_SMOOTH_SPEED * dt);
     this.state.x += dx * t;
     this.state.y += dy * t;
   }
