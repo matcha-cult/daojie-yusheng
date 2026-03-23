@@ -4,6 +4,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  EquipmentEffectDef,
+  ItemStack,
   TECHNIQUE_GRADE_LABELS,
   calculateBuffValue,
   calculateEquipmentValue,
@@ -34,8 +36,9 @@ type RawEquipment = {
   level?: number;
   desc: string;
   equipSlot?: string;
-  equipAttrs?: Record<string, number>;
-  equipStats?: Record<string, number>;
+  equipAttrs?: ItemStack['equipAttrs'];
+  equipStats?: ItemStack['equipStats'];
+  effects?: EquipmentEffectDef[];
 };
 
 type RawMap = {
@@ -47,6 +50,7 @@ export interface ValueReportRow {
   name: string;
   grade: string;
   level: string;
+  baseQuantifiedValue?: string;
   range?: string;
   damageTargets?: string;
   cooldown?: string;
@@ -317,7 +321,8 @@ export function buildEquipmentRows(): ValueReportRow[] {
       name: item.name,
       grade,
       level,
-      quantifiedValue: formatNumber(summary.quantifiedValue),
+      baseQuantifiedValue: formatNumber(summary.baseQuantifiedValue),
+      quantifiedValue: formatNumber(summary.actualQuantifiedValue),
       unquantifiedValue: joinUnquantified(summary.unquantified),
     };
   });
@@ -399,6 +404,12 @@ export function renderMarkdownTable(title: string, rows: ValueReportRow[]): stri
           '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
           ...sortedRows.map((row) => `| ${escapeCell(row.name)} | ${escapeCell(row.grade)} | ${escapeCell(row.level)} | ${escapeCell(row.range ?? '-')} | ${escapeCell(row.damageTargets ?? '-')} | ${escapeCell(row.cooldown ?? '-')} | ${escapeCell(row.cost ?? '-')} | ${escapeCell(row.quantifiedValue)} | ${escapeCell(row.unquantifiedValue)} |`),
         ]
+      : title === '装备价值报表'
+        ? [
+            '| 名字 | 品阶 | 等级 | 实际价值 | 基准价值 | 无法量化特效 |',
+            '| --- | --- | --- | --- | --- | --- |',
+            ...sortedRows.map((row) => `| ${escapeCell(row.name)} | ${escapeCell(row.grade)} | ${escapeCell(row.level)} | ${escapeCell(row.quantifiedValue)} | ${escapeCell(row.baseQuantifiedValue ?? '-')} | ${escapeCell(row.unquantifiedValue)} |`),
+          ]
       : [
           '| 名字 | 品阶 | 等级 | 量化价值 | 无法量化价值 |',
           '| --- | --- | --- | --- | --- |',

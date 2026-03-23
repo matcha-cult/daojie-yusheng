@@ -3,18 +3,21 @@
  * 统一折算为可比较的"价值点"，用于平衡性分析。
  */
 import { ELEMENT_KEYS, NUMERIC_SCALAR_STAT_KEYS } from './constants/gameplay/attributes';
+import { TECHNIQUE_GRADE_ORDER } from './constants/gameplay/technique';
 import type { PartialNumericStats } from './numeric';
 import { calcTechniqueAttrValues } from './technique';
 import type {
   AttrBonus,
   AttrKey,
   Attributes,
+  EquipmentEffectDef,
   ItemStack,
   SkillBuffEffectDef,
   SkillDef,
   SkillFormula,
   SkillFormulaVar,
   TechniqueLayerDef,
+  TechniqueGrade,
   TechniqueState,
 } from './types';
 
@@ -118,6 +121,12 @@ export interface ValueSummary {
   unquantified: string[];
 }
 
+/** 装备价值汇总（区分基准价值与实际价值） */
+export interface EquipmentValueSummary extends ValueSummary {
+  baseQuantifiedValue: number;
+  actualQuantifiedValue: number;
+}
+
 /** 技能价值汇总（含基础价值和乘区倍率） */
 export interface SkillValueSummary extends ValueSummary {
   baseQuantifiedValue: number;
@@ -173,6 +182,18 @@ function formatPercent(scale: number): string {
   return `${formatNumber(scale * 100)}%`;
 }
 
+function getAttrLabel(key: string): string {
+  const labels: Record<string, string> = {
+    constitution: '体魄',
+    spirit: '神识',
+    perception: '身法',
+    talent: '根骨',
+    comprehension: '悟性',
+    luck: '气运',
+  };
+  return labels[key] ?? key;
+}
+
 function getNumericStatLabel(key: string): string {
   const labels: Record<string, string> = {
     maxHp: '最大生命',
@@ -187,13 +208,258 @@ function getNumericStatLabel(key: string): string {
     critDamage: '暴伤',
     breakPower: '破招',
     resolvePower: '化解',
+    maxQiOutputPerTick: '每息灵力输出上限',
     moveSpeed: '移速',
     qiRegenRate: '灵力回复',
     hpRegenRate: '生命回复',
     cooldownSpeed: '冷却速度',
+    auraCostReduce: '灵气消耗减免',
     auraPowerRate: '灵气强度',
+    playerExpRate: '角色经验倍率',
+    techniqueExpRate: '功法经验倍率',
+    realmExpPerTick: '境界修炼效率',
+    techniqueExpPerTick: '功法修炼效率',
+    lootRate: '掉落倍率',
+    rareLootRate: '稀有掉落倍率',
+    viewRange: '视野范围',
   };
   return labels[key] ?? key;
+}
+
+function getEquipmentLevelLinearMultiplier(level: number | undefined): number {
+  const normalizedLevel = Math.max(1, Math.floor(level ?? 1));
+  return 1 + (normalizedLevel - 1) * 0.1;
+}
+
+function getEquipmentLevelExponentialMultiplier(level: number | undefined): number {
+  const normalizedLevel = Math.max(1, Math.floor(level ?? 1));
+  return Math.pow(1.1, normalizedLevel - 1);
+}
+
+function isExponentialEquipmentStat(key: typeof NUMERIC_SCALAR_STAT_KEYS[number]): boolean {
+  return key === 'physAtk' || key === 'spellAtk' || key === 'maxHp' || key === 'maxQi';
+}
+
+function getEquipmentGradeMultiplier(grade: TechniqueGrade | undefined): number {
+  const gradeIndex = Math.max(0, TECHNIQUE_GRADE_ORDER.indexOf(grade ?? 'mortal'));
+  return 2 ** gradeIndex;
+}
+
+function scaleAttributes(attrs: Partial<Attributes> | undefined, multiplier: number): Partial<Attributes> | undefined {
+  if (!attrs) {
+    return undefined;
+  }
+  const scaled: Partial<Attributes> = {};
+  for (const key of Object.keys(ATTRIBUTE_VALUE_PER_POINT) as AttrKey[]) {
+    const amount = attrs[key];
+    if (!amount) {
+      continue;
+    }
+    scaled[key] = amount * multiplier;
+  }
+  return Object.keys(scaled).length > 0 ? scaled : undefined;
+}
+
+function scaleNumericStats(
+  stats: PartialNumericStats | undefined,
+  gradeMultiplier: number,
+  level: number | undefined,
+): PartialNumericStats | undefined {
+  if (!stats) {
+    return undefined;
+  }
+
+  const scaled: PartialNumericStats = {};
+  for (const key of NUMERIC_SCALAR_STAT_KEYS) {
+    const amount = stats[key];
+    if (!amount) {
+      continue;
+    }
+    const levelMultiplier = isExponentialEquipmentStat(key)
+      ? getEquipmentLevelExponentialMultiplier(level)
+      : getEquipmentLevelLinearMultiplier(level);
+    scaled[key] = amount * gradeMultiplier * levelMultiplier;
+  }
+
+  if (stats.elementDamageBonus) {
+    const scaledBonus: NonNullable<PartialNumericStats['elementDamageBonus']> = {};
+    const levelMultiplier = getEquipmentLevelLinearMultiplier(level);
+    for (const element of ELEMENT_KEYS) {
+      const amount = stats.elementDamageBonus[element];
+      if (!amount) {
+        continue;
+      }
+      scaledBonus[element] = amount * gradeMultiplier * levelMultiplier;
+    }
+    if (Object.keys(scaledBonus).length > 0) {
+      scaled.elementDamageBonus = scaledBonus;
+    }
+  }
+
+  if (stats.elementDamageReduce) {
+    const scaledReduce: NonNullable<PartialNumericStats['elementDamageReduce']> = {};
+    const levelMultiplier = getEquipmentLevelLinearMultiplier(level);
+    for (const element of ELEMENT_KEYS) {
+      const amount = stats.elementDamageReduce[element];
+      if (!amount) {
+        continue;
+      }
+      scaledReduce[element] = amount * gradeMultiplier * levelMultiplier;
+    }
+    if (Object.keys(scaledReduce).length > 0) {
+      scaled.elementDamageReduce = scaledReduce;
+    }
+  }
+
+  return Object.keys(scaled).length > 0 ? scaled : undefined;
+}
+
+function sumAttributePoints(attrs: Partial<Attributes> | undefined): number {
+  if (!attrs) {
+    return 0;
+  }
+  let total = 0;
+  for (const key of Object.keys(ATTRIBUTE_VALUE_PER_POINT) as AttrKey[]) {
+    total += attrs[key] ?? 0;
+  }
+  return total;
+}
+
+function formatEquipmentStatValue(key: string, value: number): string {
+  if (key === 'critDamage') {
+    return `${formatNumber(value / 10)}%`;
+  }
+  if ([
+    'qiRegenRate',
+    'hpRegenRate',
+    'auraCostReduce',
+    'auraPowerRate',
+    'playerExpRate',
+    'techniqueExpRate',
+    'lootRate',
+    'rareLootRate',
+  ].includes(key)) {
+    return `${formatNumber(value / 100)}%`;
+  }
+  return formatNumber(value);
+}
+
+function describeAttrBonus(attrs?: Partial<Attributes>): string[] {
+  if (!attrs) {
+    return [];
+  }
+  const parts: string[] = [];
+  for (const key of Object.keys(ATTRIBUTE_VALUE_PER_POINT) as AttrKey[]) {
+    const amount = attrs[key];
+    if (!amount) {
+      continue;
+    }
+    parts.push(`${getAttrLabel(key)}+${formatNumber(amount)}`);
+  }
+  return parts;
+}
+
+function describeStatBonus(stats?: PartialNumericStats): string[] {
+  if (!stats) {
+    return [];
+  }
+  const parts: string[] = [];
+  for (const key of NUMERIC_SCALAR_STAT_KEYS) {
+    const amount = stats[key];
+    if (!amount) {
+      continue;
+    }
+    parts.push(`${getNumericStatLabel(key)}+${formatEquipmentStatValue(key, amount)}`);
+  }
+  for (const element of ELEMENT_KEYS) {
+    const bonus = stats.elementDamageBonus?.[element];
+    if (bonus) {
+      parts.push(`${element}行增伤+${formatNumber(bonus)}`);
+    }
+    const reduce = stats.elementDamageReduce?.[element];
+    if (reduce) {
+      parts.push(`${element}行减伤+${formatNumber(reduce)}`);
+    }
+  }
+  return parts;
+}
+
+function describeEquipmentConditions(effect: EquipmentEffectDef): string {
+  const conditions = effect.conditions?.items ?? [];
+  if (conditions.length === 0) {
+    return '';
+  }
+  const parts = conditions.map((condition) => {
+    switch (condition.type) {
+      case 'time_segment':
+        return `时段:${condition.in.join('/')}`;
+      case 'map':
+        return `地图:${condition.mapIds.join('/')}`;
+      case 'hp_ratio':
+        return `生命${condition.op}${Math.round(condition.value * 100)}%`;
+      case 'qi_ratio':
+        return `灵力${condition.op}${Math.round(condition.value * 100)}%`;
+      case 'is_cultivating':
+        return condition.value ? '修炼中' : '未修炼';
+      case 'has_buff':
+        return `需带有${condition.buffId}${condition.minStacks ? `${condition.minStacks}层` : ''}`;
+      case 'target_kind':
+        return `目标:${condition.in.join('/')}`;
+      default:
+        return '';
+    }
+  }).filter((entry) => entry.length > 0);
+  return parts.length > 0 ? ` [${parts.join('，')}]` : '';
+}
+
+function getEquipmentTriggerLabel(trigger: string): string {
+  const labels: Record<string, string> = {
+    on_equip: '装备时',
+    on_unequip: '卸下时',
+    on_tick: '每息',
+    on_move: '移动后',
+    on_attack: '攻击后',
+    on_hit: '受击后',
+    on_kill: '击杀后',
+    on_skill_cast: '施法后',
+    on_cultivation_tick: '修炼时',
+    on_time_segment_changed: '时段切换时',
+    on_enter_map: '入图时',
+  };
+  return labels[trigger] ?? trigger;
+}
+
+function describeEquipmentEffect(effect: EquipmentEffectDef): string {
+  const conditionText = describeEquipmentConditions(effect);
+  switch (effect.type) {
+    case 'stat_aura':
+      return `常驻特效:${[...describeAttrBonus(effect.attrs), ...describeStatBonus(effect.stats)].join(' / ') || '无数值变化'}${conditionText}`;
+    case 'progress_boost':
+      return `推进特效:${[...describeAttrBonus(effect.attrs), ...describeStatBonus(effect.stats)].join(' / ') || '无数值变化'}${conditionText}`;
+    case 'periodic_cost': {
+      const amount = effect.mode === 'flat'
+        ? formatNumber(effect.value)
+        : `${formatNumber(effect.value / 100)}% ${effect.mode === 'max_ratio_bp' ? '最大' : '当前'}${effect.resource === 'hp' ? '生命' : '灵力'}`;
+      const triggerLabel = effect.trigger === 'on_cultivation_tick' ? '修炼时每息' : '每息';
+      return `持续代价:${triggerLabel}损失 ${amount}${conditionText}`;
+    }
+    case 'timed_buff': {
+      const metaParts = [
+        getEquipmentTriggerLabel(effect.trigger),
+        effect.target === 'target' ? '目标' : '自身',
+        `${effect.buff.duration}息`,
+      ];
+      if (effect.cooldown !== undefined) {
+        metaParts.push(`冷却${formatNumber(effect.cooldown)}息`);
+      }
+      if (effect.chance !== undefined) {
+        metaParts.push(`概率${formatNumber(effect.chance * 100)}%`);
+      }
+      const effectParts = [...describeAttrBonus(effect.buff.attrs), ...describeStatBonus(effect.buff.stats)];
+      const descPart = effect.buff.desc ? `；${effect.buff.desc}` : '';
+      return `触发特效:${metaParts.join(' · ')}，获得${effect.buff.name}${conditionText}${effectParts.length > 0 ? `，效果:${effectParts.join(' / ')}` : ''}${descPart}`;
+    }
+  }
 }
 
 function getFormulaVarLabel(variable: SkillFormulaVar): string {
@@ -533,17 +799,36 @@ export function calculateAttrBonusValue(bonus: Pick<AttrBonus, 'attrs' | 'stats'
 }
 
 /** 计算装备的价值 */
-export function calculateEquipmentValue(item: Pick<ItemStack, 'equipAttrs' | 'equipStats' | 'desc'>): ValueSummary {
-  const summary = calculateAttrBonusValue({
+export function calculateEquipmentValue(
+  item: Pick<ItemStack, 'equipAttrs' | 'equipStats' | 'effects' | 'grade' | 'level'>,
+): EquipmentValueSummary {
+  const baseSummary = calculateAttrBonusValue({
     attrs: item.equipAttrs ?? {},
     stats: item.equipStats,
   });
-  const unquantified = [...summary.unquantified];
-  const hasNumeric = summary.breakdown.length > 0;
-  if (!hasNumeric && item.desc) {
-    unquantified.push(item.desc);
-  }
-  return finalizeSummary(summary.breakdown, unquantified);
+
+  const gradeMultiplier = getEquipmentGradeMultiplier(item.grade);
+  const scaledAttrs = scaleAttributes(item.equipAttrs, gradeMultiplier);
+  const scaledStats = scaleNumericStats(item.equipStats, gradeMultiplier, item.level);
+  const attrPoints = sumAttributePoints(scaledAttrs);
+  const attrValueMultiplier = 1 + attrPoints * 0.03;
+
+  const actualAttrSummary = calculateAttributesValue(scaledAttrs);
+  const actualStatSummary = calculateNumericStatsValue(scaledStats);
+  const actualBreakdown = [...actualAttrSummary.breakdown, ...actualStatSummary.breakdown]
+    .map((entry) => ({
+      ...entry,
+      quantifiedValue: entry.quantifiedValue * attrValueMultiplier,
+      note: `${entry.note ?? '装备价值'}；六维乘区 x${formatNumber(attrValueMultiplier)}`,
+    }));
+  const effectDescriptions = (item.effects ?? []).map((effect) => describeEquipmentEffect(effect));
+  const summary = finalizeSummary(actualBreakdown, effectDescriptions);
+  return {
+    ...summary,
+    quantifiedValue: summary.quantifiedValue,
+    baseQuantifiedValue: roundValue(baseSummary.quantifiedValue),
+    actualQuantifiedValue: roundValue(summary.quantifiedValue),
+  };
 }
 
 /** 计算 Buff 效果的价值（按持续时间折算） */
