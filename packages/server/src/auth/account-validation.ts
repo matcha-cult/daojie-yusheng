@@ -1,11 +1,9 @@
 /**
  * 账号与密码校验工具 —— 用户名 / 密码 / 显示名称 / 角色名的格式校验与归一化
  */
+import { ACCOUNT_MIN_LENGTH, PASSWORD_MIN_LENGTH } from '@mud/shared';
 
-/** 账号最小长度 */
-export const ACCOUNT_MIN_LENGTH = 1;
-/** 密码最小长度 */
-export const PASSWORD_MIN_LENGTH = 6;
+export { ACCOUNT_MIN_LENGTH, PASSWORD_MIN_LENGTH };
 
 function containsWhitespace(value: string): boolean {
   return /\s/.test(value);

@@ -10,6 +10,7 @@ import {
   getMovePointsPerTick,
   manhattanDistance,
   MAX_STORED_MOVE_POINTS,
+  PATHFINDING_MIN_STEP_COST,
   PlayerState,
 } from '@mud/shared';
 import { AttrService } from './attr.service';
@@ -54,8 +55,6 @@ interface PathMoveAttemptResult {
   blocked: boolean;
   points: number;
 }
-
-const MIN_STEP_COST = 1;
 
 class MinHeap {
   private items: HeapNode[] = [];
@@ -434,7 +433,7 @@ export class NavigationService {
   }
 
   private heuristic(x: number, y: number, targetX: number, targetY: number): number {
-    return manhattanDistance({ x, y }, { x: targetX, y: targetY }) * MIN_STEP_COST;
+    return manhattanDistance({ x, y }, { x: targetX, y: targetY }) * PATHFINDING_MIN_STEP_COST;
   }
 
   private occupancyPenalty(

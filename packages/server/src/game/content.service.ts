@@ -5,12 +5,13 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  compileValueStatsToActualStats,
   createItemStackSignature,
+  ATTR_KEYS,
   AttrKey,
   Attributes,
   DEFAULT_INVENTORY_CAPACITY,
   ELEMENT_KEYS,
-  GAME_TIME_PHASES,
   EquipmentConditionDef,
   EquipmentConditionGroup,
   EquipmentEffectDef,
@@ -23,13 +24,19 @@ import {
   PlayerRealmStage,
   scaleTechniqueExp,
   SkillDef,
-  TECHNIQUE_ATTR_KEYS,
+  SkillEffectDef,
+  SkillFormula,
   TechniqueGrade,
   TechniqueLayerDef,
   TechniqueRealm,
   TimePhaseId,
   resolveSkillUnlockLevel,
 } from '@mud/shared';
+import {
+  EQUIPMENT_TRIGGERS,
+  PLAYER_REALM_STAGE_LEVEL_RANGES,
+  TIME_PHASE_IDS,
+} from '../constants/gameplay/content';
 
 interface TechniqueTemplate {
   id: string;
@@ -62,6 +69,7 @@ export interface EditorItemCatalogEntry {
   desc?: string;
   equipAttrs?: ItemStack['equipAttrs'];
   equipStats?: ItemStack['equipStats'];
+  equipValueStats?: ItemStack['equipValueStats'];
   tags?: string[];
   effects?: EquipmentEffectDef[];
 }
@@ -71,9 +79,16 @@ interface StarterInventoryEntry {
   count?: number;
 }
 
-interface RawSkillDef extends Omit<SkillDef, 'unlockRealm' | 'unlockPlayerRealm'> {
+interface RawSkillDef extends Omit<SkillDef, 'unlockRealm' | 'unlockPlayerRealm' | 'effects'> {
+  effects: unknown;
   unlockRealm?: keyof typeof TechniqueRealm | TechniqueRealm;
   unlockPlayerRealm?: keyof typeof PlayerRealmStage | PlayerRealmStage;
+}
+
+interface RawItemTemplate extends Omit<ItemTemplate, 'equipStats' | 'equipValueStats' | 'effects'> {
+  equipStats?: unknown;
+  equipValueStats?: unknown;
+  effects?: unknown;
 }
 
 interface RawTechniqueLayerDef extends Omit<TechniqueLayerDef, 'expToNext'> {
@@ -189,32 +204,6 @@ interface BreakthroughConfigFile {
   }>;
 }
 
-const PLAYER_REALM_STAGE_LEVEL_RANGES: Record<PlayerRealmStage, { levelFrom: number; levelTo: number }> = {
-  [PlayerRealmStage.Mortal]: { levelFrom: 1, levelTo: 5 },
-  [PlayerRealmStage.BodyTempering]: { levelFrom: 6, levelTo: 8 },
-  [PlayerRealmStage.BoneForging]: { levelFrom: 9, levelTo: 12 },
-  [PlayerRealmStage.Meridian]: { levelFrom: 13, levelTo: 15 },
-  [PlayerRealmStage.Innate]: { levelFrom: 16, levelTo: 18 },
-  [PlayerRealmStage.QiRefining]: { levelFrom: 19, levelTo: 24 },
-  [PlayerRealmStage.Foundation]: { levelFrom: 25, levelTo: 30 },
-};
-
-const ATTR_KEYS: readonly AttrKey[] = TECHNIQUE_ATTR_KEYS;
-const EQUIPMENT_TRIGGERS: readonly EquipmentTrigger[] = [
-  'on_equip',
-  'on_unequip',
-  'on_tick',
-  'on_move',
-  'on_attack',
-  'on_hit',
-  'on_kill',
-  'on_skill_cast',
-  'on_cultivation_tick',
-  'on_time_segment_changed',
-  'on_enter_map',
-];
-const TIME_PHASE_IDS: readonly TimePhaseId[] = GAME_TIME_PHASES.map((phase) => phase.id);
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -277,6 +266,7 @@ export class ContentService implements OnModuleInit {
           .sort((left, right) => left.level - right.level),
         skills: raw.skills.map((skill) => ({
           ...skill,
+          effects: this.normalizeSkillEffects(skill.effects),
           unlockLevel: resolveSkillUnlockLevel({
             unlockLevel: skill.unlockLevel,
             unlockRealm: skill.unlockRealm === undefined ? undefined : this.parseTechniqueRealm(skill.unlockRealm),
@@ -345,6 +335,14 @@ export class ContentService implements OnModuleInit {
       }
     }
     return Object.keys(normalized).length > 0 ? normalized : undefined;
+  }
+
+  private resolveConfiguredStats(actualStats: unknown, valueStats: unknown): ItemStack['equipStats'] {
+    const configuredValueStats = this.normalizeItemStats(valueStats);
+    if (configuredValueStats) {
+      return compileValueStatsToActualStats(configuredValueStats);
+    }
+    return this.normalizeItemStats(actualStats);
   }
 
   private normalizeEquipmentConditionGroup(input: unknown): EquipmentConditionGroup | undefined {
@@ -435,7 +433,7 @@ export class ContentService implements OnModuleInit {
           type: 'stat_aura',
           conditions,
           attrs: this.normalizeItemAttrs(input.attrs),
-          stats: this.normalizeItemStats(input.stats),
+          stats: this.resolveConfiguredStats(input.stats, input.valueStats),
         }];
       case 'progress_boost':
         return [{
@@ -443,7 +441,7 @@ export class ContentService implements OnModuleInit {
           type: 'progress_boost',
           conditions,
           attrs: this.normalizeItemAttrs(input.attrs),
-          stats: this.normalizeItemStats(input.stats),
+          stats: this.resolveConfiguredStats(input.stats, input.valueStats),
         }];
       case 'periodic_cost': {
         const trigger = input.trigger === 'on_cultivation_tick' ? 'on_cultivation_tick' : input.trigger === 'on_tick' ? 'on_tick' : null;
@@ -498,7 +496,7 @@ export class ContentService implements OnModuleInit {
             duration: Math.max(1, Math.floor(Number(buff.duration))),
             maxStacks: Number.isFinite(buff.maxStacks) ? Math.max(1, Math.floor(Number(buff.maxStacks))) : undefined,
             attrs: this.normalizeItemAttrs(buff.attrs),
-            stats: this.normalizeItemStats(buff.stats),
+            stats: this.resolveConfiguredStats(buff.stats, buff.valueStats),
           },
         }];
       }
@@ -508,13 +506,14 @@ export class ContentService implements OnModuleInit {
   }
 
   private loadItems(): void {
-    for (const raw of this.readJsonEntries<ItemTemplate>(this.itemsDir)) {
+    for (const raw of this.readJsonEntries<RawItemTemplate>(this.itemsDir)) {
       const item: ItemTemplate = {
         ...raw,
         grade: raw.grade,
         level: Number.isFinite(raw.level) ? Math.max(1, Math.floor(Number(raw.level))) : undefined,
         equipAttrs: this.normalizeItemAttrs(raw.equipAttrs),
-        equipStats: this.normalizeItemStats(raw.equipStats),
+        equipStats: this.resolveConfiguredStats(raw.equipStats, raw.equipValueStats),
+        equipValueStats: this.normalizeItemStats(raw.equipValueStats),
         effects: this.normalizeEquipmentEffects(raw.effects, raw.itemId),
         tags: normalizeStringArray(raw.tags),
         tileAuraGainAmount: Number.isFinite(raw.tileAuraGainAmount)
@@ -523,6 +522,61 @@ export class ContentService implements OnModuleInit {
         allowBatchUse: raw.allowBatchUse === true,
       };
       this.items.set(item.itemId, item);
+    }
+  }
+
+  private normalizeSkillEffects(input: unknown): SkillEffectDef[] {
+    if (!Array.isArray(input)) {
+      return [];
+    }
+    return input.flatMap((entry) => this.normalizeSkillEffect(entry));
+  }
+
+  private normalizeSkillEffect(input: unknown): SkillEffectDef[] {
+    if (!isPlainObject(input) || typeof input.type !== 'string') {
+      return [];
+    }
+
+    switch (input.type) {
+      case 'damage':
+        if (input.formula === undefined) {
+          return [];
+        }
+        return [{
+          type: 'damage',
+          damageKind: input.damageKind === 'physical' || input.damageKind === 'spell' ? input.damageKind : undefined,
+          element: ELEMENT_KEYS.includes(input.element as typeof ELEMENT_KEYS[number]) ? input.element as typeof ELEMENT_KEYS[number] : undefined,
+          formula: input.formula as SkillFormula,
+        }];
+      case 'buff':
+        if (
+          (input.target !== 'self' && input.target !== 'target')
+          || typeof input.buffId !== 'string'
+          || input.buffId.trim().length === 0
+          || typeof input.name !== 'string'
+          || !Number.isFinite(input.duration)
+        ) {
+          return [];
+        }
+        return [{
+          type: 'buff',
+          target: input.target,
+          buffId: input.buffId.trim(),
+          name: input.name,
+          desc: typeof input.desc === 'string' ? input.desc : undefined,
+          shortMark: typeof input.shortMark === 'string' ? input.shortMark : undefined,
+          category: input.category === 'debuff' ? 'debuff' : input.category === 'buff' ? 'buff' : undefined,
+          visibility: input.visibility === 'hidden' || input.visibility === 'observe_only' || input.visibility === 'public'
+            ? input.visibility
+            : undefined,
+          color: typeof input.color === 'string' ? input.color : undefined,
+          duration: Math.max(1, Math.floor(Number(input.duration))),
+          maxStacks: Number.isFinite(input.maxStacks) ? Math.max(1, Math.floor(Number(input.maxStacks))) : undefined,
+          attrs: this.normalizeItemAttrs(input.attrs),
+          stats: this.resolveConfiguredStats(input.stats, input.valueStats),
+        }];
+      default:
+        return [];
     }
   }
 
@@ -775,6 +829,9 @@ export class ContentService implements OnModuleInit {
         desc: item.desc,
         equipAttrs: item.equipAttrs ? JSON.parse(JSON.stringify(item.equipAttrs)) as NonNullable<ItemStack['equipAttrs']> : undefined,
         equipStats: item.equipStats ? JSON.parse(JSON.stringify(item.equipStats)) as NonNullable<ItemStack['equipStats']> : undefined,
+        equipValueStats: item.equipValueStats
+          ? JSON.parse(JSON.stringify(item.equipValueStats)) as NonNullable<ItemStack['equipValueStats']>
+          : undefined,
         tags: item.tags ? [...item.tags] : undefined,
         effects: item.effects ? JSON.parse(JSON.stringify(item.effects)) as EquipmentEffectDef[] : undefined,
       }))

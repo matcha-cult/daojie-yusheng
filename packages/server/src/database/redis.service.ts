@@ -5,9 +5,7 @@ import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { PlayerState } from '@mud/shared';
 import type { PersistedPlayerCollections } from '../game/player-storage';
-
-/** 生成玩家 Redis 键名 */
-const PLAYER_KEY = (id: string) => `player:${id}`;
+import { PLAYER_KEY } from '../constants/storage/redis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {

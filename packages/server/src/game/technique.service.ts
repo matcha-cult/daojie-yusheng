@@ -34,6 +34,20 @@ import { BreakthroughConfigEntry, BreakthroughRequirementDef, ContentService } f
 import { InventoryService } from './inventory.service';
 import { MapService } from './map.service';
 import { PerformanceService } from './performance.service';
+import {
+  CULTIVATION_ACTION_ID,
+  CULTIVATION_BUFF_DURATION,
+  CULTIVATION_BUFF_ID,
+  CULTIVATION_REALM_EXP_PER_TICK,
+  CULTIVATION_TECHNIQUE_EXP_PER_TICK,
+  EMPTY_CULTIVATION_RESULT,
+  MONSTER_KILL_TECHNIQUE_EXP_MULTIPLIER,
+  PATH_SEVERED_BREAKTHROUGH_LABEL,
+  PATH_SEVERED_BREAKTHROUGH_REASON,
+  REALM_STATE_SOURCE,
+  REALM_STAGE_SOURCE,
+  TECHNIQUE_SOURCE_PREFIX,
+} from '../constants/gameplay/technique';
 
 type TechniqueDirtyFlag = 'inv' | 'tech' | 'attr' | 'actions';
 type TechniqueMessageKind = 'system' | 'quest' | 'combat' | 'loot';
@@ -70,19 +84,6 @@ interface MonsterKillExpInput {
   participantCount?: number;
   isKiller?: boolean;
 }
-
-const EMPTY_CULTIVATION: CultivationResult = { changed: false, dirty: [], messages: [] };
-const REALM_STAGE_SOURCE = 'realm:stage';
-const REALM_STATE_SOURCE = 'realm:state';
-const TECHNIQUE_SOURCE_PREFIX = 'technique:';
-const CULTIVATION_BUFF_ID = 'cultivation:active';
-const CULTIVATION_ACTION_ID = 'cultivation:toggle';
-const CULTIVATION_BUFF_DURATION = 1;
-const CULTIVATION_REALM_EXP_PER_TICK = 2;
-const CULTIVATION_TECHNIQUE_EXP_PER_TICK = CULTIVATE_EXP_PER_TICK;
-const MONSTER_KILL_TECHNIQUE_EXP_MULTIPLIER = 5;
-const PATH_SEVERED_BREAKTHROUGH_LABEL = '仙路断绝';
-const PATH_SEVERED_BREAKTHROUGH_REASON = '仙路断绝，你的前路已被无形天堑阻断，暂时无法继续突破。';
 
 @Injectable()
 export class TechniqueService {
@@ -187,7 +188,7 @@ export class TechniqueService {
     const cultivationBuff = this.measureCpuSection('cultivation_resolve', '修炼: 主修解析', () => (
       this.getCultivationBuff(player)
     ));
-    if (!cultivationBuff) return EMPTY_CULTIVATION;
+    if (!cultivationBuff) return EMPTY_CULTIVATION_RESULT;
     this.refreshCultivationBuff(cultivationBuff, technique.name);
 
     const numericStats = this.measureCpuSection('cultivation_stats', '修炼: 数值采集', () => (
@@ -291,7 +292,7 @@ export class TechniqueService {
   stopCultivation(player: PlayerState, reason = '你收束气机，停止了修炼。', kind: TechniqueMessageKind = 'quest'): CultivationResult {
     const removed = this.removeCultivationBuff(player);
     if (!removed) {
-      return EMPTY_CULTIVATION;
+      return EMPTY_CULTIVATION_RESULT;
     }
     return {
       changed: true,
@@ -310,7 +311,7 @@ export class TechniqueService {
       case 'hit':
         return this.stopCultivation(player, '你受到攻击，修炼气机被强行打断。', 'combat');
       default:
-        return EMPTY_CULTIVATION;
+        return EMPTY_CULTIVATION_RESULT;
     }
   }
 
@@ -632,7 +633,7 @@ export class TechniqueService {
   private clearInvalidCultivation(player: PlayerState): CultivationResult {
     const hadBuff = this.removeCultivationBuff(player);
     if (!player.cultivatingTechId && !hadBuff) {
-      return EMPTY_CULTIVATION;
+      return EMPTY_CULTIVATION_RESULT;
     }
     player.cultivatingTechId = undefined;
     return {

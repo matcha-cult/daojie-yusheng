@@ -10,14 +10,16 @@ import {
   EquipmentSlots,
   EquipSlot,
   Inventory,
+  ITEM_TYPES,
   ItemStack,
   ItemType,
+  QUEST_OBJECTIVE_TYPE_KEYS,
+  QUEST_STATUS_KEYS,
   QuestObjectiveType,
   QuestState,
   QuestStatus,
   SkillDef,
   SkillEffectDef,
-  TECHNIQUE_GRADE_ORDER,
   TechniqueAttrCurves,
   TechniqueGrade,
   TechniqueLayerDef,
@@ -28,6 +30,11 @@ import {
   WORLD_DARKNESS_BUFF_ID,
   WORLD_TIME_SOURCE_ID,
 } from '@mud/shared';
+import {
+  CULTIVATION_ACTION_ID,
+  CULTIVATION_BUFF_ID,
+  TECHNIQUE_GRADES,
+} from '../constants/gameplay/player-storage';
 import { ContentService } from './content.service';
 import { MapService } from './map.service';
 import { resolveQuestTargetName } from './quest-display';
@@ -93,19 +100,12 @@ interface PlayerStorageState {
   quests: QuestState[];
 }
 
-const ITEM_TYPES: readonly ItemType[] = ['consumable', 'equipment', 'material', 'quest_item', 'skill_book'];
-const TECHNIQUE_GRADES: readonly TechniqueGrade[] = TECHNIQUE_GRADE_ORDER;
-const QUEST_STATUSES: readonly QuestStatus[] = ['available', 'active', 'ready', 'completed'];
-const QUEST_OBJECTIVE_TYPES: readonly QuestObjectiveType[] = ['kill', 'learn_technique', 'realm_progress', 'realm_stage'];
-const CULTIVATION_BUFF_ID = 'cultivation:active';
-const CULTIVATION_ACTION_ID = 'cultivation:toggle';
-
 function isQuestStatus(value: unknown): value is QuestStatus {
-  return typeof value === 'string' && QUEST_STATUSES.includes(value as QuestStatus);
+  return typeof value === 'string' && QUEST_STATUS_KEYS.includes(value as QuestStatus);
 }
 
 function isQuestObjectiveType(value: unknown): value is QuestObjectiveType {
-  return typeof value === 'string' && QUEST_OBJECTIVE_TYPES.includes(value as QuestObjectiveType);
+  return typeof value === 'string' && QUEST_OBJECTIVE_TYPE_KEYS.includes(value as QuestObjectiveType);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

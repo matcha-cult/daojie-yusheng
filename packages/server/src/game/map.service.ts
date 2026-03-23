@@ -58,6 +58,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolveServerDataPath } from '../common/data-path';
 import { resolveRealmStageTargetLabel } from './quest-display';
+import {
+  DEFAULT_TERRAIN_DURABILITY_BY_TILE,
+  MAP_TERRAIN_DURABILITY_OVERRIDES,
+  TerrainDurabilityProfile,
+} from '../constants/world/terrain';
 
 export interface QuestConfig {
   id: string;
@@ -232,68 +237,6 @@ interface OccupancyCheckOptions {
   occupancyId?: string | null;
   actorType?: OccupantKind;
 }
-
-type TerrainDurabilityProfile = {
-  grade: TechniqueGrade;
-  material: TerrainDurabilityMaterial;
-};
-
-const DEFAULT_TERRAIN_DURABILITY_BY_TILE: Partial<Record<TileType, TerrainDurabilityProfile>> = {
-  [TileType.Wall]: { grade: 'mortal', material: 'stone' },
-  [TileType.Tree]: { grade: 'mortal', material: 'wood' },
-  [TileType.Stone]: { grade: 'mortal', material: 'stone' },
-  [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
-  [TileType.Window]: { grade: 'mortal', material: 'wood' },
-};
-
-// 现有地图按区域主题与进度分配材质与品阶，统一走“品阶基础血量 × 材质倍率”。
-const MAP_TERRAIN_DURABILITY_OVERRIDES: Partial<Record<string, Partial<Record<TileType, TerrainDurabilityProfile>>>> = {
-  spawn: {
-    [TileType.Wall]: { grade: 'mortal', material: 'stone' },
-    [TileType.Tree]: { grade: 'mortal', material: 'wood' },
-    [TileType.Stone]: { grade: 'mortal', material: 'stone' },
-    [TileType.Door]: { grade: 'mortal', material: 'ironwood' },
-    [TileType.Window]: { grade: 'mortal', material: 'wood' },
-  },
-  wildlands: {
-    [TileType.Wall]: { grade: 'yellow', material: 'stone' },
-    [TileType.Tree]: { grade: 'mortal', material: 'wood' },
-    [TileType.Stone]: { grade: 'yellow', material: 'stone' },
-  },
-  bamboo_forest: {
-    [TileType.Wall]: { grade: 'yellow', material: 'stone' },
-    [TileType.Tree]: { grade: 'yellow', material: 'bamboo' },
-    [TileType.Stone]: { grade: 'yellow', material: 'stone' },
-    [TileType.Door]: { grade: 'mortal', material: 'wood' },
-  },
-  black_iron_mine: {
-    [TileType.Wall]: { grade: 'mystic', material: 'blackIron' },
-    [TileType.Stone]: { grade: 'mystic', material: 'blackIron' },
-    [TileType.Door]: { grade: 'yellow', material: 'ironwood' },
-  },
-  ancient_ruins: {
-    [TileType.Wall]: { grade: 'mystic', material: 'runeStone' },
-    [TileType.Tree]: { grade: 'yellow', material: 'spiritWood' },
-    [TileType.Stone]: { grade: 'mystic', material: 'runeStone' },
-    [TileType.Door]: { grade: 'yellow', material: 'ironwood' },
-  },
-  spirit_ridge: {
-    [TileType.Wall]: { grade: 'earth', material: 'stone' },
-    [TileType.Tree]: { grade: 'mystic', material: 'spiritWood' },
-    [TileType.Stone]: { grade: 'earth', material: 'stone' },
-  },
-  beast_valley: {
-    [TileType.Wall]: { grade: 'earth', material: 'stone' },
-    [TileType.Tree]: { grade: 'yellow', material: 'wood' },
-    [TileType.Stone]: { grade: 'earth', material: 'stone' },
-  },
-  sky_ruins: {
-    [TileType.Wall]: { grade: 'earth', material: 'skyMetal' },
-    [TileType.Tree]: { grade: 'mystic', material: 'spiritWood' },
-    [TileType.Stone]: { grade: 'earth', material: 'skyMetal' },
-    [TileType.Door]: { grade: 'mystic', material: 'metal' },
-  },
-};
 
 export interface NpcLocation {
   mapId: string;

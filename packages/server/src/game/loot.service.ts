@@ -17,6 +17,7 @@ import {
 import { ContentService } from './content.service';
 import { InventoryService } from './inventory.service';
 import { ContainerConfig, DropConfig, MapService } from './map.service';
+import { CONTAINER_SEARCH_TICKS } from '../constants/gameplay/loot';
 
 type LootMessageKind = 'system' | 'loot';
 
@@ -78,17 +79,6 @@ interface LootActionResult {
   dirtyPlayers: string[];
   inventoryChanged?: boolean;
 }
-
-const CONTAINER_SEARCH_TICKS: Record<TechniqueGrade, number> = {
-  mortal: 1,
-  yellow: 1,
-  mystic: 2,
-  earth: 2,
-  heaven: 3,
-  spirit: 3,
-  saint: 4,
-  emperor: 4,
-};
 
 @Injectable()
 export class LootService {

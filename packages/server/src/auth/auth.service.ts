@@ -18,11 +18,7 @@ import {
   validatePassword,
   validateUsername,
 } from './account-validation';
-
-/** GM 令牌有效期（秒） */
-const GM_TOKEN_EXPIRES_IN = 60 * 60 * 12;
-/** GM 密码配置文件路径 */
-const GM_CONFIG_PATH = resolveServerDataPath('gm-config.json');
+import { GM_CONFIG_PATH, GM_TOKEN_EXPIRES_IN } from '../constants/auth/gm';
 
 /** GM 密码配置文件结构 */
 interface GmConfigFile {

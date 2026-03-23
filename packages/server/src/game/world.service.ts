@@ -53,6 +53,13 @@ import { PlayerService } from './player.service';
 import { isLikelyInternalContentId, resolveQuestTargetName } from './quest-display';
 import { TechniqueService } from './technique.service';
 import { TimeService } from './time.service';
+import {
+  DEFAULT_MONSTER_RATIO_DIVISORS,
+  EMPTY_UPDATE,
+  NPC_ROLE_PROFILES,
+  OBSERVATION_BLIND_RATIO,
+  OBSERVATION_FULL_RATIO,
+} from '../constants/world/overview';
 
 type MessageKind = 'system' | 'quest' | 'combat' | 'loot';
 type WorldDirtyFlag = 'inv' | 'quest' | 'actions' | 'tech' | 'attr' | 'loot';
@@ -123,33 +130,6 @@ export interface WorldUpdate {
   consumedAction?: boolean;
 }
 
-const EMPTY_UPDATE: WorldUpdate = { messages: [], dirty: [] };
-const DEFAULT_MONSTER_RATIO_DIVISORS: NumericRatioDivisors = {
-  dodge: DEFAULT_RATIO_DIVISOR,
-  crit: DEFAULT_RATIO_DIVISOR,
-  breakPower: DEFAULT_RATIO_DIVISOR,
-  resolvePower: DEFAULT_RATIO_DIVISOR,
-  cooldownSpeed: DEFAULT_RATIO_DIVISOR,
-  moveSpeed: DEFAULT_RATIO_DIVISOR,
-  elementDamageReduce: {
-    metal: DEFAULT_RATIO_DIVISOR,
-    wood: DEFAULT_RATIO_DIVISOR,
-    water: DEFAULT_RATIO_DIVISOR,
-    fire: DEFAULT_RATIO_DIVISOR,
-    earth: DEFAULT_RATIO_DIVISOR,
-  },
-};
-const OBSERVATION_FULL_RATIO = 1.2;
-const OBSERVATION_BLIND_RATIO = 0.2;
-const NPC_ROLE_PROFILES: Record<string, { title: string; spirit: number; hp: number; qi: number }> = {
-  quest_giver: { title: '引路前辈', spirit: 30, hp: 96, qi: 132 },
-  support: { title: '养脉修者', spirit: 26, hp: 82, qi: 120 },
-  craft: { title: '炉火匠人', spirit: 18, hp: 108, qi: 74 },
-  lore: { title: '守卷旧识', spirit: 28, hp: 72, qi: 118 },
-  quest_hint: { title: '路引修者', spirit: 14, hp: 64, qi: 52 },
-  warning: { title: '示警修士', spirit: 16, hp: 70, qi: 58 },
-  scene: { title: '器物残痕', spirit: 2, hp: 44, qi: 0 },
-};
 
 interface CombatSnapshot {
   stats: NumericStats;

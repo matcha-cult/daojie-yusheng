@@ -39,7 +39,7 @@ import {
   PERSIST_INTERVAL,
 } from '@mud/shared';
 import * as fs from 'fs';
-import * as path from 'path';
+import { GAME_CONFIG_PATH } from '../constants/storage/config';
 import { ActionService } from './action.service';
 import { AoiService } from './aoi.service';
 import { AttrService } from './attr.service';
@@ -57,8 +57,6 @@ import { DirtyFlag, ImmediateCommandType, PlayerService } from './player.service
 import { TechniqueService } from './technique.service';
 import { TimeService } from './time.service';
 import { WorldMessage, WorldService, WorldUpdate } from './world.service';
-
-const CONFIG_PATH = path.resolve(__dirname, '../../data/config.json');
 
 /** 上一次发送给各玩家的 tick 快照，用于增量比对 */
 interface LastSentTickState {
@@ -174,7 +172,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
   private loadConfig() {
     try {
-      const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+      const raw = fs.readFileSync(GAME_CONFIG_PATH, 'utf-8');
       const cfg = JSON.parse(raw);
       if (typeof cfg.minTickInterval === 'number' && cfg.minTickInterval > 0) {
         this.minTickInterval = cfg.minTickInterval;
@@ -201,7 +199,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
   private watchConfig() {
     try {
-      this.watcher = fs.watch(CONFIG_PATH, () => {
+      this.watcher = fs.watch(GAME_CONFIG_PATH, () => {
         this.loadConfig();
       });
     } catch (error) {

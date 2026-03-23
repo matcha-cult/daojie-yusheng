@@ -3,12 +3,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-
-/** data 目录候选路径，按优先级排列 */
-const DATA_DIR_CANDIDATES = [
-  path.resolve(process.cwd(), 'data'),
-  path.resolve(process.cwd(), 'packages', 'server', 'data'),
-];
+import { DATA_DIR_CANDIDATES } from '../constants/storage/path';
 
 /** 拼接服务端 data 目录下的子路径，自动选择存在的候选目录 */
 export function resolveServerDataPath(...segments: string[]): string {

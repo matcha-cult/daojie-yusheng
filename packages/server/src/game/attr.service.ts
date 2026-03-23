@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import {
   ATTR_TO_PERCENT_NUMERIC_WEIGHTS,
   ATTR_TO_NUMERIC_WEIGHTS,
+  ATTR_KEYS,
   Attributes,
   AttrBonus,
   AttrKey,
@@ -17,7 +18,6 @@ import {
   PLAYER_REALM_NUMERIC_TEMPLATES,
   PlayerRealmStage,
   PartialNumericStats,
-  TECHNIQUE_ATTR_KEYS,
   TemporaryBuffState,
   VIEW_RADIUS,
   addPartialNumericStats,
@@ -27,48 +27,9 @@ import {
   NumericStats,
   resetNumericStats,
 } from '@mud/shared';
+import { REALM_EXPONENTIAL_NUMERIC_KEYS, REALM_LINEAR_NUMERIC_KEYS } from '../constants/gameplay/attr';
 
-const ATTR_KEYS: readonly AttrKey[] = TECHNIQUE_ATTR_KEYS;
 type PercentBonusAccumulator = Pick<NumericStats, 'maxHp' | 'maxQi' | 'physAtk' | 'spellAtk'>;
-const REALM_EXPONENTIAL_NUMERIC_KEYS: Array<
-  'maxHp'
-  | 'physAtk'
-  | 'spellAtk'
-> = [
-  'maxHp',
-  'physAtk',
-  'spellAtk',
-];
-
-const REALM_LINEAR_NUMERIC_KEYS: Array<
-  'maxQi'
-  | 'physDef'
-  | 'spellDef'
-  | 'hit'
-  | 'dodge'
-  | 'crit'
-  | 'critDamage'
-  | 'breakPower'
-  | 'resolvePower'
-  | 'maxQiOutputPerTick'
-  | 'qiRegenRate'
-  | 'hpRegenRate'
-  | 'cooldownSpeed'
-> = [
-  'maxQi',
-  'physDef',
-  'spellDef',
-  'hit',
-  'dodge',
-  'crit',
-  'critDamage',
-  'breakPower',
-  'resolvePower',
-  'maxQiOutputPerTick',
-  'qiRegenRate',
-  'hpRegenRate',
-  'cooldownSpeed',
-];
 
 function createAttributeSnapshot(initial = 0): Attributes {
   return {
@@ -146,6 +107,13 @@ export class AttrService {
       if (attrs.comprehension !== undefined) result.comprehension += attrs.comprehension;
       if (attrs.luck !== undefined) result.luck += attrs.luck;
     }
+
+    result.constitution = Math.max(0, result.constitution);
+    result.spirit = Math.max(0, result.spirit);
+    result.perception = Math.max(0, result.perception);
+    result.talent = Math.max(0, result.talent);
+    result.comprehension = Math.max(0, result.comprehension);
+    result.luck = Math.max(0, result.luck);
 
     return result;
   }

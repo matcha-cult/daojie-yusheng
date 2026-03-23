@@ -19,6 +19,12 @@ import {
 } from '@mud/shared';
 import { AttrService } from './attr.service';
 import { TimeService } from './time.service';
+import { CULTIVATION_BUFF_ID } from '../constants/gameplay/technique';
+import {
+  EQUIP_DYNAMIC_SOURCE_PREFIX,
+  LAST_TIME_PHASE_KEY,
+  RUNTIME_STATE_KEY,
+} from '../constants/gameplay/equipment';
 
 type EquipmentDirtyFlag = 'attr';
 type EquipmentEventTarget =
@@ -53,10 +59,6 @@ type PlayerRuntimeCarrier = PlayerState & {
   [LAST_TIME_PHASE_KEY]?: TimePhaseId;
 };
 
-const EQUIP_DYNAMIC_SOURCE_PREFIX = 'equip-effect:';
-const CULTIVATION_BUFF_ID = 'cultivation:active';
-const RUNTIME_STATE_KEY = Symbol('equipment-runtime-states');
-const LAST_TIME_PHASE_KEY = Symbol('equipment-last-time-phase');
 
 function normalizeBuffShortMark(raw: string | undefined, fallbackName: string): string {
   const trimmed = raw?.trim();

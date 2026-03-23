@@ -41,6 +41,7 @@ import {
   S2C_Pong,
   S2C_TileRuntimeDetail,
   DEFAULT_BASE_ATTRS,
+  DEFAULT_PLAYER_MAP_ID,
   BASE_MAX_HP,
   HP_PER_CONSTITUTION,
   Direction,
@@ -60,8 +61,6 @@ import { WorldService } from './world.service';
 import { PerformanceService } from './performance.service';
 import { TickService } from './tick.service';
 import { SuggestionService } from './suggestion.service';
-
-const DEFAULT_MAP = 'spawn';
 
 @WebSocketGateway({ cors: true })
 export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -148,13 +147,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     // 创建新角色
     const playerId = `p_${userId}_${Date.now()}`;
-    const spawn = this.mapService.getSpawnPoint(DEFAULT_MAP) ?? { x: 10, y: 10 };
+    const spawn = this.mapService.getSpawnPoint(DEFAULT_PLAYER_MAP_ID) ?? { x: 10, y: 10 };
     const initMaxHp = BASE_MAX_HP + DEFAULT_BASE_ATTRS.constitution * HP_PER_CONSTITUTION;
     const playerState: PlayerState = {
       id: playerId,
       name: username,
       displayName,
-      mapId: DEFAULT_MAP,
+      mapId: DEFAULT_PLAYER_MAP_ID,
       x: spawn.x,
       y: spawn.y,
       senseQiActive: false,
