@@ -2,7 +2,7 @@
  * 前后端通信协议：事件名定义与所有 Payload 类型。
  * C2S = 客户端→服务端，S2C = 服务端→客户端。
  */
-import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig, ItemType, QuestLine, QuestObjectiveType, GameTimeState, MapTimeConfig, MonsterAggroMode, TechniqueGrade, GroundItemPileView, LootWindowState, VisibleBuffState, ActionType, SkillDef, TechniqueAttrCurves, TechniqueLayerDef, TechniqueRealm, GroundItemEntryView, MapMinimapArchiveEntry, MapMinimapMarker, MapMinimapSnapshot, Suggestion } from './types';
+import { Direction, PlayerState, Tile, VisibleTile, RenderEntity, MapMeta, Attributes, Inventory, EquipmentSlots, TechniqueState, ActionDef, AttrBonus, EquipSlot, EntityKind, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestState, CombatEffect, AutoBattleSkillConfig, ItemType, QuestLine, QuestObjectiveType, GameTimeState, MapTimeConfig, MonsterAggroMode, TechniqueGrade, GroundItemPileView, LootWindowState, VisibleBuffState, ActionType, SkillDef, TechniqueAttrCurves, TechniqueLayerDef, TechniqueRealm, GroundItemEntryView, MapMinimapArchiveEntry, MapMinimapMarker, MapMinimapSnapshot, Suggestion, ItemStack, EquipmentEffectDef } from './types';
 import { NumericRatioDivisors, NumericStats } from './numeric';
 
 // ===== 事件名 =====
@@ -563,6 +563,42 @@ export interface GmStateRes {
 
 export interface GmPlayerDetailRes {
   player: GmManagedPlayerRecord;
+}
+
+export interface GmEditorTechniqueOption {
+  id: string;
+  name: string;
+  grade?: TechniqueGrade;
+  skills?: SkillDef[];
+  layers?: TechniqueLayerDef[];
+}
+
+export interface GmEditorItemOption {
+  itemId: string;
+  name: string;
+  type: ItemType;
+  grade?: TechniqueGrade;
+  level?: number;
+  equipSlot?: EquipSlot;
+  desc?: string;
+  equipAttrs?: ItemStack['equipAttrs'];
+  equipStats?: ItemStack['equipStats'];
+  tags?: string[];
+  effects?: EquipmentEffectDef[];
+}
+
+export interface GmEditorRealmOption {
+  realmLv: number;
+  displayName: string;
+  name: string;
+  phaseName?: string;
+  review?: string;
+}
+
+export interface GmEditorCatalogRes {
+  techniques: GmEditorTechniqueOption[];
+  items: GmEditorItemOption[];
+  realmLevels: GmEditorRealmOption[];
 }
 
 export interface GmUpdatePlayerReq {

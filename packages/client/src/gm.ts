@@ -7,6 +7,9 @@ import {
   Direction,
   type GmChangePasswordReq,
   type GmCpuSectionSnapshot,
+  type GmEditorCatalogRes,
+  type GmEditorItemOption,
+  type GmEditorTechniqueOption,
   TechniqueRealm,
   type AttrKey,
   type AutoBattleSkillConfig,
@@ -53,6 +56,13 @@ const EQUIP_SLOT_LABELS: Record<(typeof EQUIP_SLOTS)[number], string> = {
   accessory: '饰品',
 };
 const ITEM_TYPES = ['consumable', 'equipment', 'material', 'quest_item', 'skill_book'] as const;
+const ITEM_TYPE_LABELS: Record<(typeof ITEM_TYPES)[number], string> = {
+  consumable: '消耗品',
+  equipment: '装备',
+  material: '材料',
+  quest_item: '任务物',
+  skill_book: '功法书',
+};
 const QUEST_LINES = ['main', 'side', 'daily', 'encounter'] as const;
 const QUEST_STATUSES = ['available', 'active', 'ready', 'completed'] as const;
 const QUEST_OBJECTIVE_TYPES = ['kill', 'learn_technique', 'realm_progress', 'realm_stage'] as const;
@@ -86,13 +96,15 @@ const editorTitleEl = document.getElementById('editor-title') as HTMLDivElement;
 const editorSubtitleEl = document.getElementById('editor-subtitle') as HTMLDivElement;
 const editorMetaEl = document.getElementById('editor-meta') as HTMLDivElement;
 const editorContentEl = document.getElementById('editor-content') as HTMLDivElement;
+const editorVisualPanelEl = document.getElementById('editor-visual-panel') as HTMLDivElement;
+const editorPersistedPanelEl = document.getElementById('editor-persisted-panel') as HTMLDivElement;
+const editorTabAttributesBtn = document.getElementById('editor-tab-attributes') as HTMLButtonElement;
+const editorTabTechniquesBtn = document.getElementById('editor-tab-techniques') as HTMLButtonElement;
+const editorTabItemsBtn = document.getElementById('editor-tab-items') as HTMLButtonElement;
+const editorTabPersistedBtn = document.getElementById('editor-tab-persisted') as HTMLButtonElement;
 const playerJsonEl = document.getElementById('player-json') as HTMLTextAreaElement;
 const playerPersistedJsonEl = document.getElementById('player-persisted-json') as HTMLTextAreaElement;
 const applyRawJsonBtn = document.getElementById('apply-raw-json') as HTMLButtonElement;
-const jsonViewRuntimeBtn = document.getElementById('json-view-runtime') as HTMLButtonElement;
-const jsonViewPersistedBtn = document.getElementById('json-view-persisted') as HTMLButtonElement;
-const runtimeJsonPanelEl = document.getElementById('runtime-json-panel') as HTMLDivElement;
-const persistedJsonPanelEl = document.getElementById('persisted-json-panel') as HTMLDivElement;
 const savePlayerBtn = document.getElementById('save-player') as HTMLButtonElement;
 const resetPlayerBtn = document.getElementById('reset-player') as HTMLButtonElement;
 const removeBotBtn = document.getElementById('remove-bot') as HTMLButtonElement;
@@ -159,6 +171,7 @@ const suggestionListEl = document.getElementById('gm-suggestion-list') as HTMLEl
 let token = sessionStorage.getItem(TOKEN_KEY) ?? '';
 let state: GmStateRes | null = null;
 let suggestions: Suggestion[] = [];
+let editorCatalog: GmEditorCatalogRes | null = null;
 let selectedPlayerId: string | null = null;
 let selectedPlayerDetail: GmManagedPlayerRecord | null = null;
 let loadingPlayerDetailId: string | null = null;
@@ -170,7 +183,8 @@ let pollTimer: number | null = null;
 let currentTab: 'server' | 'players' | 'maps' | 'suggestions' | 'world' = 'server';
 let currentServerTab: 'overview' | 'traffic' | 'cpu' = 'overview';
 let currentCpuBreakdownSort: 'total' | 'count' | 'avg' = 'total';
-let currentJsonView: 'runtime' | 'persisted' = 'runtime';
+let currentEditorTab: 'attributes' | 'techniques' | 'items' | 'persisted' = 'attributes';
+let currentInventoryAddType: (typeof ITEM_TYPES)[number] = 'material';
 let lastPlayerListStructureKey: string | null = null;
 let lastEditorStructureKey: string | null = null;
 let lastSuggestionStructureKey: string | null = null;
@@ -360,7 +374,7 @@ function getInventoryCardTitle(item: ItemStack | undefined, index: number): stri
 
 function getInventoryCardMeta(item: ItemStack | undefined): string {
   if (!item) return '';
-  return `${item.itemId || '未填写 ID'} · ${item.type} · 数量 ${item.count}`;
+  return getInventoryRowMeta(item);
 }
 
 function getAutoSkillCardTitle(entry: AutoBattleSkillConfig | undefined, index: number): string {
@@ -387,6 +401,175 @@ function getQuestCardTitle(quest: QuestState | undefined, index: number): string
 function getQuestCardMeta(quest: QuestState | undefined): string {
   if (!quest) return '';
   return `${quest.id || '未填写任务 ID'} · ${quest.line} · ${quest.status}`;
+}
+
+function getTechniqueOptionLabel(option: GmEditorTechniqueOption): string {
+  return `${option.name}${option.grade ? ` · ${option.grade}` : ''}`;
+}
+
+function getItemOptionLabel(option: GmEditorItemOption): string {
+  const parts = [option.name];
+  if (option.type === 'equipment' && option.equipSlot) {
+    parts.push(EQUIP_SLOT_LABELS[option.equipSlot]);
+  } else {
+    parts.push(ITEM_TYPE_LABELS[option.type] ?? option.type);
+  }
+  return parts.join(' · ');
+}
+
+function getTechniqueCatalogOptions(includeEmpty = false): Array<{ value: string; label: string }> {
+  const options = editorCatalog?.techniques.map((option) => ({
+    value: option.id,
+    label: getTechniqueOptionLabel(option),
+  })) ?? [];
+  return includeEmpty ? [{ value: '', label: '未选择' }, ...options] : options;
+}
+
+function getLearnedTechniqueOptions(techniques: TechniqueState[], includeEmpty = false): Array<{ value: string; label: string }> {
+  const options = techniques.map((technique) => ({
+    value: technique.techId,
+    label: technique.name || technique.techId,
+  }));
+  return includeEmpty ? [{ value: '', label: '未选择' }, ...options] : options;
+}
+
+function getRealmCatalogOptions(): Array<{ value: number; label: string }> {
+  return editorCatalog?.realmLevels.map((entry) => ({
+    value: entry.realmLv,
+    label: `${entry.displayName} · Lv.${entry.realmLv}`,
+  })) ?? [];
+}
+
+function getItemCatalogOptions(filter?: (option: GmEditorItemOption) => boolean): Array<{ value: string; label: string }> {
+  const items = filter ? (editorCatalog?.items.filter(filter) ?? []) : (editorCatalog?.items ?? []);
+  return items.map((option) => ({
+    value: option.itemId,
+    label: getItemOptionLabel(option),
+  }));
+}
+
+function getInventoryAddTypeOptions(): Array<{ value: string; label: string }> {
+  return ITEM_TYPES.map((type) => ({
+    value: type,
+    label: ITEM_TYPE_LABELS[type],
+  }));
+}
+
+function getInventoryAddItemOptions(): Array<{ value: string; label: string }> {
+  return getItemCatalogOptions((option) => option.type === currentInventoryAddType);
+}
+
+function findTechniqueCatalogEntry(techId: string | undefined): GmEditorTechniqueOption | null {
+  if (!techId) return null;
+  return editorCatalog?.techniques.find((entry) => entry.id === techId) ?? null;
+}
+
+function findItemCatalogEntry(itemId: string | undefined): GmEditorItemOption | null {
+  if (!itemId) return null;
+  return editorCatalog?.items.find((entry) => entry.itemId === itemId) ?? null;
+}
+
+function createTechniqueFromCatalog(techId: string): TechniqueState {
+  const option = findTechniqueCatalogEntry(techId);
+  if (!option) {
+    return createDefaultTechnique();
+  }
+  const initialExpToNext = option.layers?.find((layer) => layer.level === 1)?.expToNext ?? 0;
+  return {
+    techId: option.id,
+    name: option.name,
+    level: 1,
+    exp: 0,
+    expToNext: initialExpToNext,
+    realm: TechniqueRealm.Entry,
+    skills: option.skills ? clone(option.skills) : [],
+    grade: option.grade ?? 'mortal',
+    layers: option.layers ? clone(option.layers) : [],
+    attrCurves: {},
+  };
+}
+
+function createItemFromCatalog(itemId: string, count = 1): ItemStack {
+  const option = findItemCatalogEntry(itemId);
+  if (!option) {
+    return { ...createDefaultItem(), itemId, count };
+  }
+  return {
+    itemId: option.itemId,
+    name: option.name,
+    type: option.type,
+    count,
+    desc: option.desc ?? '',
+    grade: option.grade,
+    level: option.level,
+    equipSlot: option.equipSlot,
+    equipAttrs: option.equipAttrs ? clone(option.equipAttrs) : undefined,
+    equipStats: option.equipStats ? clone(option.equipStats) : undefined,
+    tags: option.tags ? [...option.tags] : undefined,
+    effects: option.effects ? clone(option.effects) : undefined,
+  };
+}
+
+function getTechniqueSummary(technique: TechniqueState): string {
+  return `${technique.name || technique.techId} · ${technique.grade ?? 'mortal'} · 等级 ${technique.level}`;
+}
+
+function getInventoryRowMeta(item: ItemStack): string {
+  const parts = [ITEM_TYPE_LABELS[item.type] ?? item.type];
+  if (item.type === 'equipment' && item.equipSlot) {
+    parts.push(EQUIP_SLOT_LABELS[item.equipSlot] ?? item.equipSlot);
+  }
+  return parts.join(' · ');
+}
+
+function getTechniqueEditorControls(index: number, technique: TechniqueState): string {
+  return `
+    <div class="editor-grid compact">
+      ${selectField('功法', `techniques.${index}.techId`, technique.techId, getTechniqueCatalogOptions())}
+      ${selectField('功法境界', `techniques.${index}.realm`, technique.realm, TECHNIQUE_REALM_OPTIONS)}
+      ${numberField('等级', `techniques.${index}.level`, technique.level)}
+      ${numberField('经验', `techniques.${index}.exp`, technique.exp)}
+      ${numberField('升级所需经验', `techniques.${index}.expToNext`, technique.expToNext)}
+      <div class="editor-field wide">
+        <span>当前模板</span>
+        <div class="editor-code">${escapeHtml(getTechniqueSummary(technique))}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getItemEditorControls(basePath: string, item: ItemStack, mode: 'inventory' | 'equipment'): string {
+  const itemOptions = mode === 'equipment'
+    ? getItemCatalogOptions((option) => option.type === 'equipment' && option.equipSlot === item.equipSlot)
+    : getItemCatalogOptions();
+  return `
+    <div class="editor-grid compact">
+      ${selectField(mode === 'equipment' ? '装备模板' : '物品', `${basePath}.itemId`, item.itemId, itemOptions, 'wide')}
+      ${mode === 'inventory' ? numberField('数量', `${basePath}.count`, item.count) : ''}
+      ${numberField('等级', `${basePath}.level`, item.level)}
+      ${nullableTextField('品阶', `${basePath}.grade`, item.grade, 'undefined')}
+      ${jsonField('装备属性', `${basePath}.equipAttrs`, item.equipAttrs ?? {}, 'object')}
+      ${jsonField('装备数值', `${basePath}.equipStats`, item.equipStats ?? {}, 'object')}
+      ${jsonField('特效配置', `${basePath}.effects`, item.effects ?? [], 'array', 'wide')}
+    </div>
+  `;
+}
+
+function getCompactInventoryItemMarkup(item: ItemStack, index: number): string {
+  return `
+    <div class="editor-card inventory-compact-row">
+      <div class="editor-card-head">
+        <div>
+          <div class="editor-card-title" data-preview="inventory-title" data-index="${index}">${escapeHtml(getInventoryCardTitle(item, index))}</div>
+          <div class="editor-card-meta" data-preview="inventory-meta" data-index="${index}">${escapeHtml(getInventoryRowMeta(item))}</div>
+        </div>
+        <button class="small-btn danger" type="button" data-action="remove-inventory-item" data-index="${index}">删除</button>
+      </div>
+      <div class="editor-grid compact">
+        ${numberField('数量', `inventory.items.${index}.count`, item.count)}
+      </div>
+    </div>
+  `;
 }
 
 function getReadonlyPreviewValue(draft: PlayerState, path: string): string {
@@ -716,12 +899,17 @@ function patchSuggestionCard(card: HTMLElement, suggestion: Suggestion): void {
   completeBtn.style.display = completed ? 'none' : '';
 }
 
-function switchJsonView(view: 'runtime' | 'persisted'): void {
-  currentJsonView = view;
-  jsonViewRuntimeBtn.classList.toggle('primary', view === 'runtime');
-  jsonViewPersistedBtn.classList.toggle('primary', view === 'persisted');
-  runtimeJsonPanelEl.classList.toggle('hidden', view !== 'runtime');
-  persistedJsonPanelEl.classList.toggle('hidden', view !== 'persisted');
+function switchEditorTab(tab: 'attributes' | 'techniques' | 'items' | 'persisted'): void {
+  currentEditorTab = tab;
+  editorTabAttributesBtn.classList.toggle('active', tab === 'attributes');
+  editorTabTechniquesBtn.classList.toggle('active', tab === 'techniques');
+  editorTabItemsBtn.classList.toggle('active', tab === 'items');
+  editorTabPersistedBtn.classList.toggle('active', tab === 'persisted');
+  editorVisualPanelEl.classList.toggle('hidden', tab === 'persisted');
+  editorPersistedPanelEl.classList.toggle('hidden', tab !== 'persisted');
+  editorContentEl.querySelectorAll<HTMLElement>('[data-editor-tab]').forEach((section) => {
+    section.classList.toggle('hidden', section.dataset.editorTab !== tab);
+  });
 }
 
 function setStatus(message: string, isError = false): void {
@@ -793,6 +981,10 @@ async function loadSuggestions(): Promise<void> {
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '加载建议失败', true);
   }
+}
+
+async function loadEditorCatalog(): Promise<void> {
+  editorCatalog = await request<GmEditorCatalogRes>('/gm/editor-catalog');
 }
 
 function renderSuggestions(): void {
@@ -999,6 +1191,30 @@ function createDefaultPlayerSnapshot(source?: PlayerState): PlayerState {
   };
 }
 
+function readCatalogSelectValue(
+  kind: 'technique' | 'inventory-item' | 'equipment',
+  slot?: (typeof EQUIP_SLOTS)[number],
+): string {
+  const selector = kind === 'equipment'
+    ? `select[data-catalog-select="${kind}"][data-slot="${slot}"]`
+    : `select[data-catalog-select="${kind}"]`;
+  const field = editorContentEl.querySelector<HTMLSelectElement>(selector);
+  return field?.value ?? '';
+}
+
+function updateInventoryAddControls(resetSelectedItem = true): void {
+  const typeSelect = editorContentEl.querySelector<HTMLSelectElement>('select[data-catalog-select="inventory-type"]');
+  const itemSelect = editorContentEl.querySelector<HTMLSelectElement>('select[data-catalog-select="inventory-item"]');
+  if (!typeSelect || !itemSelect) {
+    return;
+  }
+  typeSelect.value = currentInventoryAddType;
+  itemSelect.innerHTML = `<option value="">选择${ITEM_TYPE_LABELS[currentInventoryAddType]}模板</option>${optionsMarkup(getInventoryAddItemOptions(), '')}`;
+  if (resetSelectedItem) {
+    itemSelect.value = '';
+  }
+}
+
 function pathSegments(path: string): string[] {
   return path.split('.');
 }
@@ -1123,23 +1339,8 @@ function readonlyCodeBlock(title: string, path: string, value: unknown): string 
   `;
 }
 
-function renderItemFields(basePath: string, item: ItemStack): string {
-  return `
-    <div class="editor-grid compact">
-      ${textField('物品 ID', `${basePath}.itemId`, item.itemId)}
-      ${textField('名称', `${basePath}.name`, item.name)}
-      ${selectField('类型', `${basePath}.type`, item.type, ITEM_TYPES.map((value) => ({ value, label: value })))}
-      ${numberField('数量', `${basePath}.count`, item.count)}
-      ${nullableTextField('品阶', `${basePath}.grade`, item.grade, 'undefined')}
-      ${numberField('等级', `${basePath}.level`, item.level)}
-      ${nullableTextField('装备槽', `${basePath}.equipSlot`, item.equipSlot, 'undefined')}
-      ${textField('描述', `${basePath}.desc`, item.desc, 'wide')}
-      ${stringArrayField('标签', `${basePath}.tags`, item.tags, 'wide')}
-      ${jsonField('装备属性', `${basePath}.equipAttrs`, item.equipAttrs ?? {}, 'object')}
-      ${jsonField('装备数值', `${basePath}.equipStats`, item.equipStats ?? {}, 'object')}
-      ${jsonField('特效配置', `${basePath}.effects`, item.effects ?? [], 'array', 'wide')}
-    </div>
-  `;
+function renderEditorTabSection(tab: 'attributes' | 'techniques' | 'items', content: string): string {
+  return `<div data-editor-tab="${tab}">${content}</div>`;
 }
 
 function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): string {
@@ -1165,10 +1366,21 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
           <div class="button-row">
             ${item
               ? `<button class="small-btn danger" type="button" data-action="clear-equip" data-slot="${slot}">清空槽位</button>`
-              : `<button class="small-btn" type="button" data-action="create-equip" data-slot="${slot}">创建装备</button>`}
+              : `<button class="small-btn" type="button" data-action="create-equip-from-catalog" data-slot="${slot}">加入槽位</button>`}
           </div>
         </div>
-        ${item ? renderItemFields(`equipment.${slot}`, item) : '<div class="editor-note">点击“创建装备”后可填写该槽位的详细数据。</div>'}
+        ${item ? getItemEditorControls(`equipment.${slot}`, item, 'equipment') : `
+          <div class="editor-note">从下方选择装备模板后即可快速塞入这个槽位。</div>
+          <div class="editor-grid compact">
+            <label class="editor-field wide">
+              <span>装备模板</span>
+              <select data-catalog-select="equipment" data-slot="${slot}">
+                <option value="">选择一个装备模板</option>
+                ${optionsMarkup(getItemCatalogOptions((option) => option.type === 'equipment' && option.equipSlot === slot), '')}
+              </select>
+            </label>
+          </div>
+        `}
       </div>
     `;
   }).join('');
@@ -1226,18 +1438,7 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     : '<div class="editor-note">当前没有临时效果。</div>';
 
   const inventoryMarkup = inventoryItems.length > 0
-    ? inventoryItems.map((item, index) => `
-      <div class="editor-card">
-        <div class="editor-card-head">
-          <div>
-            <div class="editor-card-title" data-preview="inventory-title" data-index="${index}">${escapeHtml(getInventoryCardTitle(item, index))}</div>
-            <div class="editor-card-meta" data-preview="inventory-meta" data-index="${index}">${escapeHtml(getInventoryCardMeta(item))}</div>
-          </div>
-          <button class="small-btn danger" type="button" data-action="remove-inventory-item" data-index="${index}">删除</button>
-        </div>
-        ${renderItemFields(`inventory.items.${index}`, item)}
-      </div>
-    `).join('')
+    ? inventoryItems.map((item, index) => getCompactInventoryItemMarkup(item, index)).join('')
     : '<div class="editor-note">背包为空。</div>';
 
   const autoBattleMarkup = autoBattleSkills.length > 0
@@ -1274,18 +1475,7 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
           </div>
           <button class="small-btn danger" type="button" data-action="remove-technique" data-index="${index}">删除</button>
         </div>
-        <div class="editor-grid compact">
-          ${textField('功法 ID', `techniques.${index}.techId`, technique.techId)}
-          ${textField('名称', `techniques.${index}.name`, technique.name)}
-          ${numberField('等级', `techniques.${index}.level`, technique.level)}
-          ${numberField('经验', `techniques.${index}.exp`, technique.exp)}
-          ${numberField('升级所需经验', `techniques.${index}.expToNext`, technique.expToNext)}
-          ${selectField('功法境界', `techniques.${index}.realm`, technique.realm, TECHNIQUE_REALM_OPTIONS)}
-          ${nullableTextField('品阶', `techniques.${index}.grade`, technique.grade, 'undefined')}
-          ${jsonField('技能列表', `techniques.${index}.skills`, technique.skills ?? [], 'array', 'wide')}
-          ${jsonField('层级配置', `techniques.${index}.layers`, technique.layers ?? [], 'array')}
-          ${jsonField('属性曲线', `techniques.${index}.attrCurves`, technique.attrCurves ?? {}, 'object')}
-        </div>
+        ${getTechniqueEditorControls(index, technique)}
       </div>
     `).join('')
     : '<div class="editor-note">当前没有已学会功法。</div>';
@@ -1333,6 +1523,7 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     : '<div class="editor-note">当前没有任务数据。</div>';
 
   return `
+    ${renderEditorTabSection('attributes', `
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
@@ -1345,21 +1536,20 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
       </div>
       <div class="editor-grid">
         ${textField('角色名', 'name', draft.name)}
-        ${textField('角色 ID', 'id', draft.id)}
-        ${nullableTextField('战斗目标 ID', 'combatTargetId', draft.combatTargetId, 'undefined')}
         ${selectField('地图', 'mapId', draft.mapId, mapIds.map((mapId) => ({ value: mapId, label: mapId })))}
         ${numberField('X', 'x', draft.x)}
         ${numberField('Y', 'y', draft.y)}
         ${selectField('朝向', 'facing', draft.facing, FACING_OPTIONS)}
         ${numberField('视野', 'viewRange', draft.viewRange)}
-        ${nullableTextField('主修功法 ID', 'cultivatingTechId', draft.cultivatingTechId, 'undefined')}
+        ${selectField('主修功法', 'cultivatingTechId', draft.cultivatingTechId ?? '', getLearnedTechniqueOptions(techniques, true))}
         ${numberField('HP', 'hp', draft.hp)}
         ${numberField('最大 HP', 'maxHp', draft.maxHp)}
         ${numberField('QI', 'qi', draft.qi)}
-        ${numberField('境界等级', 'realmLv', typeof draft.realmLv === 'number' ? draft.realmLv : 0)}
-        ${nullableTextField('境界名', 'realmName', draft.realmName, 'undefined')}
-        ${nullableTextField('境界阶段标签', 'realmStage', draft.realmStage, 'undefined')}
-        ${nullableTextField('境界评语', 'realmReview', draft.realmReview, 'undefined', 'wide')}
+        ${selectField('当前境界', 'realmLv', typeof draft.realmLv === 'number' ? draft.realmLv : 1, getRealmCatalogOptions())}
+        <div class="editor-field wide">
+          <span>角色标识</span>
+          <div class="editor-code">ID: ${escapeHtml(draft.id)}</div>
+        </div>
       </div>
       <div class="editor-toggle-row" style="margin-top: 10px;">
         ${checkboxField('机器人', 'isBot', draft.isBot)}
@@ -1404,6 +1594,24 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
+          <div class="editor-section-title">派生只读快照</div>
+          <div class="editor-section-note">这些通常由服务端重算，不建议直接改。若确实需要，去高级 JSON 区导入。</div>
+        </div>
+      </div>
+      <div class="editor-grid compact">
+        ${readonlyCodeBlock('最终属性', 'finalAttrs', draft.finalAttrs ?? {})}
+        ${readonlyCodeBlock('数值属性', 'numericStats', draft.numericStats ?? {})}
+        ${readonlyCodeBlock('比率分母', 'ratioDivisors', draft.ratioDivisors ?? {})}
+        ${readonlyCodeBlock('境界状态', 'realm', draft.realm ?? {})}
+        ${readonlyCodeBlock('动作列表', 'actions', draft.actions ?? [])}
+      </div>
+    </section>
+    `)}
+
+    ${renderEditorTabSection('techniques', `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
           <div class="editor-section-title">自动战斗</div>
           <div class="editor-section-note">编辑自动技能列表。</div>
         </div>
@@ -1415,34 +1623,19 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
-          <div class="editor-section-title">背包</div>
-          <div class="editor-section-note">容量与物品堆叠。</div>
-        </div>
-        <div class="button-row">
-          ${numberField('容量', 'inventory.capacity', draft.inventory.capacity)}
-          <button class="small-btn" type="button" data-action="add-inventory-item">新增物品</button>
-        </div>
-      </div>
-      <div class="editor-card-list">${inventoryMarkup}</div>
-    </section>
-
-    <section class="editor-section">
-      <div class="editor-section-head">
-        <div>
-          <div class="editor-section-title">装备</div>
-          <div class="editor-section-note">五个装备槽独立编辑。</div>
-        </div>
-      </div>
-      <div class="editor-card-list">${equipmentMarkup}</div>
-    </section>
-
-    <section class="editor-section">
-      <div class="editor-section-head">
-        <div>
           <div class="editor-section-title">功法</div>
           <div class="editor-section-note">等级、经验、技能与层级结构。</div>
         </div>
-        <button class="small-btn" type="button" data-action="add-technique">新增功法</button>
+        <div class="button-row">
+          <label class="editor-field" style="min-width: 220px;">
+            <span>新增功法</span>
+            <select data-catalog-select="technique">
+              <option value="">选择功法模板</option>
+              ${optionsMarkup(getTechniqueCatalogOptions(), '')}
+            </select>
+          </label>
+          <button class="small-btn" type="button" data-action="add-technique-from-catalog">加入角色</button>
+        </div>
       </div>
       <div class="editor-card-list">${techniqueMarkup}</div>
     </section>
@@ -1457,22 +1650,46 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
       </div>
       <div class="editor-card-list">${questMarkup}</div>
     </section>
+    `)}
+
+    ${renderEditorTabSection('items', `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">背包</div>
+          <div class="editor-section-note">容量与物品堆叠。</div>
+        </div>
+        <div class="button-row">
+          ${numberField('容量', 'inventory.capacity', draft.inventory.capacity)}
+          <label class="editor-field" style="min-width: 220px;">
+            <span>物品类别</span>
+            <select data-catalog-select="inventory-type">
+              ${optionsMarkup(getInventoryAddTypeOptions(), currentInventoryAddType)}
+            </select>
+          </label>
+          <label class="editor-field" style="min-width: 260px;">
+            <span>新增物品</span>
+            <select data-catalog-select="inventory-item">
+              <option value="">选择${ITEM_TYPE_LABELS[currentInventoryAddType]}模板</option>
+              ${optionsMarkup(getInventoryAddItemOptions(), '')}
+            </select>
+          </label>
+          <button class="small-btn" type="button" data-action="add-inventory-item-from-catalog">加入背包</button>
+        </div>
+      </div>
+      <div class="inventory-compact-list">${inventoryMarkup}</div>
+    </section>
 
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
-          <div class="editor-section-title">派生只读快照</div>
-          <div class="editor-section-note">这些通常由服务端重算，不建议直接改。若确实需要，去高级 JSON 区导入。</div>
+          <div class="editor-section-title">装备</div>
+          <div class="editor-section-note">五个装备槽独立编辑。</div>
         </div>
       </div>
-      <div class="editor-grid compact">
-        ${readonlyCodeBlock('最终属性', 'finalAttrs', draft.finalAttrs ?? {})}
-        ${readonlyCodeBlock('数值属性', 'numericStats', draft.numericStats ?? {})}
-        ${readonlyCodeBlock('比率分母', 'ratioDivisors', draft.ratioDivisors ?? {})}
-        ${readonlyCodeBlock('境界状态', 'realm', draft.realm ?? {})}
-        ${readonlyCodeBlock('动作列表', 'actions', draft.actions ?? [])}
-      </div>
+      <div class="editor-card-list">${equipmentMarkup}</div>
     </section>
+    `)}
   `;
 }
 
@@ -1608,9 +1825,11 @@ function renderEditor(data: GmStateRes): void {
     }
     patchEditorPreview(detail, draftSnapshot);
   }
+  updateInventoryAddControls(false);
 
   setTextLikeValue(playerJsonEl, formatJson(draftSnapshot));
   setTextLikeValue(playerPersistedJsonEl, formatJson(detail.persistedSnapshot));
+  switchEditorTab(currentEditorTab);
 
   removeBotBtn.style.display = detail.meta.isBot ? '' : 'none';
   removeBotBtn.disabled = !detail.meta.isBot;
@@ -1689,6 +1908,48 @@ function mutateDraft(mutator: (draft: PlayerState) => void): boolean {
   mutator(draftSnapshot);
   editorDirty = true;
   renderEditor(state);
+  return true;
+}
+
+function applyCatalogBindingChange(path: string, value: string): boolean {
+  if (!draftSnapshot) return false;
+
+  let changed = false;
+  const inventoryMatch = path.match(/^inventory\.items\.(\d+)\.itemId$/);
+  if (inventoryMatch) {
+    const index = Number(inventoryMatch[1]);
+    const previousCount = draftSnapshot.inventory.items[index]?.count ?? 1;
+    draftSnapshot.inventory.items[index] = createItemFromCatalog(value, previousCount);
+    changed = true;
+  }
+
+  const equipmentMatch = path.match(/^equipment\.(weapon|head|body|legs|accessory)\.itemId$/);
+  if (equipmentMatch) {
+    const slot = equipmentMatch[1] as (typeof EQUIP_SLOTS)[number];
+    draftSnapshot.equipment[slot] = createItemFromCatalog(value);
+    changed = true;
+  }
+
+  const techniqueMatch = path.match(/^techniques\.(\d+)\.techId$/);
+  if (techniqueMatch) {
+    const index = Number(techniqueMatch[1]);
+    draftSnapshot.techniques[index] = createTechniqueFromCatalog(value);
+    changed = true;
+  }
+
+  if (path === 'cultivatingTechId' && !value) {
+    draftSnapshot.cultivatingTechId = undefined;
+    changed = true;
+  }
+
+  if (!changed) {
+    return false;
+  }
+  editorDirty = true;
+  lastEditorStructureKey = null;
+  if (state) {
+    renderEditor(state);
+  }
   return true;
 }
 
@@ -1797,7 +2058,7 @@ function logout(message?: string): void {
   mapEditor.reset();
   worldViewer.stopPolling();
   switchTab('server');
-  switchJsonView('runtime');
+  switchEditorTab('attributes');
   loginErrorEl.textContent = message ?? '';
   setStatus('');
   showLogin();
@@ -1828,6 +2089,7 @@ async function login(): Promise<void> {
     token = result.accessToken;
     sessionStorage.setItem(TOKEN_KEY, token);
     showShell();
+    await loadEditorCatalog();
     await loadState();
     startPolling();
     passwordInput.value = '';
@@ -1879,6 +2141,7 @@ async function applyRawJson(): Promise<void> {
     editorDirty = true;
     lastEditorStructureKey = null;
     renderEditor(state!);
+    switchEditorTab('attributes');
     setStatus('原始 JSON 已应用到可视化编辑区');
   } catch {
     setStatus('原始 JSON 解析失败', true);
@@ -2056,6 +2319,17 @@ function handleEditorAction(action: string, trigger: HTMLElement): void {
     case 'add-inventory-item':
       mutateDraft((draft) => draft.inventory.items.push(createDefaultItem()));
       break;
+    case 'add-inventory-item-from-catalog': {
+      const itemId = readCatalogSelectValue('inventory-item');
+      if (!itemId) {
+        setStatus('请先选择一个物品模板', true);
+        return;
+      }
+      mutateDraft((draft) => {
+        draft.inventory.items.push(createItemFromCatalog(itemId));
+      });
+      break;
+    }
     case 'remove-inventory-item':
       mutateDraft((draft) => draft.inventory.items.splice(index, 1));
       break;
@@ -2064,6 +2338,19 @@ function handleEditorAction(action: string, trigger: HTMLElement): void {
       mutateDraft((draft) => {
         draft.equipment[slot] = createDefaultItem(slot);
       });
+      break;
+    case 'create-equip-from-catalog':
+      if (!slot) return;
+      {
+        const itemId = readCatalogSelectValue('equipment', slot);
+        if (!itemId) {
+          setStatus('请先选择一个装备模板', true);
+          return;
+        }
+        mutateDraft((draft) => {
+          draft.equipment[slot] = createItemFromCatalog(itemId);
+        });
+      }
       break;
     case 'clear-equip':
       if (!slot) return;
@@ -2082,6 +2369,20 @@ function handleEditorAction(action: string, trigger: HTMLElement): void {
     case 'add-technique':
       mutateDraft((draft) => draft.techniques.push(createDefaultTechnique()));
       break;
+    case 'add-technique-from-catalog': {
+      const techId = readCatalogSelectValue('technique');
+      if (!techId) {
+        setStatus('请先选择一个功法模板', true);
+        return;
+      }
+      mutateDraft((draft) => {
+        draft.techniques.push(createTechniqueFromCatalog(techId));
+        if (!draft.cultivatingTechId) {
+          draft.cultivatingTechId = techId;
+        }
+      });
+      break;
+    }
     case 'remove-technique':
       mutateDraft((draft) => draft.techniques.splice(index, 1));
       break;
@@ -2120,11 +2421,27 @@ editorContentEl.addEventListener('click', (event) => {
   handleEditorAction(action, trigger);
 });
 
-editorContentEl.addEventListener('change', () => {
+editorContentEl.addEventListener('change', (event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.dataset.catalogSelect === 'inventory-type') {
+    currentInventoryAddType = (target.value as (typeof ITEM_TYPES)[number]) || 'material';
+    updateInventoryAddControls(true);
+    return;
+  }
   const synced = syncVisualEditorToDraft();
   if (!synced.ok) {
     setStatus(synced.message, true);
     return;
+  }
+  if (
+    target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+  ) {
+    const path = target.dataset.bind;
+    if (path && applyCatalogBindingChange(path, target.value)) {
+      return;
+    }
   }
   const detail = getSelectedPlayerDetail();
   if (detail && draftSnapshot) {
@@ -2188,8 +2505,10 @@ loginForm.addEventListener('submit', (event) => {
 applyRawJsonBtn.addEventListener('click', () => {
   applyRawJson().catch(() => {});
 });
-jsonViewRuntimeBtn.addEventListener('click', () => switchJsonView('runtime'));
-jsonViewPersistedBtn.addEventListener('click', () => switchJsonView('persisted'));
+editorTabAttributesBtn.addEventListener('click', () => switchEditorTab('attributes'));
+editorTabTechniquesBtn.addEventListener('click', () => switchEditorTab('techniques'));
+editorTabItemsBtn.addEventListener('click', () => switchEditorTab('items'));
+editorTabPersistedBtn.addEventListener('click', () => switchEditorTab('persisted'));
 
 document.getElementById('refresh-state')?.addEventListener('click', () => {
   loadState(false, true).catch((error: unknown) => {
@@ -2228,8 +2547,9 @@ if (token) {
   switchTab('server');
   switchServerTab(currentServerTab);
   setCpuBreakdownSort(currentCpuBreakdownSort);
-  switchJsonView(currentJsonView);
-  loadState()
+  switchEditorTab(currentEditorTab);
+  loadEditorCatalog()
+    .then(() => loadState())
     .then(() => startPolling())
     .catch(() => logout('GM 登录已失效，请重新输入密码'));
 } else {

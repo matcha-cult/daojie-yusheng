@@ -41,6 +41,28 @@ interface ItemTemplate extends Omit<ItemStack, 'count'> {
   healAmount?: number;
 }
 
+export interface EditorTechniqueCatalogEntry {
+  id: string;
+  name: string;
+  grade: TechniqueGrade;
+  skills: SkillDef[];
+  layers: TechniqueLayerDef[];
+}
+
+export interface EditorItemCatalogEntry {
+  itemId: string;
+  name: string;
+  type: ItemStack['type'];
+  grade?: TechniqueGrade;
+  level?: number;
+  equipSlot?: ItemStack['equipSlot'];
+  desc?: string;
+  equipAttrs?: ItemStack['equipAttrs'];
+  equipStats?: ItemStack['equipStats'];
+  tags?: string[];
+  effects?: EquipmentEffectDef[];
+}
+
 interface StarterInventoryEntry {
   itemId: string;
   count?: number;
@@ -695,6 +717,40 @@ export class ContentService implements OnModuleInit {
 
   getRealmLevelEntry(realmLv: number): RealmLevelEntry | undefined {
     return this.realmLevels.get(realmLv);
+  }
+
+  getEditorTechniqueCatalog(): EditorTechniqueCatalogEntry[] {
+    return [...this.techniques.values()]
+      .map((technique) => ({
+        id: technique.id,
+        name: technique.name,
+        grade: technique.grade,
+        skills: JSON.parse(JSON.stringify(technique.skills)) as SkillDef[],
+        layers: JSON.parse(JSON.stringify(technique.layers)) as TechniqueLayerDef[],
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  }
+
+  getEditorItemCatalog(): EditorItemCatalogEntry[] {
+    return [...this.items.values()]
+      .map((item) => ({
+        itemId: item.itemId,
+        name: item.name,
+        type: item.type,
+        grade: item.grade,
+        level: item.level,
+        equipSlot: item.equipSlot,
+        desc: item.desc,
+        equipAttrs: item.equipAttrs ? JSON.parse(JSON.stringify(item.equipAttrs)) as NonNullable<ItemStack['equipAttrs']> : undefined,
+        equipStats: item.equipStats ? JSON.parse(JSON.stringify(item.equipStats)) as NonNullable<ItemStack['equipStats']> : undefined,
+        tags: item.tags ? [...item.tags] : undefined,
+        effects: item.effects ? JSON.parse(JSON.stringify(item.effects)) as EquipmentEffectDef[] : undefined,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  }
+
+  getEditorRealmCatalog(): RealmLevelEntry[] {
+    return [...this.realmLevels.values()].sort((left, right) => left.realmLv - right.realmLv);
   }
 
   getRealmLevelRange(stage: PlayerRealmStage): { levelFrom: number; levelTo: number } {

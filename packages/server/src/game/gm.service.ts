@@ -13,6 +13,7 @@ import {
   DEFAULT_INVENTORY_CAPACITY,
   Direction,
   EquipmentSlots,
+  GmEditorCatalogRes,
   GmMapDocument,
   GmMapListRes,
   GmMapRuntimeRes,
@@ -143,6 +144,20 @@ export class GmService {
     }
 
     return this.buildRecord(this.hydrateStoredPlayer(entity), entity.userId, false, entity.updatedAt);
+  }
+
+  getEditorCatalog(): GmEditorCatalogRes {
+    return {
+      techniques: this.contentService.getEditorTechniqueCatalog(),
+      items: this.contentService.getEditorItemCatalog(),
+      realmLevels: this.contentService.getEditorRealmCatalog().map((entry) => ({
+        realmLv: entry.realmLv,
+        displayName: entry.displayName,
+        name: entry.name,
+        phaseName: entry.phaseName ?? undefined,
+        review: entry.review || undefined,
+      })),
+    };
   }
 
   getEditableMapList(): GmMapListRes {
@@ -502,6 +517,9 @@ export class GmService {
       : undefined;
 
     this.techniqueService.initializePlayerProgression(player);
+    if (typeof snapshot.realmLv === 'number' && snapshot.realmLv > 0) {
+      this.techniqueService.setRealmLevel(player, snapshot.realmLv);
+    }
     this.equipmentService.rebuildBonuses(player);
 
     player.hp = Math.min(player.maxHp, requestedHp);

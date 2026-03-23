@@ -612,6 +612,17 @@
       gap: 14px;
     }
 
+    .editor-tabs {
+      margin-bottom: 12px;
+    }
+
+    .editor-tab-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
     .editor-section {
       border: 1px solid var(--wash-ink);
       background: rgba(255,255,255,0.48);
@@ -720,6 +731,25 @@
       padding: 10px;
       border: 1px solid var(--wash-ink);
       background: rgba(248,248,245,0.94);
+    }
+
+    .inventory-compact-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .inventory-compact-row {
+      padding: 8px 10px;
+    }
+
+    .inventory-compact-row .editor-card-head {
+      margin-bottom: 6px;
+    }
+
+    .inventory-compact-row .editor-grid.compact {
+      grid-template-columns: minmax(120px, 180px);
+      justify-content: start;
     }
 
     .editor-card-head {
@@ -1283,24 +1313,34 @@
             <button id="remove-bot" class="small-btn danger" type="button">移除该机器人</button>
           </div>
           <div class="editor-note">常用数据可直接在下方分区编辑。在线玩家通常会在下一次 tick 后反映到客户端。</div>
-          <div id="editor-content" class="editor-stack"></div>
-          <details class="editor-section editor-advanced">
-            <summary class="editor-section-title">高级模式 · 原始 JSON</summary>
-            <div class="editor-note" style="margin-top:8px;">运行态 JSON 用于导入、兜底修改或核对完整快照；存档态 JSON 用于查看真实落盘结构。</div>
-            <div class="button-row" style="margin: 10px 0;">
-              <button id="json-view-runtime" class="small-btn primary" type="button">运行态 JSON</button>
-              <button id="json-view-persisted" class="small-btn" type="button">存档态 JSON</button>
+          <div class="workspace-tabs editor-tabs">
+            <button id="editor-tab-attributes" class="workspace-tab active" type="button">属性</button>
+            <button id="editor-tab-techniques" class="workspace-tab" type="button">功法</button>
+            <button id="editor-tab-items" class="workspace-tab" type="button">物品</button>
+            <button id="editor-tab-persisted" class="workspace-tab" type="button">持久化 JSON</button>
+          </div>
+          <div id="editor-visual-panel" class="editor-tab-panel">
+            <div id="editor-content" class="editor-stack"></div>
+          </div>
+          <div id="editor-persisted-panel" class="editor-tab-panel hidden">
+            <div class="editor-section">
+              <div class="editor-section-head">
+                <div>
+                  <div class="editor-section-title">完整持久化 JSON</div>
+                  <div class="editor-section-note">用于核对真实落盘结构，不直接参与可视化编辑。</div>
+                </div>
+              </div>
+              <textarea id="player-persisted-json" class="editor-textarea" spellcheck="false" readonly></textarea>
             </div>
-            <div id="runtime-json-panel">
+            <details class="editor-section editor-advanced">
+              <summary class="editor-section-title">高级模式 · 运行态 JSON 导入</summary>
+              <div class="editor-note" style="margin-top:8px;">运行态 JSON 用于导入、兜底修改或核对完整快照。应用后会同步到上方可视化标签。</div>
               <div class="button-row" style="margin: 10px 0;">
                 <button id="apply-raw-json" class="small-btn" type="button">应用运行态 JSON 到可视化</button>
               </div>
               <textarea id="player-json" class="editor-textarea" spellcheck="false"></textarea>
-            </div>
-            <div id="persisted-json-panel" class="hidden">
-              <textarea id="player-persisted-json" class="editor-textarea" spellcheck="false" readonly></textarea>
-            </div>
-          </details>
+            </details>
+          </div>
         </div>
       </div>
     </section>
