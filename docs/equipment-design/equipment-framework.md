@@ -76,7 +76,7 @@
 
 | 层级 | 职责 | 位置建议 |
 | --- | --- | --- |
-| 装备模板层 | 定义装备基础信息、槽位、品阶、静态词条、特效列表 | `packages/shared/src/types.ts` + `packages/server/data/content/items/*.json` |
+| 装备模板层 | 定义装备基础信息、槽位、品阶、静态词条、特效列表 | `packages/shared/src/types.ts` + `packages/server/data/content/items/**/*.json` |
 | 效果定义层 | 定义触发器、条件、效果类型、参数结构 | `packages/shared/src/types.ts` |
 | 内容加载层 | 读取 JSON、归一化、校验、建立索引 | `packages/server/src/game/content.service.ts` |
 | 运行时结算层 | 在 tick / 战斗 / 修炼 / 昼夜切换时派发装备事件并结算 | `packages/server/src/game/equipment.service.ts` + 新增 `equipment-effect.service.ts` |
@@ -452,12 +452,12 @@ equipmentEffectService.dispatch(player, event)
 
 当前装备都堆在：
 
-- `packages/server/data/content/items/equipment.*.json`
+- `packages/server/data/content/items/装备/*.json`
 
 如果以后装备效果丰富起来，建议拆分为：
 
 ```text
-packages/server/data/content/items/equipment/
+packages/server/data/content/items/装备/
   fanren-town.json
   fanren-wildlands.json
   fanren-bamboo.json

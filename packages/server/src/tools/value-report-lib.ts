@@ -65,10 +65,27 @@ function readJsonFile<T>(filePath: string): T {
 
 function readJsonEntries<T>(dirPath: string): T[] {
   const entries: T[] = [];
-  for (const file of fs.readdirSync(dirPath).filter((entry) => entry.endsWith('.json')).sort()) {
-    entries.push(...readJsonFile<T[]>(path.join(dirPath, file)));
+  for (const filePath of collectJsonFiles(dirPath)) {
+    entries.push(...readJsonFile<T[]>(filePath));
   }
   return entries;
+}
+
+function collectJsonFiles(dirPath: string): string[] {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  const files: string[] = [];
+  for (const entry of entries) {
+    const entryPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectJsonFiles(entryPath));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      files.push(entryPath);
+    }
+  }
+  return files;
 }
 
 function walkForItemIds(value: unknown, found: Set<string>): void {

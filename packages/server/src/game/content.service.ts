@@ -600,14 +600,29 @@ export class ContentService implements OnModuleInit {
   }
 
   private readJsonEntries<T>(dirPath: string): T[] {
-    const files = fs.readdirSync(dirPath).filter((file) => file.endsWith('.json')).sort();
     const result: T[] = [];
-    for (const file of files) {
-      const filePath = path.join(dirPath, file);
+    for (const filePath of this.collectJsonFiles(dirPath)) {
       const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T[];
       result.push(...raw);
     }
     return result;
+  }
+
+  private collectJsonFiles(dirPath: string): string[] {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+    const files: string[] = [];
+    for (const entry of entries) {
+      const entryPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...this.collectJsonFiles(entryPath));
+        continue;
+      }
+      if (entry.isFile() && entry.name.endsWith('.json')) {
+        files.push(entryPath);
+      }
+    }
+    return files;
   }
 
   private parseTechniqueRealm(value: keyof typeof TechniqueRealm | TechniqueRealm): TechniqueRealm {
