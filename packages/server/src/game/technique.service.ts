@@ -79,6 +79,8 @@ const CULTIVATION_BUFF_DURATION = 1;
 const CULTIVATION_REALM_EXP_PER_TICK = 2;
 const CULTIVATION_TECHNIQUE_EXP_PER_TICK = 10;
 const MONSTER_KILL_TECHNIQUE_EXP_MULTIPLIER = 5;
+const PATH_SEVERED_BREAKTHROUGH_LABEL = '仙路断绝';
+const PATH_SEVERED_BREAKTHROUGH_REASON = '仙路断绝，你的前路已被无形天堑阻断，暂时无法继续突破。';
 
 @Injectable()
 export class TechniqueService {
@@ -398,7 +400,7 @@ export class TechniqueService {
       id: 'realm:breakthrough',
       name: `突破至 ${realm.breakthrough.targetDisplayName}`,
       type: 'breakthrough',
-      desc: `当前境界已圆满，点击查看 ${realm.breakthrough.targetDisplayName} 的突破要求。`,
+      desc: realm.breakthrough.blockedReason ?? `当前境界已圆满，点击查看 ${realm.breakthrough.targetDisplayName} 的突破要求。`,
       cooldownLeft: 0,
     };
   }
@@ -415,6 +417,9 @@ export class TechniqueService {
     }
 
     const breakthrough = this.resolveBreakthroughRequirements(player, realm.realmLv);
+    if (breakthrough.blockedReason) {
+      return { error: breakthrough.blockedReason, dirty: [], messages: [] };
+    }
     const unmet = breakthrough.requirements.filter((entry) => entry.blocksBreakthrough && !entry.completed);
     if (unmet.length > 0) {
       return { error: '突破条件尚未满足', dirty: [], messages: [] };
@@ -804,13 +809,12 @@ export class TechniqueService {
 
   private buildBreakthroughPreview(player: PlayerState, realm: PlayerRealmState): BreakthroughPreviewState | undefined {
     if (!realm.breakthroughReady) return undefined;
-    const config = this.getBreakthroughConfig(realm.realmLv);
     const resolved = this.resolveBreakthroughRequirements(player, realm.realmLv);
     const requirements = resolved.requirements.map((entry) => entry.view);
-    const targetEntry = this.contentService.getRealmLevelEntry(config.toRealmLv);
+    const targetEntry = this.contentService.getRealmLevelEntry(resolved.config.toRealmLv);
     return {
-      targetRealmLv: config.toRealmLv,
-      targetDisplayName: targetEntry?.displayName ?? `realmLv ${config.toRealmLv}`,
+      targetRealmLv: resolved.config.toRealmLv,
+      targetDisplayName: targetEntry?.displayName ?? `realmLv ${resolved.config.toRealmLv}`,
       totalRequirements: resolved.blockingRequirements,
       completedRequirements: resolved.completedBlockingRequirements,
       allCompleted: resolved.canBreakthrough,
@@ -818,6 +822,7 @@ export class TechniqueService {
       blockingRequirements: resolved.blockingRequirements,
       completedBlockingRequirements: resolved.completedBlockingRequirements,
       requirements,
+      blockedReason: resolved.blockedReason,
     };
   }
 
@@ -825,12 +830,24 @@ export class TechniqueService {
     player: PlayerState,
     fromRealmLv: number,
   ): {
+    config: BreakthroughConfigEntry;
     requirements: ResolvedBreakthroughRequirement[];
     canBreakthrough: boolean;
     blockingRequirements: number;
     completedBlockingRequirements: number;
+    blockedReason?: string;
   } {
     const config = this.getBreakthroughConfig(fromRealmLv);
+    if (config.requirements.length === 0) {
+      return {
+        config,
+        requirements: [this.buildPathSeveredRequirement(fromRealmLv)],
+        canBreakthrough: false,
+        blockingRequirements: 1,
+        completedBlockingRequirements: 0,
+        blockedReason: PATH_SEVERED_BREAKTHROUGH_REASON,
+      };
+    }
     const revealed = new Set(player.revealedBreakthroughRequirementIds ?? []);
     const increaseMultiplier = config.requirements.reduce((multiplier, def) => {
       if (!this.isOptionalAttributeIncreaser(def) || this.isBreakthroughRequirementCompleted(player, def)) {
@@ -853,10 +870,35 @@ export class TechniqueService {
     const blockingRequirements = requirements.filter((entry) => entry.blocksBreakthrough).length;
     const completedBlockingRequirements = requirements.filter((entry) => entry.blocksBreakthrough && entry.completed).length;
     return {
+      config,
       requirements,
       canBreakthrough: blockingRequirements === completedBlockingRequirements,
       blockingRequirements,
       completedBlockingRequirements,
+    };
+  }
+
+  private buildPathSeveredRequirement(fromRealmLv: number): ResolvedBreakthroughRequirement {
+    const def: BreakthroughRequirementDef = {
+      id: `missing-config:${fromRealmLv}`,
+      type: 'attribute',
+      attr: 'comprehension',
+      minValue: 1,
+      label: PATH_SEVERED_BREAKTHROUGH_LABEL,
+    };
+    return {
+      def,
+      completed: false,
+      blocksBreakthrough: true,
+      view: {
+        id: def.id,
+        type: def.type,
+        label: PATH_SEVERED_BREAKTHROUGH_LABEL,
+        completed: false,
+        hidden: false,
+        blocksBreakthrough: true,
+        detail: PATH_SEVERED_BREAKTHROUGH_REASON,
+      },
     };
   }
 

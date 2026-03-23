@@ -482,7 +482,9 @@ function openBreakthroughModal() {
     ownerId: 'realm:breakthrough',
     title: `突破至 ${preview.targetDisplayName}`,
     subtitle: `${currentRealm.displayName} · 核心要求 ${preview.completedBlockingRequirements}/${preview.blockingRequirements}`,
-    hint: preview.canBreakthrough
+    hint: preview.blockedReason
+      ? preview.blockedReason
+      : preview.canBreakthrough
       ? (hasConsumableRequirements ? '已生效的材料会在突破后消耗；未生效的材料或功法会抬高属性要求' : '点击空白处关闭')
       : (hasConsumableRequirements ? '未生效的材料或功法会抬高属性要求' : '未达成的隐藏条件需通过任务逐步解锁'),
     bodyHtml: `

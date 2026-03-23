@@ -484,6 +484,7 @@ export interface BreakthroughPreviewState {
   blockingRequirements: number;
   completedBlockingRequirements: number;
   requirements: BreakthroughRequirementView[];
+  blockedReason?: string;
 }
 
 /** 功法境界 */
