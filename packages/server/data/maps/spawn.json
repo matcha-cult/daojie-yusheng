@@ -3,6 +3,7 @@
   "name": "云来镇",
   "width": 40,
   "height": 40,
+  "terrainProfileId": "mortal_settlement",
   "spaceVisionMode": "isolated",
   "dangerLevel": 1,
   "recommendedRealm": "Entry",
@@ -11,11 +12,11 @@
     "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
     "#,T,TTTT,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
     "#,TTTTTT,,,,T,,,,,,,,,,,ooooooo,,,,,,,,#",
-    "#,,TT,TTT,,,,T,,,,,,,,,,o.....o,,,,,,,,#",
+    "#,,TT,TTT,,,,T,,,,,,,,,,oLLLLLo,,,,,,,,#",
     "#,,TTTTT,,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
     "#,,,T,T,T,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
     "#,,,,,,,,,,,,,,,,,,,,,,,o.....o,,,,,,,,#",
-    "#,,,,,,,,,===========,,,o.....o,,,,,,,,#",
+    "#,,,,,,,,,===========,,,oLLLLLo,,,,,,,,#",
     "#,,,,,,,,,:,,,,,,,,,:,,,ooooooo,,,,,,,,#",
     "#,,,,#####=######,,,:,,,,,,,,,,,P,,o,,,#",
     "#,,,,#S.........#,,,:,,,,,,,,,,,,,,,o,,#",
@@ -685,7 +686,7 @@
           "line": "main",
           "chapter": "第四章·灵岭问门",
           "story": "灵岭行令到手，清玄终于承认你已站在仙门门槛前。去兽谷再收血羽与妖骨，借先前所得灵铁碎片，一举踏入练气。",
-          "desc": "备齐血羽、妖狼骨与灵铁碎片，完成从凡武到修真的第一次大跨越。",
+          "desc": "备齐血羽、妖狼骨与灵铁碎片，完成从凡���到修真的第一次大跨越。",
           "objectiveType": "realm_stage",
           "objectiveText": "收束兽谷异物，历练至练气前期",
           "targetRealmStage": "QiRefining",
@@ -905,107 +906,21 @@
   "monsterSpawns": [
     {
       "id": "m_town_rat",
-      "name": "灰尾鼠",
-      "x": 7,
-      "y": 30,
-      "char": "鼠",
-      "color": "#9b9b9b",
-      "hp": 18,
-      "attack": 4,
-      "radius": 3,
-      "maxAlive": 4,
-      "respawnSec": 15,
-      "level": 1,
-      "drops": [
-        {
-          "itemId": "rat_tail",
-          "name": "鼠尾",
-          "type": "material",
-          "count": 1,
-          "chance": 0.6
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "x": 6,
+      "y": 30
     },
     {
       "id": "m_town_thug",
-      "name": "镇外暴徒",
-      "x": 29,
-      "y": 34,
-      "char": "匪",
-      "color": "#ba6f5a",
-      "hp": 30,
-      "attack": 6,
-      "radius": 4,
-      "maxAlive": 4,
-      "respawnSec": 20,
-      "level": 2,
-      "drops": [
-        {
-          "itemId": "bandit_insignia",
-          "name": "匪徒腰牌",
-          "type": "material",
-          "count": 1,
-          "chance": 0.52
-        },
-        {
-          "itemId": "equip.rust_saber",
-          "name": "旧铁长刀",
-          "type": "equipment",
-          "count": 1,
-          "chance": 0.08
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "x": 27,
+      "y": 36
     },
     {
       "id": "m_night_bandit",
-      "name": "夜行刀客",
-      "x": 31,
+      "x": 35,
       "y": 38,
-      "char": "刀",
-      "color": "#8b3d3d",
-      "hp": 44,
-      "attack": 9,
-      "radius": 3,
-      "maxAlive": 2,
-      "respawnSec": 30,
-      "level": 3,
-      "drops": [
-        {
-          "itemId": "bandit_insignia",
-          "name": "匪徒腰牌",
-          "type": "material",
-          "count": 1,
-          "chance": 0.72
-        },
-        {
-          "itemId": "book.iron_bone_art",
-          "name": "《铁骨功》",
-          "type": "skill_book",
-          "count": 1,
-          "chance": 0.05
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "maxHp": 44,
+      "aggroRange": 6,
+      "expMultiplier": 1
     }
   ]
 }

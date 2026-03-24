@@ -163,144 +163,23 @@
   "monsterSpawns": [
     {
       "id": "m_spirit_wolf",
-      "name": "噬灵狼",
-      "char": "狼",
-      "color": "#b3b7c1",
       "x": 20,
-      "y": 11,
-      "radius": 7,
-      "maxAlive": 8,
-      "respawnSec": 18,
-      "level": 2,
-      "hp": 40,
-      "attack": 8,
-      "drops": [
-        {
-          "itemId": "wolf_fang",
-          "name": "狼牙",
-          "type": "material",
-          "count": 1,
-          "chance": 0.58
-        },
-        {
-          "itemId": "book_wind_step",
-          "name": "《踏风步》残页",
-          "type": "skill_book",
-          "count": 1,
-          "chance": 0.07
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "y": 11
     },
     {
       "id": "m_bamboo_serpent",
-      "name": "青鳞竹蛇",
-      "char": "蛇",
-      "color": "#67b56f",
       "x": 10,
-      "y": 21,
-      "radius": 5,
-      "maxAlive": 6,
-      "respawnSec": 20,
-      "level": 3,
-      "hp": 52,
-      "attack": 10,
-      "drops": [
-        {
-          "itemId": "serpent_gall",
-          "name": "竹蛇胆",
-          "type": "material",
-          "count": 1,
-          "chance": 0.5
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "y": 21
     },
     {
       "id": "m_bamboo_sprite",
-      "name": "竹心灵",
-      "char": "灵",
-      "color": "#91d88d",
       "x": 13,
-      "y": 8,
-      "radius": 5,
-      "maxAlive": 5,
-      "respawnSec": 20,
-      "level": 3,
-      "hp": 58,
-      "attack": 9,
-      "drops": [
-        {
-          "itemId": "bamboo_heart",
-          "name": "翠竹心",
-          "type": "material",
-          "count": 1,
-          "chance": 0.45
-        },
-        {
-          "itemId": "book.iron_bone_art",
-          "name": "《铁骨功》",
-          "type": "skill_book",
-          "count": 1,
-          "chance": 0.05
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "y": 8
     },
     {
       "id": "m_bamboo_mantis",
-      "name": "刃竹螳",
-      "char": "螳",
-      "color": "#7fbf5f",
       "x": 23,
-      "y": 18,
-      "radius": 6,
-      "maxAlive": 5,
-      "respawnSec": 22,
-      "level": 4,
-      "hp": 68,
-      "attack": 12,
-      "drops": [
-        {
-          "itemId": "mantis_blade",
-          "name": "螳锋",
-          "type": "material",
-          "count": 1,
-          "chance": 0.5
-        },
-        {
-          "itemId": "equip.rust_saber",
-          "name": "旧铁长刀",
-          "type": "equipment",
-          "count": 1,
-          "chance": 0.05
-        },
-        {
-          "itemId": "spirit_stone",
-          "name": "灵石",
-          "type": "consumable",
-          "count": 1,
-          "chance": 0.01
-        }
-      ]
+      "y": 18
     }
   ],
   "landmarks": [
@@ -318,5 +197,6 @@
       "y": 20,
       "desc": "灵气稍聚的水潭，常有竹灵和蛇妖出没。"
     }
-  ]
+  ],
+  "terrainProfileId": "yellow_bamboo"
 }

@@ -22,6 +22,7 @@ export enum TileType {
   Water = 'water',
   Tree = 'tree',
   Stone = 'stone',
+  SpiritOre = 'spirit_ore',
 }
 
 /** 方向 */
@@ -771,6 +772,7 @@ export interface PlayerState {
   offlineSinceAt?: number;
   senseQiActive?: boolean;
   autoRetaliate?: boolean;
+  allowAoePlayerHit?: boolean;
   autoIdleCultivation?: boolean;
   autoSwitchCultivation?: boolean;
   realmLv?: number;

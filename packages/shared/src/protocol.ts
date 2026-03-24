@@ -181,6 +181,7 @@ export interface S2C_Tick {
   p: TickRenderEntity[];                          // 玩家可见实体（含自身）
   t?: VisibleTilePatch[];                         // 视野内地块动态 patch
   e: TickRenderEntity[];                          // 怪物 / NPC 可见实体
+  threatArrows?: [number, number][];             // 可见实体索引对：owner -> target
   g?: GroundItemPilePatch[];                      // 视野内地面物品 patch
   fx?: CombatEffect[];                            // 当前 tick 触发的战斗特效
   v?: VisibleTile[][];                            // 视野 tiles（null 表示当前不可见）
@@ -409,6 +410,7 @@ export interface S2C_ActionsUpdate {
   actions: ActionUpdateEntry[];
   autoBattle?: boolean;
   autoRetaliate?: boolean;
+  allowAoePlayerHit?: boolean;
   autoIdleCultivation?: boolean;
   autoSwitchCultivation?: boolean;
   senseQiActive?: boolean;
@@ -618,8 +620,8 @@ export interface GmEditorItemOption {
   itemId: string;
   name: string;
   type: ItemType;
-  grade?: TechniqueGrade;
   groundLabel?: string;
+  grade?: TechniqueGrade;
   level?: number;
   equipSlot?: EquipSlot;
   desc?: string;
@@ -756,14 +758,17 @@ export interface GmMapNpcRecord {
 /** GM 地图怪物刷新点记录 */
 export interface GmMapMonsterSpawnRecord {
   id: string;
+  templateId?: string;
   name: string;
   x: number;
   y: number;
   char: string;
   color: string;
+  grade?: TechniqueGrade;
   hp: number;
   maxHp?: number;
   attack: number;
+  count?: number;
   radius?: number;
   maxAlive?: number;
   aggroRange?: number;
@@ -782,6 +787,7 @@ export interface GmMapDocument {
   name: string;
   width: number;
   height: number;
+  terrainProfileId?: string;
   parentMapId?: string;
   parentOriginX?: number;
   parentOriginY?: number;

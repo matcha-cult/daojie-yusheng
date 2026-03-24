@@ -58,6 +58,7 @@ export interface MapOverlayState {
   pathCells: GridPoint[];
   targeting: MapTargetingOverlayState | null;
   senseQi: MapSenseQiOverlayState | null;
+  threatArrows: Array<{ ownerId: string; targetId: string }>;
 }
 
 export interface MinimapSourceSnapshot {

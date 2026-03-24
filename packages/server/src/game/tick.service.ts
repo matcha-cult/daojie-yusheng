@@ -1118,6 +1118,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           actions: this.buildSparseActionStates(player.id, player.actions),
           autoBattle: player.autoBattle,
           autoRetaliate: player.autoRetaliate,
+          allowAoePlayerHit: player.allowAoePlayerHit,
           autoIdleCultivation: player.autoIdleCultivation,
           autoSwitchCultivation: player.autoSwitchCultivation,
           senseQiActive: player.senseQiActive,
@@ -1276,7 +1277,24 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         ? this.mapService.getMinimapSignature(viewer.mapId)
         : '';
       const minimapLibrarySignature = this.buildMinimapLibrarySignature(unlockedMinimapIds);
-      const visibleEntityIds = new Set<string>();
+      const visibleEntityIds = new Set([...visiblePlayers, ...visibleEntities].map((entity) => entity.id));
+      const visibleThreatArrows = this.measureCpuSection('broadcast_entities', '广播: 仇恨箭头构建', () => {
+        const refs = this.worldService.getVisibleThreatArrowRefs(
+          overlayParentMapId ? [viewer.mapId, overlayParentMapId] : [viewer.mapId],
+          visibleEntityIds,
+        );
+        const indexById = new Map(
+          [...visiblePlayers, ...visibleEntities].map((entity, index) => [entity.id, index] as const),
+        );
+        return refs.flatMap(({ ownerId, targetId }) => {
+          const ownerIndex = indexById.get(ownerId);
+          const targetIndex = indexById.get(targetId);
+          if (ownerIndex === undefined || targetIndex === undefined) {
+            return [];
+          }
+          return [[ownerIndex, targetIndex] as [number, number]];
+        });
+      });
       const tileOriginX = viewer.x - time.effectiveViewRange;
       const tileOriginY = viewer.y - time.effectiveViewRange;
       const groundPilePatches = this.measureCpuSection('broadcast_patch_ground', '广播: 掉落差量 Patch', () => (
@@ -1312,6 +1330,9 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         dt,
         time,
       };
+      if (visibleThreatArrows.length > 0) {
+        tickData.threatArrows = visibleThreatArrows;
+      }
       if (groundPilePatches.length > 0) {
         tickData.g = groundPilePatches;
       }

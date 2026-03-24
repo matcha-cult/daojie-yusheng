@@ -100,6 +100,7 @@ export class MapStore {
   private pathCells: Array<{ x: number; y: number }> = [];
   private targeting: MapTargetingOverlayState | null = null;
   private senseQi: MapSenseQiOverlayState | null = null;
+  private threatArrows: Array<{ ownerId: string; targetId: string }> = [];
   private minimapMemoryVersion = 0;
   private tickTiming = {
     startedAt: performance.now(),
@@ -134,6 +135,7 @@ export class MapStore {
     this.entityMap = new Map(this.entities.map((entry) => [entry.id, entry]));
     this.groundPiles.clear();
     this.pathCells = [];
+    this.threatArrows = [];
     this.entityTransition = { snapCamera: true };
     this.tickTiming.startedAt = performance.now();
   }
@@ -160,6 +162,7 @@ export class MapStore {
         this.groundPiles.clear();
         this.entities = [];
         this.entityMap.clear();
+        this.threatArrows = [];
         this.pathCells = [];
       }
       this.player.mapId = data.m;
@@ -226,6 +229,14 @@ export class MapStore {
     }
 
     this.entities = this.mergeTickEntities(data.p, data.e);
+    this.threatArrows = Array.isArray(data.threatArrows)
+      ? data.threatArrows
+        .map(([ownerIndex, targetIndex]) => ({
+          ownerId: this.entities[ownerIndex]?.id ?? '',
+          targetId: this.entities[targetIndex]?.id ?? '',
+        }))
+        .filter((entry) => entry.ownerId && entry.targetId)
+      : [];
     const moved = !mapChanged && (this.player.x !== oldX || this.player.y !== oldY);
     this.entityTransition = mapChanged
       ? { snapCamera: true }
@@ -278,6 +289,7 @@ export class MapStore {
     this.pathCells = [];
     this.targeting = null;
     this.senseQi = null;
+    this.threatArrows = [];
     this.minimapMemoryVersion = 0;
     this.entityTransition = null;
     this.tickTiming.startedAt = performance.now();
@@ -330,6 +342,7 @@ export class MapStore {
         pathCells: this.pathCells,
         targeting: this.targeting,
         senseQi: this.senseQi,
+        threatArrows: this.threatArrows,
       },
       minimap: {
         mapMeta: this.mapMeta,

@@ -1,4 +1,5 @@
 import { DEFAULT_MAP_TIME_CONFIG } from './constants';
+import { isOffsetInRange } from './geometry';
 import {
   GmMapAuraRecord,
   GmMapContainerRecord,
@@ -21,7 +22,7 @@ import {
   TileType,
 } from './types';
 
-const SUPPORTED_MAP_TILE_CHARS = new Set(['#', '.', '=', ':', 'P', 'S', '+', 'W', 'B', ',', '^', ';', '%', '~', 'T', 'o']);
+const SUPPORTED_MAP_TILE_CHARS = new Set(['#', '.', '=', ':', 'P', 'S', '+', 'W', 'B', ',', '^', ';', '%', '~', 'T', 'o', 'L']);
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -152,7 +153,7 @@ function resolveNearestWalkablePointInDocument(
   for (let radius = 0; radius <= Math.max(document.width, document.height); radius += 1) {
     for (let dy = -radius; dy <= radius; dy += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
-        if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+        if (!isOffsetInRange(dx, dy, radius)) continue;
         const x = clamped.x + dx;
         const y = clamped.y + dy;
         if (x < 0 || x >= document.width || y < 0 || y >= document.height) continue;
@@ -200,6 +201,9 @@ export function normalizeEditableMapDocument(raw: unknown): GmMapDocument {
     name: typeof source.name === 'string' ? source.name : '',
     width: Number.isInteger(source.width) ? Number(source.width) : 0,
     height: Number.isInteger(source.height) ? Number(source.height) : 0,
+    terrainProfileId: typeof (source as { terrainProfileId?: unknown }).terrainProfileId === 'string'
+      ? (source as { terrainProfileId: string }).terrainProfileId
+      : undefined,
     parentMapId: typeof source.parentMapId === 'string' ? source.parentMapId : undefined,
     parentOriginX: Number.isInteger(source.parentOriginX) ? Number(source.parentOriginX) : undefined,
     parentOriginY: Number.isInteger(source.parentOriginY) ? Number(source.parentOriginY) : undefined,
@@ -262,16 +266,23 @@ export function normalizeEditableMapDocument(raw: unknown): GmMapDocument {
     })),
     monsterSpawns: monsterSpawns.map((spawn) => ({
       id: String((spawn as GmMapMonsterSpawnRecord).id ?? ''),
+      templateId: typeof (spawn as GmMapMonsterSpawnRecord).templateId === 'string'
+        ? (spawn as GmMapMonsterSpawnRecord).templateId
+        : undefined,
       name: String((spawn as GmMapMonsterSpawnRecord).name ?? ''),
       x: Number((spawn as GmMapMonsterSpawnRecord).x ?? 0),
       y: Number((spawn as GmMapMonsterSpawnRecord).y ?? 0),
       char: String((spawn as GmMapMonsterSpawnRecord).char ?? ''),
       color: String((spawn as GmMapMonsterSpawnRecord).color ?? ''),
+      grade: normalizeContainerGrade((spawn as GmMapMonsterSpawnRecord).grade),
       hp: Number((spawn as GmMapMonsterSpawnRecord).hp ?? 0),
       maxHp: Number.isFinite((spawn as GmMapMonsterSpawnRecord).maxHp)
         ? Number((spawn as GmMapMonsterSpawnRecord).maxHp)
         : undefined,
       attack: Number((spawn as GmMapMonsterSpawnRecord).attack ?? 0),
+      count: Number.isFinite((spawn as GmMapMonsterSpawnRecord).count)
+        ? Number((spawn as GmMapMonsterSpawnRecord).count)
+        : undefined,
       radius: Number.isFinite((spawn as GmMapMonsterSpawnRecord).radius)
         ? Number((spawn as GmMapMonsterSpawnRecord).radius)
         : undefined,

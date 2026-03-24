@@ -36,6 +36,7 @@ export const TILE_TYPE_LABELS: Record<TileType, string> = {
   [TileType.Water]: '水域',
   [TileType.Tree]: '树木',
   [TileType.Stone]: '岩石',
+  [TileType.SpiritOre]: '灵石矿',
 };
 
 /** 六维属性中文标签 */

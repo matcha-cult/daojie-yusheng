@@ -10,6 +10,7 @@ import {
   Attributes,
   AutoBattleSkillConfig,
   DEFAULT_BASE_ATTRS,
+  DEFAULT_BONE_AGE_YEARS,
   DEFAULT_INVENTORY_CAPACITY,
   Direction,
   EquipmentSlots,
@@ -32,6 +33,9 @@ import {
   VisibleTile,
   getTileTypeFromMapChar,
   isTileTypeWalkable,
+  normalizeBoneAgeBaseYears,
+  normalizeLifeElapsedTicks,
+  normalizeLifespanYears,
 } from '@mud/shared';
 import { PlayerEntity } from '../database/entities/player.entity';
 import { BotService } from './bot.service';
@@ -409,6 +413,9 @@ export class GmService {
         maxHp: player.maxHp,
         qi: player.qi,
         dead: player.dead,
+        boneAgeBaseYears: player.boneAgeBaseYears ?? DEFAULT_BONE_AGE_YEARS,
+        lifeElapsedTicks: player.lifeElapsedTicks ?? 0,
+        lifespanYears: player.lifespanYears ?? null,
         baseAttrs: player.baseAttrs,
         bonuses: player.bonuses,
         temporaryBuffs: persistedCollections.temporaryBuffs,
@@ -421,6 +428,7 @@ export class GmService {
         autoBattle: player.autoBattle,
         autoBattleSkills: player.autoBattleSkills,
         autoRetaliate: player.autoRetaliate,
+        allowAoePlayerHit: player.allowAoePlayerHit,
         autoIdleCultivation: player.autoIdleCultivation,
         cultivatingTechId: player.cultivatingTechId ?? null,
         online: player.online,
@@ -446,6 +454,9 @@ export class GmService {
       maxHp: Math.max(1, this.normalizePositiveInt(entity.maxHp, 1)),
       qi: this.normalizeNonNegativeInt(entity.qi ?? 0),
       dead: Boolean(entity.dead),
+      boneAgeBaseYears: normalizeBoneAgeBaseYears(entity.boneAgeBaseYears),
+      lifeElapsedTicks: normalizeLifeElapsedTicks(entity.lifeElapsedTicks),
+      lifespanYears: normalizeLifespanYears(entity.lifespanYears),
       baseAttrs: this.normalizeAttributes(entity.baseAttrs),
       bonuses: this.cloneArray<AttrBonus>(entity.bonuses),
       temporaryBuffs: this.normalizeTemporaryBuffs(hydrateTemporaryBuffSnapshots(entity.temporaryBuffs, this.contentService)),
@@ -456,6 +467,7 @@ export class GmService {
       autoBattle: entity.autoBattle ?? false,
       autoBattleSkills: this.cloneArray<AutoBattleSkillConfig>(entity.autoBattleSkills),
       autoRetaliate: entity.autoRetaliate ?? true,
+      allowAoePlayerHit: entity.allowAoePlayerHit === true,
       autoIdleCultivation: entity.autoIdleCultivation ?? true,
       autoSwitchCultivation: entity.autoSwitchCultivation === true,
       actions: [],
@@ -508,6 +520,11 @@ export class GmService {
     player.y = nextY;
     player.facing = this.normalizeDirection(snapshot.facing);
     player.viewRange = this.normalizePositiveInt(snapshot.viewRange, player.viewRange);
+    player.boneAgeBaseYears = normalizeBoneAgeBaseYears(snapshot.boneAgeBaseYears ?? player.boneAgeBaseYears);
+    player.lifeElapsedTicks = normalizeLifeElapsedTicks(snapshot.lifeElapsedTicks ?? player.lifeElapsedTicks);
+    player.lifespanYears = snapshot.lifespanYears === undefined
+      ? player.lifespanYears ?? null
+      : normalizeLifespanYears(snapshot.lifespanYears);
     player.baseAttrs = this.normalizeAttributes(snapshot.baseAttrs);
     player.bonuses = this.cloneArray<AttrBonus>(snapshot.bonuses);
     player.temporaryBuffs = this.normalizeTemporaryBuffs(snapshot.temporaryBuffs);
@@ -517,6 +534,7 @@ export class GmService {
     player.quests = this.cloneArray<QuestState>(snapshot.quests);
     player.autoBattleSkills = this.cloneArray<AutoBattleSkillConfig>(snapshot.autoBattleSkills);
     player.autoRetaliate = snapshot.autoRetaliate !== false;
+    player.allowAoePlayerHit = snapshot.allowAoePlayerHit === true;
     player.autoIdleCultivation = snapshot.autoIdleCultivation !== undefined
       ? snapshot.autoIdleCultivation !== false
       : player.autoIdleCultivation !== false;
@@ -610,6 +628,9 @@ export class GmService {
       maxHp: player.maxHp,
       qi: player.qi,
       dead: player.dead,
+      boneAgeBaseYears: player.boneAgeBaseYears,
+      lifeElapsedTicks: player.lifeElapsedTicks,
+      lifespanYears: player.lifespanYears,
       baseAttrs: player.baseAttrs as any,
       bonuses: player.bonuses as any,
       temporaryBuffs: persisted.temporaryBuffs as any,
@@ -622,6 +643,7 @@ export class GmService {
       autoBattle: player.autoBattle,
       autoBattleSkills: player.autoBattleSkills as any,
       autoRetaliate: player.autoRetaliate,
+      allowAoePlayerHit: player.allowAoePlayerHit === true,
       autoIdleCultivation: player.autoIdleCultivation,
       autoSwitchCultivation: player.autoSwitchCultivation === true,
       cultivatingTechId: player.cultivatingTechId ?? null,
@@ -713,6 +735,7 @@ export class GmService {
         merged.dead = snapshot.dead;
         merged.autoBattle = snapshot.autoBattle;
         merged.autoRetaliate = snapshot.autoRetaliate;
+        merged.allowAoePlayerHit = snapshot.allowAoePlayerHit;
         merged.autoIdleCultivation = snapshot.autoIdleCultivation;
         merged.autoSwitchCultivation = snapshot.autoSwitchCultivation;
         merged.combatTargetId = snapshot.combatTargetId;

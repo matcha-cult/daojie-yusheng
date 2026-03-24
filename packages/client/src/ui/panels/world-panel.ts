@@ -3,7 +3,7 @@
  * 展示当前地图情报、附近实体、任务建议与可执行行动
  */
 
-import { ActionDef, manhattanDistance, MapMeta, PlayerState, QuestState } from '@mud/shared';
+import { ActionDef, gridDistance, MapMeta, PlayerState, QuestState } from '@mud/shared';
 import { preserveSelection } from '../selection-preserver';
 import { TECH_REALM_LABELS, TECH_REALM_NAME_BY_KEY, WORLD_GUIDE, type WorldGuide } from '../../constants/world/world-panel';
 import { formatDisplayCurrentMax, formatDisplayInteger } from '../../utils/number';
@@ -153,7 +153,7 @@ export class WorldPanel {
       .map((entity) => ({
         id: entity.id ?? entity.name ?? '',
         name: entity.name ?? entity.id ?? '未知妖兽',
-        distance: manhattanDistance({ x: entity.wx, y: entity.wy }, input.player),
+        distance: gridDistance({ x: entity.wx, y: entity.wy }, input.player),
         hp: entity.hp ?? 0,
         maxHp: entity.maxHp ?? 0,
       }))

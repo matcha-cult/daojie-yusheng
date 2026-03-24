@@ -14,21 +14,22 @@ message TickPayload {
   repeated TickRenderEntityPayload p = 1;
   repeated TilePatchPayload t = 2;
   repeated TickRenderEntityPayload e = 3;
-  repeated GroundItemPilePatchPayload g = 4;
-  repeated CombatEffectPayload fx = 5;
-  repeated VisibleTileRowPayload v = 6;
-  optional uint32 dt = 7;
-  optional string m = 8;
-  optional MapMetaPayload mapMeta = 9;
-  repeated PointPayload path = 10;
-  optional uint32 hp = 11;
-  optional uint32 qi = 12;
-  optional uint32 f = 13;
-  optional GameTimeStatePayload time = 14;
-  optional string minimapJson = 15;
-  optional string minimapLibraryJson = 16;
-  optional string visibleMinimapMarkersJson = 17;
-  optional uint32 auraLevelBaseValue = 18;
+  repeated PointPayload threatArrows = 4;
+  repeated GroundItemPilePatchPayload g = 5;
+  repeated CombatEffectPayload fx = 6;
+  repeated VisibleTileRowPayload v = 7;
+  optional uint32 dt = 8;
+  optional string m = 9;
+  optional MapMetaPayload mapMeta = 10;
+  repeated PointPayload path = 11;
+  optional uint32 hp = 12;
+  optional uint32 qi = 13;
+  optional uint32 f = 14;
+  optional GameTimeStatePayload time = 15;
+  optional string minimapJson = 16;
+  optional string minimapLibraryJson = 17;
+  optional string visibleMinimapMarkersJson = 18;
+  optional uint32 auraLevelBaseValue = 19;
 }
 
 message TickRenderEntityPayload {
@@ -184,6 +185,7 @@ message ActionsUpdatePayload {
   optional bool autoIdleCultivation = 4;
   optional bool autoSwitchCultivation = 5;
   optional bool senseQiActive = 6;
+  optional bool allowAoePlayerHit = 7;
 }
 
 message ActionUpdateEntryPayload {
@@ -669,6 +671,9 @@ function toWireTick(payload: S2C_Tick): Record<string, unknown> {
     p: payload.p.map(toWireTickEntity),
     e: payload.e.map(toWireTickEntity),
   };
+  if (payload.threatArrows) {
+    wire.threatArrows = payload.threatArrows.map(([x, y]) => ({ x, y }));
+  }
   if (payload.t) {
     wire.t = payload.t.map((patch) => ({
       x: patch.x,
@@ -725,6 +730,12 @@ function fromWireTick(wire: Record<string, unknown>): S2C_Tick {
     p: Array.isArray(wire.p) ? wire.p.map((entry) => fromWireTickEntity(entry as Record<string, unknown>)) : [],
     e: Array.isArray(wire.e) ? wire.e.map((entry) => fromWireTickEntity(entry as Record<string, unknown>)) : [],
   };
+  if (Array.isArray(wire.threatArrows)) {
+    payload.threatArrows = wire.threatArrows.map((point) => {
+      const entry = point as Record<string, unknown>;
+      return [Number(entry.x ?? 0), Number(entry.y ?? 0)] as [number, number];
+    });
+  }
   if (Array.isArray(wire.t)) {
     payload.t = wire.t.map((entry) => {
       const patch = entry as Record<string, unknown>;
@@ -823,6 +834,7 @@ function toWireActionsUpdate(payload: S2C_ActionsUpdate): Record<string, unknown
   };
   if (payload.autoBattle !== undefined) wire.autoBattle = payload.autoBattle;
   if (payload.autoRetaliate !== undefined) wire.autoRetaliate = payload.autoRetaliate;
+  if (payload.allowAoePlayerHit !== undefined) wire.allowAoePlayerHit = payload.allowAoePlayerHit;
   if (payload.autoIdleCultivation !== undefined) wire.autoIdleCultivation = payload.autoIdleCultivation;
   if (payload.autoSwitchCultivation !== undefined) wire.autoSwitchCultivation = payload.autoSwitchCultivation;
   if (payload.senseQiActive !== undefined) wire.senseQiActive = payload.senseQiActive;
@@ -837,6 +849,7 @@ function fromWireActionsUpdate(wire: Record<string, unknown>): S2C_ActionsUpdate
   };
   if (hasOwn(wire, 'autoBattle')) payload.autoBattle = Boolean(wire.autoBattle);
   if (hasOwn(wire, 'autoRetaliate')) payload.autoRetaliate = Boolean(wire.autoRetaliate);
+  if (hasOwn(wire, 'allowAoePlayerHit')) payload.allowAoePlayerHit = Boolean(wire.allowAoePlayerHit);
   if (hasOwn(wire, 'autoIdleCultivation')) payload.autoIdleCultivation = Boolean(wire.autoIdleCultivation);
   if (hasOwn(wire, 'autoSwitchCultivation')) payload.autoSwitchCultivation = Boolean(wire.autoSwitchCultivation);
   if (hasOwn(wire, 'senseQiActive')) payload.senseQiActive = Boolean(wire.senseQiActive);

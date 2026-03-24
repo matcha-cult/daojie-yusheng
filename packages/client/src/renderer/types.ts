@@ -29,6 +29,7 @@ export interface IRenderer {
   init(canvas: HTMLCanvasElement): void;
   clear(): void;
   resetScene(): void;
+  setThreatArrows(arrows: Array<{ ownerId: string; targetId: string }>): void;
   setTargetingOverlay(state: TargetingOverlayState | null): void;
   setSenseQiOverlay(state: SenseQiOverlayState | null): void;
   renderWorld(
@@ -61,7 +62,7 @@ export interface IRenderer {
     settleEntityId?: string,
     motionSyncToken?: number,
   ): void;
-  renderEntities(camera: Camera, progress?: number): void;
+  renderEntities(camera: Camera, progress?: number, localPlayerId?: string): void;
   addFloatingText(x: number, y: number, text: string, color?: string): void;
   addAttackTrail(fromX: number, fromY: number, toX: number, toY: number, color?: string): void;
   renderFloatingTexts(camera: Camera): void;

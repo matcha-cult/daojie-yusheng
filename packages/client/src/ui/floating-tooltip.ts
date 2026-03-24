@@ -22,18 +22,58 @@ interface FloatingTooltipShowOptions {
   }>;
 }
 
+export function prefersPinnedTooltipInteraction(win: Window = window): boolean {
+  if (typeof win.matchMedia !== 'function') {
+    return false;
+  }
+  return win.matchMedia('(pointer: coarse)').matches || win.matchMedia('(hover: none)').matches;
+}
+
 export class FloatingTooltip {
   private readonly el: HTMLDivElement;
   private lastPoint = { x: 0, y: 0 };
+  private pinned = false;
+  private pinnedAnchor: Element | null = null;
 
   constructor(className = 'floating-tooltip') {
     this.el = document.createElement('div');
     this.el.className = className;
     document.body.appendChild(this.el);
+    document.addEventListener('pointerdown', (event) => {
+      if (!this.pinned) {
+        return;
+      }
+      const target = event.target;
+      if (target instanceof Node && this.pinnedAnchor?.contains(target)) {
+        return;
+      }
+      this.hide(true);
+    }, true);
   }
 
   /** 显示提示框并定位到鼠标附近 */
   show(title: string, lines: string[], clientX: number, clientY: number, options?: FloatingTooltipShowOptions): void {
+    if (this.pinned) {
+      return;
+    }
+    this.render(title, lines, clientX, clientY, options);
+  }
+
+  showPinned(anchor: Element, title: string, lines: string[], clientX: number, clientY: number, options?: FloatingTooltipShowOptions): void {
+    this.pinned = true;
+    this.pinnedAnchor = anchor;
+    this.render(title, lines, clientX, clientY, options);
+  }
+
+  isPinned(): boolean {
+    return this.pinned;
+  }
+
+  isPinnedTo(anchor: Element | null): boolean {
+    return !!anchor && this.pinned && this.pinnedAnchor === anchor;
+  }
+
+  private render(title: string, lines: string[], clientX: number, clientY: number, options?: FloatingTooltipShowOptions): void {
     const content = lines
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
@@ -76,7 +116,12 @@ export class FloatingTooltip {
     this.el.style.top = `${top}px`;
   }
 
-  hide(): void {
+  hide(force = false): void {
+    if (this.pinned && !force) {
+      return;
+    }
+    this.pinned = false;
+    this.pinnedAnchor = null;
     this.el.classList.remove('visible');
   }
 

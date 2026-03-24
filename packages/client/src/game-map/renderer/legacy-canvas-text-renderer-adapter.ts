@@ -41,6 +41,7 @@ export class LegacyCanvasTextRendererAdapter {
 
   syncScene(scene: MapSceneSnapshot, transition: MapEntityTransition | null, motionSyncToken?: number): void {
     this.renderer.setPathHighlight(scene.overlays.pathCells);
+    this.renderer.setThreatArrows(scene.overlays.threatArrows);
     this.renderer.setTargetingOverlay(scene.overlays.targeting);
     this.renderer.setSenseQiOverlay(scene.overlays.senseQi);
     this.renderer.setGroundPiles(scene.groundPiles.values());
@@ -109,7 +110,7 @@ export class LegacyCanvasTextRendererAdapter {
       scene.terrain.time,
     );
     this.renderer.renderAttackTrails(this.cameraBridge);
-    this.renderer.renderEntities(this.cameraBridge, progress);
+    this.renderer.renderEntities(this.cameraBridge, progress, scene.player.id);
     this.renderer.renderFloatingTexts(this.cameraBridge);
   }
 

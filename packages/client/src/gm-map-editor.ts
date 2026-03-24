@@ -12,6 +12,7 @@ import {
   GmMapNpcRecord,
   GmMapPortalRecord,
   GmUpdateMapReq,
+  TECHNIQUE_GRADE_LABELS,
   Tile,
   TileType,
   TILE_TYPE_LABELS,
@@ -20,6 +21,7 @@ import {
   TILE_VISUAL_GLYPH_COLORS,
   getMapCharFromTileType,
   getTileTypeFromMapChar,
+  isOffsetInRange,
   isTileTypeWalkable,
 } from '@mud/shared';
 import {
@@ -36,6 +38,7 @@ import {
 
 type RequestFn = <T>(path: string, init?: RequestInit) => Promise<T>;
 type StatusFn = (message: string, isError?: boolean) => void;
+const MONSTER_GRADE_OPTIONS = Object.entries(TECHNIQUE_GRADE_LABELS).map(([value, label]) => ({ value, label }));
 type GmMapEditorOptions = {
   mapApiBasePath?: string;
   syncedSummaryLabel?: string;
@@ -908,28 +911,30 @@ export class GmMapEditor {
           <div class="editor-section-head">
             <div>
               <div class="editor-section-title">怪物刷新点属性</div>
-              <div class="editor-section-note">可视位置和数值都在这里编辑。</div>
+              <div class="editor-section-note">地图里只维护怪物 ID 与坐标。基础属性来自怪物模板配置。</div>
             </div>
             <button class="small-btn danger" type="button" data-map-action="remove-selected">删除</button>
           </div>
           <div class="map-form-grid">
-            ${textField('ID', `monsterSpawns.${this.selectedEntity.index}.id`, spawn.id)}
-            ${textField('名称', `monsterSpawns.${this.selectedEntity.index}.name`, spawn.name)}
+            ${textField('怪物 ID', `monsterSpawns.${this.selectedEntity.index}.id`, spawn.id)}
             ${numberField('X', `monsterSpawns.${this.selectedEntity.index}.x`, spawn.x)}
             ${numberField('Y', `monsterSpawns.${this.selectedEntity.index}.y`, spawn.y)}
-            ${textField('显示字', `monsterSpawns.${this.selectedEntity.index}.char`, spawn.char)}
-            ${textField('颜色', `monsterSpawns.${this.selectedEntity.index}.color`, spawn.color)}
-            ${numberField('HP', `monsterSpawns.${this.selectedEntity.index}.hp`, spawn.hp)}
-            ${numberField('最大 HP', `monsterSpawns.${this.selectedEntity.index}.maxHp`, spawn.maxHp ?? spawn.hp)}
-            ${numberField('攻击', `monsterSpawns.${this.selectedEntity.index}.attack`, spawn.attack)}
-            ${numberField('巡逻半径', `monsterSpawns.${this.selectedEntity.index}.radius`, spawn.radius ?? 3)}
-            ${numberField('最大存活', `monsterSpawns.${this.selectedEntity.index}.maxAlive`, spawn.maxAlive ?? 1)}
-            ${numberField('仇恨范围', `monsterSpawns.${this.selectedEntity.index}.aggroRange`, spawn.aggroRange ?? 6)}
-            ${numberField('重生秒数', `monsterSpawns.${this.selectedEntity.index}.respawnSec`, spawn.respawnSec ?? spawn.respawnTicks ?? 15)}
-            ${numberField('等级', `monsterSpawns.${this.selectedEntity.index}.level`, spawn.level ?? 1)}
-            ${numberField('经验倍率', `monsterSpawns.${this.selectedEntity.index}.expMultiplier`, spawn.expMultiplier ?? 1)}
-            ${jsonField('掉落列表', `monsterSpawns.${this.selectedEntity.index}.drops`, spawn.drops ?? [], 'wide')}
+            ${readonlyField('名称', spawn.name || '未匹配到怪物模板')}
+            ${readonlyField('显示字', spawn.char || '-')}
+            ${readonlyField('颜色', spawn.color || '-')}
+            ${readonlyField('品阶', TECHNIQUE_GRADE_LABELS[spawn.grade ?? 'mortal'] ?? (spawn.grade ?? 'mortal'))}
+            ${readonlyField('HP', `${spawn.hp ?? 0}`)}
+            ${readonlyField('最大 HP', `${spawn.maxHp ?? spawn.hp ?? 0}`)}
+            ${readonlyField('攻击', `${spawn.attack ?? 0}`)}
+            ${readonlyField('巡逻半径', `${spawn.radius ?? 3}`)}
+            ${readonlyField('数量', `${spawn.count ?? spawn.maxAlive ?? 1}`)}
+            ${readonlyField('最大存活', `${spawn.maxAlive ?? spawn.count ?? 1}`)}
+            ${readonlyField('仇恨范围', `${spawn.aggroRange ?? 6}`)}
+            ${readonlyField('重生秒数', `${spawn.respawnSec ?? spawn.respawnTicks ?? 15}`)}
+            ${readonlyField('等级', `${spawn.level ?? 1}`)}
+            ${readonlyField('经验倍率', `${spawn.expMultiplier ?? 1}`)}
           </div>
+          <div class="editor-note">要改怪物属性，请编辑 packages/server/data/content/monsters/*.json 中对应模板。</div>
         </section>
       `;
     }
@@ -1180,25 +1185,23 @@ export class GmMapEditor {
     const { x, y } = this.selectedCell!;
     if (!this.ensureWalkableSelection('怪物刷新点')) return;
     this.captureUndoState();
+    const fallbackId = this.selectedEntity?.kind === 'monster'
+      ? this.draft!.monsterSpawns[this.selectedEntity.index]?.id
+      : this.draft!.monsterSpawns[0]?.id;
     this.draft!.monsterSpawns.push({
-      id: `monster_${this.draft!.id}_${this.draft!.monsterSpawns.length + 1}`,
-      name: '新怪物点',
+      id: fallbackId ?? '',
       x,
       y,
-      char: '妖',
-      color: '#c47f7f',
-      hp: 10,
-      maxHp: 10,
-      attack: 2,
-      radius: 3,
-      maxAlive: 1,
-      aggroRange: 6,
-      respawnSec: 15,
-      level: 1,
-      expMultiplier: 1,
-      drops: [],
+      name: '',
+      char: '',
+      color: '',
+      hp: 0,
+      attack: 0,
     });
     this.selectedEntity = { kind: 'monster', index: this.draft!.monsterSpawns.length - 1 };
+    if (!fallbackId) {
+      this.setStatus('新怪物点已创建，请先填写一个已存在的怪物 ID', true);
+    }
     this.markDirty();
   }
 
@@ -1369,7 +1372,7 @@ export class GmMapEditor {
     for (let radius = 0; radius <= Math.max(this.draft.width, this.draft.height); radius += 1) {
       for (let dy = -radius; dy <= radius; dy += 1) {
         for (let dx = -radius; dx <= radius; dx += 1) {
-          if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+          if (!isOffsetInRange(dx, dy, radius)) continue;
           const x = origin.x + dx;
           const y = origin.y + dy;
           if (x < 0 || y < 0 || x >= this.draft.width || y >= this.draft.height) continue;

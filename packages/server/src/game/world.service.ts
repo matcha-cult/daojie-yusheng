@@ -8,6 +8,7 @@ import {
   ActionDef,
   Attributes,
   calcQiCostWithOutputLimit,
+  cloneNumericStats,
   CombatEffect,
   computeAffectedCellsFromAnchor,
   createItemStackSignature,
@@ -15,6 +16,7 @@ import {
   DEFAULT_RATIO_DIVISOR,
   Direction,
   ElementKey,
+  estimateMonsterSpiritFromStats,
   gameplayConstants,
   GameTimeState,
   getDamageTrailColor,
@@ -345,6 +347,14 @@ export class WorldService {
       desc: player.autoRetaliate === false ? '被攻击时不会自动开启自动战斗。' : '被攻击时自动开启自动战斗。',
       cooldownLeft: 0,
     }, {
+      id: 'toggle:allow_aoe_player_hit',
+      name: player.allowAoePlayerHit === true ? '全体攻击已开' : '全体攻击已关',
+      type: 'toggle',
+      desc: player.allowAoePlayerHit === true
+        ? '开启后，群体攻击也会命中其他玩家，请留意误伤。'
+        : '关闭后，群体攻击不会命中玩家，单体攻击仍可正常攻击玩家。',
+      cooldownLeft: 0,
+    }, {
       id: 'toggle:auto_idle_cultivation',
       name: player.autoIdleCultivation === false ? '闲置自动修炼已关' : '闲置自动修炼已开',
       type: 'toggle',
@@ -470,6 +480,20 @@ export class WorldService {
         messages: [{
           playerId: player.id,
           text: player.autoRetaliate ? '已开启受击自动开战。' : '已关闭受击自动开战。',
+          kind: 'combat',
+        }],
+        dirty: ['actions'],
+      };
+    }
+
+    if (actionId === 'toggle:allow_aoe_player_hit') {
+      player.allowAoePlayerHit = player.allowAoePlayerHit === true ? false : true;
+      return {
+        messages: [{
+          playerId: player.id,
+          text: player.allowAoePlayerHit === true
+            ? '已开启全体攻击，群体攻击现在也会命中玩家。'
+            : '已关闭全体攻击，群体攻击将不会命中玩家。',
           kind: 'combat',
         }],
         dirty: ['actions'],
@@ -932,8 +956,11 @@ export class WorldService {
     }
 
     const monsters = this.monstersByMap.get(player.mapId) ?? [];
-    const players = this.playerService.getPlayersByMap(player.mapId)
-      .filter((entry) => entry.id !== player.id && !entry.dead);
+    const canHitPlayersWithGroupSkill = player.allowAoePlayerHit === true;
+    const players = canHitPlayersWithGroupSkill
+      ? this.playerService.getPlayersByMap(player.mapId)
+        .filter((entry) => entry.id !== player.id && !entry.dead)
+      : [];
     const maxTargets = Math.max(1, targeting?.maxTargets ?? 99);
     if (shape === 'line') {
       const cells = computeAffectedCellsFromAnchor(player, primaryTarget, {
@@ -2018,7 +2045,10 @@ export class WorldService {
     const defender = this.getPlayerCombatSnapshot(player);
     const element = this.inferMonsterElement(monster);
     const damageKind: SkillDamageKind = element ? 'spell' : 'physical';
-    const rawDamage = monster.attack + (damageKind === 'physical' ? attacker.stats.physAtk : attacker.stats.spellAtk);
+    const attackStat = damageKind === 'physical' ? attacker.stats.physAtk : attacker.stats.spellAtk;
+    const rawDamage = monster.combatModel === 'value_stats'
+      ? Math.max(1, Math.round(attackStat))
+      : monster.attack + attackStat;
     return this.resolveHit(attacker, defender, rawDamage, damageKind, 0, element, (damage) => {
       player.hp = Math.max(0, player.hp - damage);
     });
@@ -2261,18 +2291,20 @@ export class WorldService {
   }
 
   private getMonsterCombatSnapshot(monster: RuntimeMonster): CombatSnapshot {
-    const stats = createNumericStats();
+    const stats = monster.numericStats ? cloneNumericStats(monster.numericStats) : createNumericStats();
     const level = Math.max(1, monster.level ?? Math.round(monster.attack / 6));
-    stats.physAtk = monster.attack;
-    stats.spellAtk = Math.max(1, Math.round(monster.attack * 0.9));
-    stats.physDef = Math.max(0, Math.round(monster.maxHp * 0.18 + level * 2));
-    stats.spellDef = Math.max(0, Math.round(monster.maxHp * 0.14 + level * 2));
-    stats.hit = 12 + level * 8;
-    stats.dodge = level * 4;
-    stats.crit = level * 2;
-    stats.critDamage = level * 6;
-    stats.breakPower = level * 3;
-    stats.resolvePower = level * 3;
+    if (!monster.numericStats) {
+      stats.physAtk = monster.attack;
+      stats.spellAtk = Math.max(1, Math.round(monster.attack * 0.9));
+      stats.physDef = Math.max(0, Math.round(monster.maxHp * 0.18 + level * 2));
+      stats.spellDef = Math.max(0, Math.round(monster.maxHp * 0.14 + level * 2));
+      stats.hit = 12 + level * 8;
+      stats.dodge = level * 4;
+      stats.crit = level * 2;
+      stats.critDamage = level * 6;
+      stats.breakPower = level * 3;
+      stats.resolvePower = level * 3;
+    }
     this.applyMonsterBuffStats(stats, monster.temporaryBuffs);
     return {
       stats,
@@ -2354,8 +2386,8 @@ export class WorldService {
 
   private createMonsterObservationSnapshot(monster: RuntimeMonster): ObservationTargetSnapshot {
     const combat = this.getMonsterCombatSnapshot(monster);
-    const spirit = this.estimateMonsterSpirit(monster);
-    const maxQi = Math.max(24, Math.round(spirit * 2 + (monster.level ?? 1) * 8));
+    const spirit = this.estimateMonsterSpirit(monster, combat.stats);
+    const maxQi = Math.max(24, Math.round(combat.stats.maxQi > 0 ? combat.stats.maxQi : (spirit * 2 + (monster.level ?? 1) * 8)));
     const hpRatio = monster.maxHp > 0 ? monster.hp / monster.maxHp : 0;
     return {
       hp: monster.hp,
@@ -2511,9 +2543,9 @@ export class WorldService {
     };
   }
 
-  private estimateMonsterSpirit(monster: RuntimeMonster): number {
+  private estimateMonsterSpirit(monster: RuntimeMonster, stats?: NumericStats): number {
     const level = Math.max(1, monster.level ?? Math.round(monster.attack / 6));
-    return Math.max(6, Math.round(level * 12 + monster.attack * 0.8 + monster.maxHp * 0.18));
+    return estimateMonsterSpiritFromStats(stats ?? this.getMonsterCombatSnapshot(monster).stats, level);
   }
 
   private deriveAttrsFromStats(stats: NumericStats, spirit: number): Attributes {
@@ -3166,6 +3198,49 @@ export class WorldService {
 
   private getMonsterThreatId(monster: RuntimeMonster): string {
     return monster.runtimeId;
+  }
+
+  getVisibleThreatArrowRefs(mapIds: string[], visibleEntityIds: Set<string>): Array<{ ownerId: string; targetId: string }> {
+    const refs: Array<{ ownerId: string; targetId: string }> = [];
+    const seen = new Set<string>();
+
+    const pushRef = (ownerId: string, targetId?: string): void => {
+      if (!targetId || !visibleEntityIds.has(ownerId) || !visibleEntityIds.has(targetId) || ownerId === targetId) {
+        return;
+      }
+      const key = `${ownerId}->${targetId}`;
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      refs.push({ ownerId, targetId });
+    };
+
+    for (const mapId of mapIds) {
+      if (!mapId) {
+        continue;
+      }
+      for (const player of this.playerService.getPlayersByMap(mapId)) {
+        const targetRef = player.combatTargetId;
+        if (!targetRef) {
+          continue;
+        }
+        const targetId = targetRef.startsWith('player:')
+          ? targetRef.slice('player:'.length)
+          : targetRef.startsWith('monster:')
+            ? targetRef
+            : undefined;
+        pushRef(player.id, targetId);
+      }
+      for (const monster of this.monstersByMap.get(mapId) ?? []) {
+        if (!monster.alive) {
+          continue;
+        }
+        pushRef(monster.runtimeId, monster.targetPlayerId);
+      }
+    }
+
+    return refs;
   }
 
   private getExtraAggroRate(target: PlayerState | RuntimeMonster): number {

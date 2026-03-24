@@ -84,5 +84,6 @@
     }
   ],
   "npcs": [],
-  "monsterSpawns": []
+  "monsterSpawns": [],
+  "terrainProfileId": "mortal_settlement"
 }

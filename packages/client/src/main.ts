@@ -26,7 +26,7 @@ import { createMapRuntime } from './game-map/runtime/map-runtime';
 import { getEntityKindLabel, getTileTypeLabel } from './domain-labels';
 import { MAP_FALLBACK } from './constants/world/world-panel';
 
-import { FloatingTooltip } from './ui/floating-tooltip';
+import { FloatingTooltip, prefersPinnedTooltipInteraction } from './ui/floating-tooltip';
 import { detailModalHost } from './ui/detail-modal-host';
 import { describePreviewBonuses } from './ui/stat-preview';
 import { MAX_ZOOM, MIN_ZOOM, getDisplayRangeX, getDisplayRangeY, getZoom, setZoom } from './display';
@@ -43,10 +43,10 @@ import {
   encodeTileTargetRef,
   GAME_TIME_PHASES,
   GameTimeState,
+  gridDistance,
   GroundItemPileView,
   GridPoint,
   isPointInRange,
-  manhattanDistance,
   PlayerState,
   RenderEntity,
   S2C_AttrUpdate,
@@ -73,6 +73,7 @@ import {
 const canvasHost = document.getElementById('game-stage') as HTMLElement;
 const zoomSlider = document.getElementById('zoom-slider') as HTMLInputElement | null;
 const zoomLevelEl = document.getElementById('zoom-level');
+const zoomResetBtn = document.getElementById('zoom-reset') as HTMLButtonElement | null;
 const tickRateEl = document.getElementById('map-tick-rate');
 const currentTimeEl = document.getElementById('map-current-time');
 const currentTimeValueEl = document.getElementById('map-current-time-value');
@@ -673,7 +674,7 @@ function isWithinDisplayedMemoryBounds(x: number, y: number): boolean {
 }
 
 function hideObserveModal(): void {
-  observeBuffTooltip.hide();
+  observeBuffTooltip.hide(true);
   observeModalEl?.classList.add('hidden');
   observeModalEl?.setAttribute('aria-hidden', 'true');
   observeModalAsideEl?.classList.add('hidden');
@@ -958,10 +959,10 @@ function buildAttrStateFromPlayer(player: PlayerState): S2C_AttrUpdate {
     ratioDivisors: player.ratioDivisors ? cloneJson(player.ratioDivisors) : undefined,
     maxHp: player.maxHp,
     qi: player.qi,
-    realm: player.realm ? cloneJson(player.realm) : null,
     boneAgeBaseYears: player.boneAgeBaseYears,
     lifeElapsedTicks: player.lifeElapsedTicks,
     lifespanYears: player.lifespanYears ?? null,
+    realm: player.realm ? cloneJson(player.realm) : null,
   };
 }
 
@@ -988,12 +989,12 @@ function mergeAttrUpdatePatch(previous: S2C_AttrUpdate | null, patch: S2C_AttrUp
     ratioDivisors: patch.ratioDivisors ? cloneJson(patch.ratioDivisors) : (previous?.ratioDivisors ? cloneJson(previous.ratioDivisors) : undefined),
     maxHp: patch.maxHp ?? previous?.maxHp ?? myPlayer?.maxHp ?? 0,
     qi: patch.qi ?? previous?.qi ?? myPlayer?.qi ?? 0,
-    realm: patch.realm === null ? null : patch.realm ? cloneJson(patch.realm) : (previous?.realm ? cloneJson(previous.realm) : null),
     boneAgeBaseYears: patch.boneAgeBaseYears ?? previous?.boneAgeBaseYears ?? myPlayer?.boneAgeBaseYears ?? undefined,
     lifeElapsedTicks: patch.lifeElapsedTicks ?? previous?.lifeElapsedTicks ?? myPlayer?.lifeElapsedTicks ?? undefined,
     lifespanYears: patch.lifespanYears === null
       ? null
       : patch.lifespanYears ?? previous?.lifespanYears ?? myPlayer?.lifespanYears ?? null,
+    realm: patch.realm === null ? null : patch.realm ? cloneJson(patch.realm) : (previous?.realm ? cloneJson(previous.realm) : null),
   };
 }
 
@@ -1113,6 +1114,19 @@ function bindObserveBuffTooltips(root: ParentNode): void {
     const title = node.dataset.buffTooltipTitle ?? '';
     const detail = node.dataset.buffTooltipDetail ?? '';
     const lines = detail.split('\n').filter(Boolean);
+    const tapMode = prefersPinnedTooltipInteraction();
+    node.addEventListener('click', (event) => {
+      if (!tapMode) {
+        return;
+      }
+      if (observeBuffTooltip.isPinnedTo(node)) {
+        observeBuffTooltip.hide(true);
+        return;
+      }
+      observeBuffTooltip.showPinned(node, title, lines, event.clientX, event.clientY);
+      event.preventDefault();
+      event.stopPropagation();
+    }, true);
     node.addEventListener('mouseenter', (event) => {
       observeBuffTooltip.show(title, lines, event.clientX, event.clientY);
     });
@@ -1309,6 +1323,10 @@ zoomSlider?.addEventListener('change', () => {
   const zoom = applyZoomChange(Number(zoomSlider.value));
   showToast(`缩放已调整为 ${formatZoom(zoom)}x`);
 });
+zoomResetBtn?.addEventListener('click', () => {
+  const zoom = applyZoomChange(2);
+  showToast(`缩放已重置为 ${formatZoom(zoom)}x`);
+});
 
 document.getElementById('hud-toggle-auto-battle')?.addEventListener('click', () => {
   socket.sendAction('toggle:auto_battle');
@@ -1342,7 +1360,7 @@ socket.onAttrUpdate((data) => {
     myPlayer.breakthroughReady = latestAttrUpdate.realm?.breakthroughReady;
   }
   attrPanel.update(latestAttrUpdate);
-  refreshHudChrome();
+  refreshUiChrome();
 });
 socket.onInventoryUpdate((data) => {
   if (myPlayer) myPlayer.inventory = data.inventory;
@@ -1350,11 +1368,6 @@ socket.onInventoryUpdate((data) => {
 });
 socket.onEquipmentUpdate((data) => {
   if (myPlayer) myPlayer.equipment = data.equipment;
-    myPlayer.boneAgeBaseYears = latestAttrUpdate.boneAgeBaseYears ?? myPlayer.boneAgeBaseYears;
-    myPlayer.lifeElapsedTicks = latestAttrUpdate.lifeElapsedTicks ?? myPlayer.lifeElapsedTicks;
-    myPlayer.lifespanYears = latestAttrUpdate.lifespanYears === undefined
-      ? myPlayer.lifespanYears
-      : latestAttrUpdate.lifespanYears;
   equipmentPanel.update(data.equipment);
 });
 socket.onTechniqueUpdate((data) => {
@@ -1377,15 +1390,21 @@ socket.onActionsUpdate((data) => {
   const previousActions = myPlayer?.actions ?? [];
   const previousAutoBattle = myPlayer?.autoBattle ?? false;
   const previousAutoRetaliate = myPlayer?.autoRetaliate ?? true;
+  const previousAllowAoePlayerHit = myPlayer?.allowAoePlayerHit ?? false;
   const previousAutoIdleCultivation = myPlayer?.autoIdleCultivation ?? true;
+  const previousAutoSwitchCultivation = myPlayer?.autoSwitchCultivation ?? false;
   const nextAutoBattle = data.autoBattle ?? myPlayer?.autoBattle ?? false;
   const nextAutoRetaliate = data.autoRetaliate ?? myPlayer?.autoRetaliate ?? true;
+  const nextAllowAoePlayerHit = data.allowAoePlayerHit ?? myPlayer?.allowAoePlayerHit ?? false;
   const nextAutoIdleCultivation = data.autoIdleCultivation ?? myPlayer?.autoIdleCultivation ?? true;
+  const nextAutoSwitchCultivation = data.autoSwitchCultivation ?? myPlayer?.autoSwitchCultivation ?? false;
   const nextSenseQiActive = data.senseQiActive ?? myPlayer?.senseQiActive ?? false;
   const shouldRefreshActionPanel = !myPlayer
     || previousAutoBattle !== nextAutoBattle
     || previousAutoRetaliate !== nextAutoRetaliate
+    || previousAllowAoePlayerHit !== nextAllowAoePlayerHit
     || previousAutoIdleCultivation !== nextAutoIdleCultivation
+    || previousAutoSwitchCultivation !== nextAutoSwitchCultivation
     || buildActionRenderSignature(previousActions) !== buildActionRenderSignature(mergedActions);
   if (myPlayer) {
     myPlayer.actions = mergedActions;
@@ -1397,7 +1416,9 @@ socket.onActionsUpdate((data) => {
       }));
     myPlayer.autoBattle = data.autoBattle ?? inferAutoBattle(myPlayer.autoBattle, mergedActions);
     myPlayer.autoRetaliate = data.autoRetaliate ?? inferAutoRetaliate(myPlayer.autoRetaliate !== false, mergedActions);
+    myPlayer.allowAoePlayerHit = nextAllowAoePlayerHit;
     myPlayer.autoIdleCultivation = nextAutoIdleCultivation;
+    myPlayer.autoSwitchCultivation = nextAutoSwitchCultivation;
     myPlayer.senseQiActive = nextSenseQiActive;
   }
   if (!previousAutoBattle && nextAutoBattle && (pathTarget || pathCells.length > 0)) {
@@ -1938,7 +1959,9 @@ socket.onInit((data: S2C_Init) => {
   syncCurrentTimeState(data.time ?? null);
   latestAttrUpdate = buildAttrStateFromPlayer(myPlayer);
   myPlayer.senseQiActive = myPlayer.senseQiActive === true;
+  myPlayer.allowAoePlayerHit = myPlayer.allowAoePlayerHit === true;
   myPlayer.autoIdleCultivation = myPlayer.autoIdleCultivation !== false;
+  myPlayer.autoSwitchCultivation = myPlayer.autoSwitchCultivation === true;
   syncTargetingOverlay();
   mapRuntime.applyInit(data);
   syncSenseQiOverlay();

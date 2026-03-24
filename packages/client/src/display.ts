@@ -4,17 +4,39 @@
 
 import { BASE_CELL_SIZE, DEFAULT_ZOOM, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './constants/visuals/display';
 
-let zoom = 2;
-let cellSize = BASE_CELL_SIZE * zoom;
-let displayRangeX = 10;
-let displayRangeY = 10;
-
-export { MAX_ZOOM, MIN_ZOOM };
+const MAP_ZOOM_STORAGE_KEY = 'mud:map-zoom';
+const MAP_DEFAULT_ZOOM = 2;
 
 function clampZoom(value: number): number {
   const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
   return Number(clamped.toFixed(2));
 }
+
+function readStoredZoom(): number {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return MAP_DEFAULT_ZOOM;
+  }
+  const raw = window.localStorage.getItem(MAP_ZOOM_STORAGE_KEY);
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return MAP_DEFAULT_ZOOM;
+  }
+  return clampZoom(parsed);
+}
+
+function persistZoom(nextZoom: number): void {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  window.localStorage.setItem(MAP_ZOOM_STORAGE_KEY, String(nextZoom));
+}
+
+let zoom = readStoredZoom();
+let cellSize = BASE_CELL_SIZE * zoom;
+let displayRangeX = 10;
+let displayRangeY = 10;
+
+export { MAX_ZOOM, MIN_ZOOM };
 
 /** 获取当前缩放倍率 */
 export function getZoom(): number {
@@ -24,18 +46,21 @@ export function getZoom(): number {
 /** 循环切换缩放倍率（到最大后回到最小） */
 export function cycleZoom(): number {
   zoom = zoom >= MAX_ZOOM ? MIN_ZOOM : clampZoom(zoom + ZOOM_STEP);
+  persistZoom(zoom);
   return zoom;
 }
 
 /** 直接设置缩放倍率，自动钳位到合法范围 */
 export function setZoom(level: number): number {
   zoom = clampZoom(level);
+  persistZoom(zoom);
   return zoom;
 }
 
 /** 按增量调整缩放倍率，自动钳位到合法范围 */
 export function adjustZoom(delta: number): number {
   zoom = clampZoom(zoom + delta);
+  persistZoom(zoom);
   return zoom;
 }
 

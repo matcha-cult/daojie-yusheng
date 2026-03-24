@@ -93,6 +93,14 @@ pnpm install
 ./start.sh
 ```
 
+`local` 模式会先检查本机 `localhost:5432` 和 `localhost:6379`。如果机器上已经存在 `mud-local-postgres` / `mud-local-redis` 这样的旧本地容器，会优先直接启动它们；只有没有现成容器时，才会执行 `docker compose up -d postgres redis` 拉起仓库自带的本地 PostgreSQL / Redis。因此重启电脑后如果 Docker 守护进程还没启动，需要先启动 Docker Desktop 或 `docker` 服务，再执行脚本。
+
+如果你使用的是自己本机或远程的数据库 / Redis，可以在 `packages/server/.env` 里覆盖连接配置，或直接使用：
+
+```bash
+SKIP_LOCAL_INFRA=1 ./start.sh
+```
+
 Docker 启动：
 
 ```bash

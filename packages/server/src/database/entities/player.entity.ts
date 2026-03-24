@@ -117,6 +117,10 @@ export class PlayerEntity {
   @Column({ type: 'boolean', default: true })
   autoRetaliate!: boolean;
 
+  /** 是否允许群体攻击命中玩家 */
+  @Column({ type: 'boolean', default: false })
+  allowAoePlayerHit!: boolean;
+
   /** 是否自动闲时修炼 */
   @Column({ type: 'boolean', default: true })
   autoIdleCultivation!: boolean;

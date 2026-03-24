@@ -33,6 +33,12 @@ import {
   PATH_TARGET_STROKE_COLOR,
 } from '../constants/visuals/path-highlight';
 import {
+  OTHER_THREAT_ARROW_COLOR,
+  OTHER_THREAT_ARROW_GLOW,
+  SELF_THREAT_ARROW_COLOR,
+  SELF_THREAT_ARROW_GLOW,
+} from '../constants/visuals/threat-arrow';
+import {
   TILE_HIDDEN_FADE_MS,
   TIME_FILTER_LERP,
   TIME_ATMOSPHERE_PROFILES,
@@ -219,6 +225,15 @@ interface AnimEntity {
   buffs?: VisibleBuffState[];
 }
 
+interface RenderedAnimEntity {
+  anim: AnimEntity;
+  sx: number;
+  sy: number;
+  centerX: number;
+  centerY: number;
+  cellSize: number;
+}
+
 interface FloatingText {
   id: number;
   x: number;
@@ -250,6 +265,7 @@ interface FloatingTextBurstOffset {
 export class TextRenderer implements IRenderer {
   private ctx: CanvasRenderingContext2D | null = null;
   private entities: Map<string, AnimEntity> = new Map();
+  private threatArrows: Array<{ ownerId: string; targetId: string }> = [];
   private groundPiles = new Map<string, GroundItemPileView>();
   private containerTileKeys = new Set<string>();
   private pathCells: { x: number; y: number }[] = [];
@@ -288,6 +304,7 @@ export class TextRenderer implements IRenderer {
 
   resetScene() {
     this.entities.clear();
+    this.threatArrows = [];
     this.groundPiles.clear();
     this.containerTileKeys.clear();
     this.floatingTexts = [];
@@ -305,6 +322,10 @@ export class TextRenderer implements IRenderer {
     this.pathKeys = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
     this.pathIndexByKey = new Map(cells.map((cell, index) => [`${cell.x},${cell.y}`, index]));
     this.pathTargetKey = cells.length > 0 ? `${cells[cells.length - 1].x},${cells[cells.length - 1].y}` : null;
+  }
+
+  setThreatArrows(arrows: Array<{ ownerId: string; targetId: string }>) {
+    this.threatArrows = arrows.map((entry) => ({ ownerId: entry.ownerId, targetId: entry.targetId }));
   }
 
   setTargetingOverlay(state: TargetingOverlayState | null) {
@@ -605,12 +626,13 @@ export class TextRenderer implements IRenderer {
   }
 
   /** 绘制所有实体（角色/怪物/NPC），含位置插值动画 */
-  renderEntities(camera: Camera, progress = 1) {
+  renderEntities(camera: Camera, progress = 1, localPlayerId?: string) {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const sw = ctx.canvas.width;
     const sh = ctx.canvas.height;
     const cellSize = getCellSize();
+    const renderedEntities: RenderedAnimEntity[] = [];
 
     for (const anim of this.entities.values()) {
       const motionProgress = Math.max(0, Math.min(1, progress));
@@ -620,17 +642,31 @@ export class TextRenderer implements IRenderer {
 
       const { sx, sy } = camera.worldToScreen(wx, wy, sw, sh);
       if (sx + cellSize < 0 || sx > sw || sy + cellSize < 0 || sy > sh) continue;
+      renderedEntities.push({
+        anim,
+        sx,
+        sy,
+        centerX: sx + cellSize / 2,
+        centerY: sy + cellSize / 2,
+        cellSize,
+      });
+    }
+
+    this.renderThreatTargetArrows(renderedEntities, localPlayerId);
+
+    for (const rendered of renderedEntities) {
+      const { anim, sx, sy, cellSize: renderedCellSize } = rendered;
 
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
-      ctx.ellipse(sx + cellSize / 2, sy + cellSize - 3, cellSize * 0.32, cellSize * 0.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(sx + renderedCellSize / 2, sy + renderedCellSize - 3, renderedCellSize * 0.32, renderedCellSize * 0.1, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = anim.color;
-      ctx.font = `bold ${cellSize * 0.75}px "Ma Shan Zheng", cursive`;
+      ctx.font = `bold ${renderedCellSize * 0.75}px "Ma Shan Zheng", cursive`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      this.drawOutlinedText(anim.char, sx + cellSize / 2, sy + cellSize / 2, anim.color, 'rgba(15,12,10,0.9)');
+      this.drawOutlinedText(anim.char, sx + renderedCellSize / 2, sy + renderedCellSize / 2, anim.color, 'rgba(15,12,10,0.9)');
 
       if (anim.kind) {
         const isMonster = anim.kind === 'monster';
@@ -639,22 +675,22 @@ export class TextRenderer implements IRenderer {
         const isContainer = anim.kind === 'container';
         const label = anim.name ?? (isMonster ? '妖兽' : isPlayer ? '修士' : isContainer ? '箱具' : '道人');
         ctx.textBaseline = 'alphabetic';
-        ctx.font = `${cellSize * 0.3}px "Noto Serif SC", serif`;
+        ctx.font = `${renderedCellSize * 0.3}px "Noto Serif SC", serif`;
         this.drawOutlinedText(
           label,
-          sx + cellSize / 2,
-          sy - Math.max(6, cellSize * 0.18),
+          sx + renderedCellSize / 2,
+          sy - Math.max(6, renderedCellSize * 0.18),
           isMonster ? '#ffddcc' : isPlayer ? '#d8f3c3' : isContainer ? '#ffe3b8' : '#cce7ff',
           'rgba(15,12,10,0.9)',
         );
 
-        this.drawBuffRows(sx, sy, cellSize, anim.buffs);
+        this.drawBuffRows(sx, sy, renderedCellSize, anim.buffs);
 
         if ((anim.maxHp ?? 0) > 0) {
           const ratio = Math.max(0, Math.min(1, (anim.hp ?? 0) / (anim.maxHp ?? 1)));
           const barX = sx + 3;
-          const barY = sy + cellSize - 5;
-          const barW = cellSize - 6;
+          const barY = sy + renderedCellSize - 5;
+          const barW = renderedCellSize - 6;
           ctx.fillStyle = 'rgba(0,0,0,0.45)';
           ctx.fillRect(barX, barY, barW, 3);
           ctx.fillStyle = isMonster ? '#d15252' : isNpc ? '#58a8ff' : isContainer ? '#c18b46' : '#63c46b';
@@ -662,10 +698,101 @@ export class TextRenderer implements IRenderer {
         }
 
         if (isNpc && anim.npcQuestMarker) {
-          this.drawNpcQuestMarker(sx, sy, cellSize, anim.npcQuestMarker);
+          this.drawNpcQuestMarker(sx, sy, renderedCellSize, anim.npcQuestMarker);
         }
       }
     }
+  }
+
+  private renderThreatTargetArrows(renderedEntities: RenderedAnimEntity[], localPlayerId?: string): void {
+    if (!this.ctx || renderedEntities.length === 0) {
+      return;
+    }
+    const ctx = this.ctx;
+    const renderedById = new Map(renderedEntities.map((entry) => [entry.anim.id, entry]));
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const arrow of this.threatArrows) {
+      const entry = renderedById.get(arrow.ownerId);
+      const target = renderedById.get(arrow.targetId);
+      if (!entry || !target || target.anim.id === entry.anim.id) {
+        continue;
+      }
+      this.drawThreatTargetArrow(entry, target, localPlayerId !== undefined && entry.anim.id === localPlayerId);
+    }
+
+    ctx.restore();
+  }
+
+  private drawThreatTargetArrow(from: RenderedAnimEntity, to: RenderedAnimEntity, isSelfArrow: boolean): void {
+    if (!this.ctx) {
+      return;
+    }
+    const ctx = this.ctx;
+    const dx = to.centerX - from.centerX;
+    const dy = to.centerY - from.centerY;
+    const distance = Math.hypot(dx, dy);
+    if (distance < Math.max(10, from.cellSize * 0.45)) {
+      return;
+    }
+
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const startPadding = from.cellSize * 0.34;
+    const endPadding = to.cellSize * 0.34;
+    const startX = from.centerX + ux * startPadding;
+    const startY = from.centerY + uy * startPadding;
+    const endX = to.centerX - ux * endPadding;
+    const endY = to.centerY - uy * endPadding;
+    const curvature = Math.max(from.cellSize * 0.32, Math.min(distance * 0.18, from.cellSize * 0.76));
+    const controlX = (startX + endX) / 2;
+    const controlY = Math.min(startY, endY) - curvature;
+    const color = isSelfArrow ? SELF_THREAT_ARROW_COLOR : OTHER_THREAT_ARROW_COLOR;
+    const glow = isSelfArrow ? SELF_THREAT_ARROW_GLOW : OTHER_THREAT_ARROW_GLOW;
+    const baseWidth = Math.max(0.35, from.cellSize * 0.014);
+    const glowWidth = baseWidth + Math.max(0.4, from.cellSize * 0.016);
+    const tangentX = endX - this.getQuadraticPoint(startX, controlX, endX, 0.86);
+    const tangentY = endY - this.getQuadraticPoint(startY, controlY, endY, 0.86);
+    const tangentLength = Math.hypot(tangentX, tangentY);
+    if (tangentLength < 0.001) {
+      return;
+    }
+    const arrowUx = tangentX / tangentLength;
+    const arrowUy = tangentY / tangentLength;
+    const headLength = Math.max(7, from.cellSize * 0.22);
+    const headWidth = Math.max(1.8, from.cellSize * 0.058);
+    const baseX = endX - arrowUx * headLength;
+    const baseY = endY - arrowUy * headLength;
+
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = glowWidth;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    ctx.stroke();
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = baseWidth;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo(controlX, controlY, endX, endY);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(baseX + (-arrowUy) * headWidth, baseY + arrowUx * headWidth);
+    ctx.lineTo(baseX - (-arrowUy) * headWidth, baseY - arrowUx * headWidth);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private getQuadraticPoint(start: number, control: number, end: number, t: number): number {
+    const invT = 1 - t;
+    return invT * invT * start + 2 * invT * t * control + t * t * end;
   }
 
   private drawBuffRows(sx: number, sy: number, cellSize: number, buffs?: VisibleBuffState[]) {
@@ -979,6 +1106,7 @@ export class TextRenderer implements IRenderer {
   destroy() {
     this.ctx = null;
     this.entities.clear();
+    this.threatArrows = [];
     this.groundPiles.clear();
     this.containerTileKeys.clear();
     this.pathKeys.clear();

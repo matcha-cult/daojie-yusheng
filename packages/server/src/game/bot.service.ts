@@ -4,8 +4,10 @@
 import { Injectable } from '@nestjs/common';
 import {
   DEFAULT_BASE_ATTRS,
+  DEFAULT_BONE_AGE_YEARS,
   DEFAULT_INVENTORY_CAPACITY,
   Direction,
+  isOffsetInRange,
   PlayerState,
   VIEW_RADIUS,
 } from '@mud/shared';
@@ -54,6 +56,9 @@ export class BotService {
         maxHp: 1,
         qi: 0,
         dead: false,
+        boneAgeBaseYears: DEFAULT_BONE_AGE_YEARS,
+        lifeElapsedTicks: 0,
+        lifespanYears: null,
         baseAttrs: { ...DEFAULT_BASE_ATTRS },
         bonuses: [],
         temporaryBuffs: [],
@@ -66,6 +71,7 @@ export class BotService {
         autoBattle: false,
         autoBattleSkills: [],
         autoRetaliate: false,
+        allowAoePlayerHit: false,
         autoIdleCultivation: false,
         idleTicks: 0,
       };
@@ -125,7 +131,7 @@ export class BotService {
       const candidates: Array<{ x: number; y: number }> = [];
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+          if (!isOffsetInRange(dx, dy, radius)) continue;
           const x = centerX + dx;
           const y = centerY + dy;
           if (!this.mapService.isWalkable(mapId, x, y, { actorType: 'player' })) continue;

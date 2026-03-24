@@ -216,6 +216,7 @@ export class PlayerService {
     if (state.combatTargetLocked === undefined) state.combatTargetLocked = false;
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
     if (state.autoRetaliate === undefined) state.autoRetaliate = true;
+    if (state.allowAoePlayerHit === undefined) state.allowAoePlayerHit = false;
     if (state.autoIdleCultivation === undefined) state.autoIdleCultivation = true;
     if (state.autoSwitchCultivation === undefined) state.autoSwitchCultivation = false;
     if (state.online === undefined) state.online = false;
@@ -266,6 +267,7 @@ export class PlayerService {
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
+      allowAoePlayerHit: state.allowAoePlayerHit === true,
       autoIdleCultivation: state.autoIdleCultivation,
       autoSwitchCultivation: state.autoSwitchCultivation === true,
       cultivatingTechId: state.cultivatingTechId ?? null,
@@ -322,6 +324,7 @@ export class PlayerService {
         autoBattle: state.autoBattle,
         autoBattleSkills: state.autoBattleSkills as any,
         autoRetaliate: state.autoRetaliate,
+        allowAoePlayerHit: state.allowAoePlayerHit === true,
         autoIdleCultivation: state.autoIdleCultivation,
         autoSwitchCultivation: state.autoSwitchCultivation === true,
         cultivatingTechId: state.cultivatingTechId ?? null,
@@ -600,6 +603,7 @@ export class PlayerService {
       autoBattle: entity.autoBattle ?? false,
       autoBattleSkills: (entity.autoBattleSkills ?? []) as AutoBattleSkillConfig[],
       autoRetaliate: entity.autoRetaliate ?? true,
+      allowAoePlayerHit: entity.allowAoePlayerHit === true,
       autoIdleCultivation: entity.autoIdleCultivation ?? true,
       autoSwitchCultivation: entity.autoSwitchCultivation === true,
       actions: [],
@@ -687,6 +691,7 @@ export class PlayerService {
       autoBattle: state.autoBattle,
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
+      allowAoePlayerHit: state.allowAoePlayerHit === true,
       autoIdleCultivation: state.autoIdleCultivation,
       autoSwitchCultivation: state.autoSwitchCultivation === true,
       cultivatingTechId: state.cultivatingTechId ?? null,

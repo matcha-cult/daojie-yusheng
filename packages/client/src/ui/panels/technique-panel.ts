@@ -18,7 +18,7 @@ import {
 } from '@mud/shared';
 import { ATTR_KEY_LABELS, getTechniqueGradeLabel, getTechniqueRealmLabel } from '../../domain-labels';
 import { resolvePreviewTechnique, resolvePreviewTechniques } from '../../content/local-templates';
-import { FloatingTooltip } from '../floating-tooltip';
+import { FloatingTooltip, prefersPinnedTooltipInteraction } from '../floating-tooltip';
 import { detailModalHost } from '../detail-modal-host';
 import { buildSkillTooltipContent } from '../skill-tooltip';
 import { preserveSelection } from '../selection-preserver';
@@ -117,6 +117,7 @@ export class TechniquePanel {
 
   clear(): void {
     this.pane.innerHTML = '<div class="empty-hint">尚未习得功法</div>';
+    this.tooltip.hide(true);
     this.closeModal();
   }
 
@@ -247,7 +248,7 @@ export class TechniquePanel {
         this.openTechId = null;
         this.openLayerLevel = null;
         this.destroyConstellationCanvas();
-        this.tooltip.hide();
+        this.tooltip.hide(true);
       },
       onAfterRender: (body) => {
         this.mountConstellation(body, tech, layers, selectedLevel, skillsByLevel, milestones);
@@ -454,6 +455,7 @@ export class TechniquePanel {
   }
 
   private bindSkillTooltips(modalBody: HTMLElement): void {
+    const tapMode = prefersPinnedTooltipInteraction();
     modalBody.querySelectorAll<HTMLElement>('[data-skill-tooltip-title]').forEach((node) => {
       if (node.dataset.skillTooltipBound === '1') {
         return;
@@ -463,7 +465,34 @@ export class TechniquePanel {
       const rich = node.dataset.skillTooltipRich === '1';
       const skillId = node.dataset.skillTooltipSkillId ?? '';
       const unlockLevel = Number(node.dataset.skillTooltipUnlockLevel ?? '0') || undefined;
+      node.addEventListener('click', (event) => {
+        if (!tapMode) {
+          return;
+        }
+        if (this.tooltip.isPinnedTo(node)) {
+          this.tooltip.hide(true);
+          return;
+        }
+        const techniques = resolvePreviewTechniques(this.lastState.techniques);
+        const technique = techniques.find((entry) => entry.skills.some((skill) => skill.id === skillId));
+        const skill = technique?.skills.find((entry) => entry.id === skillId);
+        const tooltip = skill ? buildSkillTooltipContent(skill, {
+          unlockLevel,
+          techLevel: technique?.level,
+          player: this.lastState.previewPlayer,
+          knownSkills: techniques.flatMap((entry) => entry.skills),
+        }) : { lines: [], asideCards: [] };
+        this.tooltip.showPinned(node, title, tooltip.lines, event.clientX, event.clientY, {
+          allowHtml: rich,
+          asideCards: tooltip.asideCards,
+        });
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
       node.addEventListener('pointerenter', (event) => {
+        if (tapMode && this.tooltip.isPinned()) {
+          return;
+        }
         const techniques = resolvePreviewTechniques(this.lastState.techniques);
         const technique = techniques.find((entry) => entry.skills.some((skill) => skill.id === skillId));
         const skill = technique?.skills.find((entry) => entry.id === skillId);
@@ -479,6 +508,9 @@ export class TechniquePanel {
         });
       });
       node.addEventListener('pointermove', (event) => {
+        if (tapMode && this.tooltip.isPinned()) {
+          return;
+        }
         this.tooltip.move(event.clientX, event.clientY);
       });
       node.addEventListener('pointerleave', () => {
@@ -492,7 +524,7 @@ export class TechniquePanel {
     this.openLayerLevel = null;
     this.destroyConstellationCanvas();
     detailModalHost.close(TechniquePanel.MODAL_OWNER);
-    this.tooltip.hide();
+    this.tooltip.hide(true);
   }
 
   private patchList(): boolean {

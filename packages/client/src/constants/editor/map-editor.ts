@@ -19,6 +19,7 @@ export const PAINT_TILE_TYPES: TileType[] = [
   TileType.Water,
   TileType.Tree,
   TileType.Stone,
+  TileType.SpiritOre,
 ];
 
 /** 左侧工具栏按钮与提示。 */

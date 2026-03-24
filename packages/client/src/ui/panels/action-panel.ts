@@ -4,13 +4,13 @@
  */
 
 import { ActionDef, AutoBattleSkillConfig, PlayerState, SkillDef } from '@mud/shared';
-import { FloatingTooltip } from '../floating-tooltip';
+import { FloatingTooltip, prefersPinnedTooltipInteraction } from '../floating-tooltip';
 import { buildSkillTooltipContent } from '../skill-tooltip';
 import { preserveSelection } from '../selection-preserver';
 import { getActionTypeLabel } from '../../domain-labels';
 import { ACTION_SHORTCUTS_KEY } from '../../constants/ui/action';
 
-type ActionMainTab = 'dialogue' | 'skill' | 'toggle';
+type ActionMainTab = 'dialogue' | 'skill' | 'toggle' | 'utility';
 type SkillSubTab = 'auto' | 'manual';
 
 function normalizeShortcutKey(key: string): string | null {
@@ -39,7 +39,9 @@ export class ActionPanel {
   private activeSkillTab: SkillSubTab = 'auto';
   private autoBattle = false;
   private autoRetaliate = true;
+  private allowAoePlayerHit = false;
   private autoIdleCultivation = true;
+  private autoSwitchCultivation = false;
   private currentActions: ActionDef[] = [];
   private shortcutBindings = new Map<string, string>();
   private bindingActionId: string | null = null;
@@ -56,6 +58,7 @@ export class ActionPanel {
   }
 
   clear(): void {
+    this.tooltip.hide(true);
     this.pane.innerHTML = '<div class="empty-hint">暂无可用行动</div>';
   }
 
@@ -72,7 +75,9 @@ export class ActionPanel {
     if (player) {
       this.previewPlayer = player;
       this.syncPlayerContext(player);
+      this.allowAoePlayerHit = player.allowAoePlayerHit === true;
       this.autoIdleCultivation = player.autoIdleCultivation !== false;
+      this.autoSwitchCultivation = player.autoSwitchCultivation === true;
     }
     this.currentActions = this.withUtilityActions(actions);
     if (_autoBattle !== undefined) this.autoBattle = _autoBattle;
@@ -85,7 +90,9 @@ export class ActionPanel {
     if (player) {
       this.previewPlayer = player;
       this.syncPlayerContext(player);
+      this.allowAoePlayerHit = player.allowAoePlayerHit === true;
       this.autoIdleCultivation = player.autoIdleCultivation !== false;
+      this.autoSwitchCultivation = player.autoSwitchCultivation === true;
     }
     this.currentActions = this.withUtilityActions(actions);
     if (_autoBattle !== undefined) this.autoBattle = _autoBattle;
@@ -102,7 +109,9 @@ export class ActionPanel {
     this.currentActions = this.withUtilityActions(player.actions);
     this.autoBattle = player.autoBattle ?? false;
     this.autoRetaliate = player.autoRetaliate !== false;
+    this.allowAoePlayerHit = player.allowAoePlayerHit === true;
     this.autoIdleCultivation = player.autoIdleCultivation !== false;
+    this.autoSwitchCultivation = player.autoSwitchCultivation === true;
     this.render(this.currentActions);
   }
 
@@ -129,7 +138,8 @@ export class ActionPanel {
     }> = [
       { id: 'dialogue', label: '对话', types: ['quest', 'interact', 'travel'] },
       { id: 'skill', label: '技能', types: ['skill', 'battle', 'gather'] },
-      { id: 'toggle', label: '行动', types: ['toggle'] },
+      { id: 'toggle', label: '开关', types: ['toggle'] },
+      { id: 'utility', label: '行动', types: ['toggle'] },
     ];
     const groups = new Map<string, ActionDef[]>();
     for (const action of actions) {
@@ -139,42 +149,7 @@ export class ActionPanel {
     }
     const autoBattleDisplayOrders = this.buildAutoBattleDisplayOrderMap(actions);
 
-    let html = `<div class="panel-section">
-      <div class="panel-section-title">战斗开关</div>
-      <div class="intel-grid compact">
-        <div class="gm-player-row ${this.autoBattle ? 'active' : ''}" data-action-card="toggle:auto_battle" role="button" tabindex="0">
-          <div>
-            <div class="gm-player-name">自动战斗</div>
-            <div class="gm-player-meta" data-toggle-meta="toggle:auto_battle">${this.autoBattle ? '当前已开启' : '当前已关闭'}${this.renderShortcutMeta('toggle:auto_battle')}</div>
-          </div>
-          <div class="action-card-side">
-            <div class="gm-player-stat" data-toggle-stat="toggle:auto_battle">${this.autoBattle ? '开' : '关'}</div>
-            <button class="small-btn ghost" data-bind-action="toggle:auto_battle" type="button">${this.getBindButtonLabel('toggle:auto_battle')}</button>
-          </div>
-        </div>
-        <div class="gm-player-row ${this.autoRetaliate ? 'active' : ''}" data-action-card="toggle:auto_retaliate" role="button" tabindex="0">
-          <div>
-            <div class="gm-player-name">自动反击</div>
-            <div class="gm-player-meta" data-toggle-meta="toggle:auto_retaliate">${this.autoRetaliate ? '受到攻击自动开战' : '受到攻击保持克制'}${this.renderShortcutMeta('toggle:auto_retaliate')}</div>
-          </div>
-          <div class="action-card-side">
-            <div class="gm-player-stat" data-toggle-stat="toggle:auto_retaliate">${this.autoRetaliate ? '开' : '关'}</div>
-            <button class="small-btn ghost" data-bind-action="toggle:auto_retaliate" type="button">${this.getBindButtonLabel('toggle:auto_retaliate')}</button>
-          </div>
-        </div>
-        <div class="gm-player-row ${this.autoIdleCultivation ? 'active' : ''}" data-action-card="toggle:auto_idle_cultivation" role="button" tabindex="0">
-          <div>
-            <div class="gm-player-name">闲置自动修炼</div>
-            <div class="gm-player-meta" data-toggle-meta="toggle:auto_idle_cultivation">${this.autoIdleCultivation ? '闲置 60 息后自动开始修炼' : '关闭后不会自动开始修炼'}${this.renderShortcutMeta('toggle:auto_idle_cultivation')}</div>
-          </div>
-          <div class="action-card-side">
-            <div class="gm-player-stat" data-toggle-stat="toggle:auto_idle_cultivation">${this.autoIdleCultivation ? '开' : '关'}</div>
-            <button class="small-btn ghost" data-bind-action="toggle:auto_idle_cultivation" type="button">${this.getBindButtonLabel('toggle:auto_idle_cultivation')}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="action-tab-bar">
+    let html = `<div class="action-tab-bar">
       ${tabGroups.map((tab) => `
         <button class="action-tab-btn ${this.activeTab === tab.id ? 'active' : ''}" data-action-tab="${tab.id}" type="button">${tab.label}</button>
       `).join('')}
@@ -183,10 +158,22 @@ export class ActionPanel {
     for (const tab of tabGroups) {
       html += `<div class="action-tab-pane ${this.activeTab === tab.id ? 'active' : ''}" data-action-pane="${tab.id}">`;
       if (tab.id === 'toggle') {
-        const utilityEntries = actions.filter((action) => action.type === 'toggle'
-          && action.id !== 'toggle:auto_battle'
-          && action.id !== 'toggle:auto_retaliate'
-          && action.id !== 'toggle:auto_idle_cultivation');
+        const switchEntries = actions.filter((action) => this.isSwitchAction(action));
+        if (switchEntries.length === 0) {
+          html += '<div class="empty-hint">当前分组暂无内容</div></div>';
+          continue;
+        }
+        html += `<div class="panel-section">
+          <div class="panel-section-title">开关</div>
+          <div class="intel-grid compact">`;
+        for (const action of switchEntries) {
+          html += this.renderSwitchItem(action);
+        }
+        html += '</div></div></div>';
+        continue;
+      }
+      if (tab.id === 'utility') {
+        const utilityEntries = actions.filter((action) => action.type === 'toggle' && !this.isSwitchAction(action));
         if (utilityEntries.length === 0) {
           html += '<div class="empty-hint">当前分组暂无内容</div></div>';
           continue;
@@ -334,12 +321,36 @@ export class ActionPanel {
   }
 
   private bindTooltips(): void {
+    const tapMode = prefersPinnedTooltipInteraction();
     this.pane.querySelectorAll<HTMLElement>('[data-action-tooltip-title]').forEach((node) => {
       const title = node.dataset.actionTooltipTitle ?? '';
       const rich = node.dataset.actionTooltipRich === '1';
       const skillId = node.dataset.actionTooltipSkillId ?? '';
       const skillContext = skillId ? this.skillLookup.get(skillId) : undefined;
+      node.addEventListener('click', (event) => {
+        if (!tapMode) {
+          return;
+        }
+        if (this.tooltip.isPinnedTo(node)) {
+          this.tooltip.hide(true);
+          return;
+        }
+        const tooltip = skillContext ? buildSkillTooltipContent(skillContext.skill, {
+          techLevel: skillContext.techLevel,
+          player: this.previewPlayer,
+          knownSkills: skillContext.knownSkills,
+        }) : { lines: [], asideCards: [] };
+        this.tooltip.showPinned(node, title, tooltip.lines, event.clientX, event.clientY, {
+          allowHtml: rich,
+          asideCards: tooltip.asideCards,
+        });
+        event.preventDefault();
+        event.stopPropagation();
+      }, true);
       node.addEventListener('pointerenter', (event) => {
+        if (tapMode && this.tooltip.isPinned()) {
+          return;
+        }
         const tooltip = skillContext ? buildSkillTooltipContent(skillContext.skill, {
           techLevel: skillContext.techLevel,
           player: this.previewPlayer,
@@ -351,6 +362,9 @@ export class ActionPanel {
         });
       });
       node.addEventListener('pointermove', (event) => {
+        if (tapMode && this.tooltip.isPinned()) {
+          return;
+        }
         this.tooltip.move(event.clientX, event.clientY);
       });
       node.addEventListener('pointerleave', () => {
@@ -403,6 +417,80 @@ export class ActionPanel {
   private renderShortcutMeta(actionId: string): string {
     const binding = this.shortcutBindings.get(actionId);
     return binding ? ` · 快捷键 ${binding.toUpperCase()}` : '';
+  }
+
+  private isSwitchAction(action: ActionDef): boolean {
+    return action.type === 'toggle' && this.isSwitchActionId(action.id);
+  }
+
+  private isSwitchActionId(actionId: string): boolean {
+    return actionId === 'toggle:auto_battle'
+      || actionId === 'toggle:auto_retaliate'
+      || actionId === 'toggle:auto_idle_cultivation'
+      || actionId === 'toggle:auto_switch_cultivation'
+      || actionId === 'cultivation:toggle'
+      || actionId === 'sense_qi:toggle';
+  }
+
+  private getSwitchCardTitle(action: ActionDef): string {
+    switch (action.id) {
+      case 'toggle:auto_battle':
+        return '自动战斗';
+      case 'toggle:auto_retaliate':
+        return '自动反击';
+      case 'toggle:allow_aoe_player_hit':
+        return '全体攻击';
+      case 'toggle:auto_idle_cultivation':
+        return '闲置自动修炼';
+      case 'toggle:auto_switch_cultivation':
+        return '修满自动切换';
+      case 'cultivation:toggle':
+        return '当前修炼';
+      case 'sense_qi:toggle':
+        return '感气视角';
+      default:
+        return action.name;
+    }
+  }
+
+  private getSwitchCardState(action: ActionDef): { active: boolean; label: string } {
+    switch (action.id) {
+      case 'toggle:auto_battle':
+        return { active: this.autoBattle, label: this.autoBattle ? '开' : '关' };
+      case 'toggle:auto_retaliate':
+        return { active: this.autoRetaliate, label: this.autoRetaliate ? '开' : '关' };
+      case 'toggle:allow_aoe_player_hit':
+        return { active: this.allowAoePlayerHit, label: this.allowAoePlayerHit ? '开' : '关' };
+      case 'toggle:auto_idle_cultivation':
+        return { active: this.autoIdleCultivation, label: this.autoIdleCultivation ? '开' : '关' };
+      case 'toggle:auto_switch_cultivation':
+        return { active: this.autoSwitchCultivation, label: this.autoSwitchCultivation ? '开' : '关' };
+      case 'cultivation:toggle':
+        if (!this.previewPlayer?.cultivatingTechId) {
+          return { active: false, label: '未设' };
+        }
+        return { active: action.name.includes('停止'), label: action.name.includes('停止') ? '开' : '关' };
+      case 'sense_qi:toggle': {
+        const active = this.previewPlayer?.senseQiActive === true;
+        return { active, label: active ? '开' : '关' };
+      }
+      default:
+        return { active: false, label: '执行' };
+    }
+  }
+
+  private renderSwitchItem(action: ActionDef): string {
+    const state = this.getSwitchCardState(action);
+    return `<div class="gm-player-row ${state.active ? 'active' : ''}" data-action-card="${action.id}" role="button" tabindex="0">
+      <div>
+        <div class="gm-player-name">${escapeHtml(this.getSwitchCardTitle(action))}</div>
+        <div class="gm-player-meta">${escapeHtml(action.desc)}${this.renderShortcutMeta(action.id)}</div>
+      </div>
+      <div class="action-card-side">
+        <div class="gm-player-stat">${state.label}</div>
+        <button class="small-btn ghost" data-bind-action="${action.id}" type="button">${this.getBindButtonLabel(action.id)}</button>
+      </div>
+    </div>`;
   }
 
   private getBindButtonLabel(actionId: string): string {
@@ -609,40 +697,6 @@ export class ActionPanel {
   }
 
   private patchToggleCards(): boolean {
-    const autoBattleCard = this.pane.querySelector<HTMLElement>('[data-action-card="toggle:auto_battle"]');
-    const autoBattleMeta = this.pane.querySelector<HTMLElement>('[data-toggle-meta="toggle:auto_battle"]');
-    const autoBattleStat = this.pane.querySelector<HTMLElement>('[data-toggle-stat="toggle:auto_battle"]');
-    const autoRetaliateCard = this.pane.querySelector<HTMLElement>('[data-action-card="toggle:auto_retaliate"]');
-    const autoRetaliateMeta = this.pane.querySelector<HTMLElement>('[data-toggle-meta="toggle:auto_retaliate"]');
-    const autoRetaliateStat = this.pane.querySelector<HTMLElement>('[data-toggle-stat="toggle:auto_retaliate"]');
-    const autoIdleCultivationCard = this.pane.querySelector<HTMLElement>('[data-action-card="toggle:auto_idle_cultivation"]');
-    const autoIdleCultivationMeta = this.pane.querySelector<HTMLElement>('[data-toggle-meta="toggle:auto_idle_cultivation"]');
-    const autoIdleCultivationStat = this.pane.querySelector<HTMLElement>('[data-toggle-stat="toggle:auto_idle_cultivation"]');
-    if (
-      !autoBattleCard
-      || !autoBattleMeta
-      || !autoBattleStat
-      || !autoRetaliateCard
-      || !autoRetaliateMeta
-      || !autoRetaliateStat
-      || !autoIdleCultivationCard
-      || !autoIdleCultivationMeta
-      || !autoIdleCultivationStat
-    ) {
-      return false;
-    }
-
-    autoBattleCard.classList.toggle('active', this.autoBattle);
-    autoBattleMeta.textContent = `${this.autoBattle ? '当前已开启' : '当前已关闭'}${this.renderShortcutMeta('toggle:auto_battle')}`;
-    autoBattleStat.textContent = this.autoBattle ? '开' : '关';
-
-    autoRetaliateCard.classList.toggle('active', this.autoRetaliate);
-    autoRetaliateMeta.textContent = `${this.autoRetaliate ? '受到攻击自动开战' : '受到攻击保持克制'}${this.renderShortcutMeta('toggle:auto_retaliate')}`;
-    autoRetaliateStat.textContent = this.autoRetaliate ? '开' : '关';
-
-    autoIdleCultivationCard.classList.toggle('active', this.autoIdleCultivation);
-    autoIdleCultivationMeta.textContent = `${this.autoIdleCultivation ? '闲置 60 息后自动开始修炼' : '关闭后不会自动开始修炼'}${this.renderShortcutMeta('toggle:auto_idle_cultivation')}`;
-    autoIdleCultivationStat.textContent = this.autoIdleCultivation ? '开' : '关';
     return true;
   }
 
@@ -650,9 +704,7 @@ export class ActionPanel {
     const autoBattleDisplayOrders = this.buildAutoBattleDisplayOrderMap(this.currentActions);
     for (const action of this.currentActions) {
       if (
-        action.id === 'toggle:auto_battle'
-        || action.id === 'toggle:auto_retaliate'
-        || action.id === 'toggle:auto_idle_cultivation'
+        this.isSwitchAction(action)
         || action.id === 'client:observe'
         || action.type === 'breakthrough'
       ) {

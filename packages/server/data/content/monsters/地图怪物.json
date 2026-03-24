@@ -885,7 +885,7 @@
     "char": "鼠",
     "color": "#9b9b9b",
     "grade": "mortal",
-    "radius": 3,
+    "radius": 8,
     "respawnSec": 15,
     "level": 1,
     "count": 10,

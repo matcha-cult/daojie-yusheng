@@ -22,6 +22,7 @@ export const TILE_VISUAL_BG_COLORS: Record<TileType, string> = {
   [TileType.Water]: '#6e9ab8',
   [TileType.Tree]: '#4d6b3a',
   [TileType.Stone]: '#7a7570',
+  [TileType.SpiritOre]: '#4b5f87',
 };
 
 /** 地形字符映射。 */
@@ -42,6 +43,7 @@ export const TILE_VISUAL_GLYPHS: Record<TileType, string> = {
   [TileType.Water]: '水',
   [TileType.Tree]: '木',
   [TileType.Stone]: '石',
+  [TileType.SpiritOre]: '灵',
 };
 
 /** 地形字符颜色映射。 */
@@ -62,4 +64,5 @@ export const TILE_VISUAL_GLYPH_COLORS: Record<TileType, string> = {
   [TileType.Water]: 'rgba(30,50,80,0.4)',
   [TileType.Tree]: 'rgba(20,40,15,0.5)',
   [TileType.Stone]: 'rgba(40,35,30,0.35)',
+  [TileType.SpiritOre]: '#d2e7ff',
 };

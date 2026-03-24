@@ -4,6 +4,8 @@
 
 export {
   DEFAULT_TERRAIN_DURABILITY_BY_TILE,
-  MAP_TERRAIN_DURABILITY_OVERRIDES,
+  LEGACY_MAP_TERRAIN_PROFILE_IDS,
+  TERRAIN_DURABILITY_PROFILES,
+  type TerrainDurabilityProfileId,
   type TerrainDurabilityProfile,
 } from './map';

@@ -23,6 +23,7 @@ export const TILE_MINIMAP_COLORS: Record<TileType, string> = {
   [TileType.Water]: '#4f7696',
   [TileType.Tree]: '#365133',
   [TileType.Stone]: '#605c58',
+  [TileType.SpiritOre]: '#5675a5',
 };
 
 /** 小地图标记颜色映射。 */
@@ -34,4 +35,3 @@ export const MINIMAP_MARKER_COLORS: Record<MapMinimapMarkerKind, string> = {
   portal: '#b48cff',
   stairs: '#ffd38c',
 };
-

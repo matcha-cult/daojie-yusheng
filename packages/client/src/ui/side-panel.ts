@@ -1,6 +1,23 @@
 /** 页面布局与多组标签页控制器 */
+type MobilePaneId =
+  | 'mobile-overview'
+  | 'mobile-attrs'
+  | 'mobile-world'
+  | 'mobile-bag'
+  | 'mobile-action';
+
+type MobileSectionMount = {
+  element: HTMLElement;
+  paneId: MobilePaneId;
+  originalParent: HTMLElement;
+  originalNextSibling: ChildNode | null;
+};
+
 export class SidePanel {
   private panel: HTMLElement;
+  private mobileShell: HTMLElement | null;
+  private mobileSections: MobileSectionMount[];
+  private mobileLayoutActive = false;
   private visible = false;
   private onVisibilityChange: ((visible: boolean) => void) | null = null;
   private onLayoutChange: (() => void) | null = null;
@@ -20,9 +37,13 @@ export class SidePanel {
 
   constructor() {
     this.panel = document.getElementById('game-shell')!;
+    this.mobileShell = document.getElementById('mobile-ui-shell');
+    this.mobileSections = this.collectMobileSections();
     this.bindTabGroups();
     this.bindLayoutToggles();
+    this.bindResponsiveLayout();
     this.syncLayoutState();
+    this.syncResponsiveLayout();
   }
 
   show(): void {
@@ -161,6 +182,101 @@ export class SidePanel {
           button.releasePointerCapture(event.pointerId);
         }
       });
+    });
+  }
+
+  private bindResponsiveLayout(): void {
+    const refresh = () => {
+      this.syncResponsiveLayout();
+    };
+    window.addEventListener('resize', refresh);
+    window.addEventListener('orientationchange', refresh);
+    window.visualViewport?.addEventListener('resize', refresh);
+  }
+
+  private collectMobileSections(): MobileSectionMount[] {
+    return [...this.panel.querySelectorAll<HTMLElement>('[data-mobile-section]')]
+      .map((element) => {
+        const paneId = this.resolveMobilePaneId(element.dataset.mobileSection);
+        const originalParent = element.parentElement;
+        if (!paneId || !originalParent) {
+          return null;
+        }
+        return {
+          element,
+          paneId,
+          originalParent,
+          originalNextSibling: element.nextSibling,
+        } satisfies MobileSectionMount;
+      })
+      .filter((entry): entry is MobileSectionMount => entry !== null);
+  }
+
+  private resolveMobilePaneId(section?: string): MobilePaneId | null {
+    switch (section) {
+      case 'overview':
+        return 'mobile-overview';
+      case 'attrs':
+        return 'mobile-attrs';
+      case 'world':
+        return 'mobile-world';
+      case 'bag':
+        return 'mobile-bag';
+      case 'action':
+        return 'mobile-action';
+      default:
+        return null;
+    }
+  }
+
+  private shouldUseMobileLayout(): boolean {
+    const viewportWidth = Math.max(0, window.innerWidth || 0);
+    const pointerCoarse = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(pointer: coarse)').matches
+      : false;
+    const hoverNone = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(hover: none)').matches
+      : false;
+    return viewportWidth <= 920 || ((pointerCoarse || hoverNone) && viewportWidth <= 1180);
+  }
+
+  private syncResponsiveLayout(): void {
+    const nextMobileLayoutActive = this.shouldUseMobileLayout();
+    if (nextMobileLayoutActive === this.mobileLayoutActive) {
+      return;
+    }
+    this.mobileLayoutActive = nextMobileLayoutActive;
+    this.panel.dataset.mobileLayout = nextMobileLayoutActive ? 'true' : 'false';
+    if (nextMobileLayoutActive) {
+      this.mountMobileSections();
+    } else {
+      this.restoreDesktopSections();
+    }
+    this.onLayoutChange?.();
+  }
+
+  private mountMobileSections(): void {
+    if (!this.mobileShell) {
+      return;
+    }
+    this.mobileSections.forEach((entry) => {
+      const pane = this.mobileShell?.querySelector<HTMLElement>(`[data-pane="${entry.paneId}"]`);
+      if (!pane || entry.element.parentElement === pane) {
+        return;
+      }
+      pane.appendChild(entry.element);
+    });
+  }
+
+  private restoreDesktopSections(): void {
+    this.mobileSections.forEach((entry) => {
+      if (entry.element.parentElement === entry.originalParent) {
+        return;
+      }
+      const referenceNode = entry.originalNextSibling?.parentNode === entry.originalParent
+        ? entry.originalNextSibling
+        : null;
+      entry.originalParent.insertBefore(entry.element, referenceNode);
     });
   }
 

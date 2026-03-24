@@ -19,8 +19,10 @@ import {
   GmMapNpcRecord,
   GmMapPortalRecord,
   GmMapSummary,
+  inferMonsterValueStatsFromLegacy,
   isTileTypeWalkable,
-  manhattanDistance,
+  isOffsetInRange,
+  isPointInRange,
   Tile,
   TileType,
   MapMeta,
@@ -30,10 +32,14 @@ import {
   MapSpaceVisionMode,
   MapTimeConfig,
   MonsterAggroMode,
+  MonsterCombatModel,
+  NumericStats,
   normalizeEditableMapDocument as normalizeEditableMapDocumentValue,
+  PartialNumericStats,
   Portal,
   PortalKind,
   PortalTrigger,
+  resolveMonsterNumericStatsFromValueStats,
   VIEW_RADIUS,
   validateEditableMapDocument as validateEditableMapDocumentValue,
   ItemType,
@@ -57,10 +63,12 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveServerDataPath } from '../common/data-path';
+import { ContentService } from './content.service';
 import { resolveRealmStageTargetLabel } from './quest-display';
 import {
   DEFAULT_TERRAIN_DURABILITY_BY_TILE,
-  MAP_TERRAIN_DURABILITY_OVERRIDES,
+  LEGACY_MAP_TERRAIN_PROFILE_IDS,
+  TERRAIN_DURABILITY_PROFILES,
   TerrainDurabilityProfile,
 } from '../constants/world/terrain';
 
@@ -132,9 +140,14 @@ export interface MonsterSpawnConfig {
   y: number;
   char: string;
   color: string;
+  grade: TechniqueGrade;
+  valueStats?: PartialNumericStats;
+  numericStats: NumericStats;
+  combatModel: MonsterCombatModel;
   hp: number;
   maxHp: number;
   attack: number;
+  count: number;
   radius: number;
   maxAlive: number;
   aggroRange: number;
@@ -295,8 +308,13 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   private readonly legacyAuraStatePath = resolveServerDataPath('runtime', 'map-aura-state.json');
   private auraLevelBaseValue = DEFAULT_AURA_LEVEL_BASE_VALUE;
 
+  constructor(
+    private readonly contentService: ContentService,
+  ) {}
+
   onModuleInit() {
     this.loadPersistedTileRuntimeStates();
+    this.contentService.ensureLoaded();
     this.loadAllMaps();
     this.watchMaps();
   }
@@ -519,6 +537,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   private loadAllMaps() {
+    this.contentService.ensureLoaded();
     const files = fs.readdirSync(this.mapsDir).filter(f => f.endsWith('.json'));
     for (const file of files) {
       this.loadMapFile(path.join(this.mapsDir, file));
@@ -688,7 +707,8 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      fs.writeFileSync(this.resolveMapFilePath(mapId), `${JSON.stringify(normalized, null, 2)}\n`, 'utf-8');
+      const persisted = this.dehydrateEditableMapDocument(normalized);
+      fs.writeFileSync(this.resolveMapFilePath(mapId), `${JSON.stringify(persisted, null, 2)}\n`, 'utf-8');
       this.loadMap(normalized);
       return null;
     } catch (saveError) {
@@ -1474,7 +1494,9 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
 
     const result: MonsterSpawnConfig[] = [];
     for (const candidate of rawSpawns) {
-      const spawn = candidate as Partial<MonsterSpawnConfig> & {
+      const rawSpawn = candidate as Partial<GmMapMonsterSpawnRecord> & Partial<MonsterSpawnConfig> & {
+        templateId?: string;
+        count?: number;
         respawnSec?: number;
         level?: number;
         expMultiplier?: number;
@@ -1482,8 +1504,27 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         lootChance?: number;
         drops?: unknown[];
       };
+      const templateId = this.resolveMonsterSpawnTemplateId(rawSpawn);
+      const template = templateId ? this.contentService.getMonsterTemplate(templateId) : undefined;
+      const spawn = template ? { ...template, ...rawSpawn } : rawSpawn;
+      const level = Number.isInteger((spawn as { level?: number }).level) ? (spawn as { level: number }).level : undefined;
+      const valueStats = (spawn as { valueStats?: PartialNumericStats }).valueStats
+        ?? inferMonsterValueStatsFromLegacy({
+          maxHp: Number.isInteger(spawn.maxHp) ? Number(spawn.maxHp) : (Number.isInteger(spawn.hp) ? Number(spawn.hp) : 1),
+          attack: Number.isInteger(spawn.attack) ? Number(spawn.attack) : 1,
+          level,
+          viewRange: Number.isInteger((spawn as { viewRange?: number }).viewRange)
+            ? (spawn as { viewRange: number }).viewRange
+            : (Number.isInteger(spawn.aggroRange) ? spawn.aggroRange : 6),
+        });
+      const numericStats = (spawn as { numericStats?: NumericStats }).numericStats
+        ?? resolveMonsterNumericStatsFromValueStats(valueStats, level);
+      const combatModel = (spawn as { combatModel?: MonsterCombatModel }).combatModel ?? 'legacy';
+      const spawnId = typeof rawSpawn.id === 'string' && rawSpawn.id.trim().length > 0
+        ? rawSpawn.id.trim()
+        : templateId;
       const valid =
-        typeof spawn.id === 'string' &&
+        typeof spawnId === 'string' &&
         typeof spawn.name === 'string' &&
         Number.isInteger(spawn.x) &&
         Number.isInteger(spawn.y) &&
@@ -1518,17 +1559,26 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
             : []);
       const drops = this.normalizeDrops(rawDrops);
       result.push({
-        id: spawn.id!,
+        id: spawnId!,
         name: spawn.name!,
         x: spawn.x!,
         y: spawn.y!,
         char: spawn.char!,
         color: spawn.color!,
-        hp: spawn.hp!,
-        maxHp: Number.isInteger(spawn.maxHp) ? spawn.maxHp! : spawn.hp!,
-        attack: spawn.attack!,
+        grade: this.normalizeContainerGrade((spawn as { grade?: TechniqueGrade }).grade),
+        valueStats,
+        numericStats,
+        combatModel,
+        hp: Math.max(1, Math.round(numericStats.maxHp || spawn.hp!)),
+        maxHp: Math.max(1, Math.round(numericStats.maxHp || (Number.isInteger(spawn.maxHp) ? spawn.maxHp! : spawn.hp!))),
+        attack: Math.max(1, Math.round(numericStats.physAtk || numericStats.spellAtk || spawn.attack! || 1)),
+        count: Number.isInteger((spawn as { count?: number }).count)
+          ? (spawn as { count: number }).count
+          : (Number.isInteger((spawn as { maxAlive?: number }).maxAlive) ? (spawn as { maxAlive: number }).maxAlive : 1),
         radius: Number.isInteger((spawn as { radius?: number }).radius) ? (spawn as { radius: number }).radius : 3,
-        maxAlive: Number.isInteger((spawn as { maxAlive?: number }).maxAlive) ? (spawn as { maxAlive: number }).maxAlive : 1,
+        maxAlive: Number.isInteger((spawn as { maxAlive?: number }).maxAlive)
+          ? (spawn as { maxAlive: number }).maxAlive
+          : (Number.isInteger((spawn as { count?: number }).count) ? (spawn as { count: number }).count : 1),
         aggroRange: Number.isInteger(spawn.aggroRange) ? spawn.aggroRange! : 6,
         viewRange: Number.isInteger((spawn as { viewRange?: number }).viewRange)
           ? (spawn as { viewRange: number }).viewRange
@@ -1537,7 +1587,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         respawnTicks: Number.isInteger(spawn.respawnTicks)
           ? spawn.respawnTicks!
           : Math.max(1, (spawn as { respawnSec?: number }).respawnSec ?? 15),
-        level: Number.isInteger((spawn as { level?: number }).level) ? (spawn as { level: number }).level : undefined,
+        level,
         expMultiplier: typeof (spawn as { expMultiplier?: number }).expMultiplier === 'number'
           ? Math.max(0, (spawn as { expMultiplier: number }).expMultiplier)
           : 1,
@@ -1545,6 +1595,16 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return result;
+  }
+
+  private resolveMonsterSpawnTemplateId(spawn: { id?: unknown; templateId?: unknown }): string | undefined {
+    if (typeof spawn.templateId === 'string' && spawn.templateId.trim().length > 0) {
+      return spawn.templateId.trim();
+    }
+    if (typeof spawn.id === 'string' && spawn.id.trim().length > 0) {
+      return spawn.id.trim();
+    }
+    return undefined;
   }
 
   private normalizeContainers(rawLandmarks: unknown, meta: MapMeta): ContainerConfig[] {
@@ -1988,7 +2048,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     const map = this.maps.get(mapId);
     if (!map) return undefined;
     return map.portals.find((portal) =>
-      manhattanDistance(portal, { x, y }) <= maxDistance && this.matchesPortalQuery(portal, options));
+      isPointInRange(portal, { x, y }, maxDistance) && this.matchesPortalQuery(portal, options));
   }
 
   private matchesPortalQuery(portal: Portal, options?: PortalQueryOptions): boolean {
@@ -2336,7 +2396,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     for (let radius = 0; radius <= maxRadius; radius++) {
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
-          if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+          if (!isOffsetInRange(dx, dy, radius)) continue;
           const nx = x + dx;
           const ny = y + dy;
           if (this.isWalkable(mapId, nx, ny, options)) {
@@ -2391,7 +2451,91 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   private normalizeEditableMapDocument(raw: unknown): GmMapDocument {
-    return normalizeEditableMapDocumentValue(raw);
+    return normalizeEditableMapDocumentValue(this.hydrateEditableMapDocument(raw));
+  }
+
+  private hydrateEditableMapDocument(raw: unknown): unknown {
+    if (!raw || typeof raw !== 'object') {
+      return raw;
+    }
+    const source = raw as {
+      monsterSpawns?: unknown[];
+      terrainProfileId?: unknown;
+    };
+    return {
+      ...source,
+      terrainProfileId: typeof source.terrainProfileId === 'string' ? source.terrainProfileId : undefined,
+      monsterSpawns: Array.isArray(source.monsterSpawns)
+        ? source.monsterSpawns.map((spawn) => this.hydrateMonsterSpawnRecord(spawn))
+        : [],
+    };
+  }
+
+  private hydrateMonsterSpawnRecord(raw: unknown): unknown {
+    if (!raw || typeof raw !== 'object') {
+      return raw;
+    }
+    const spawn = raw as Partial<GmMapMonsterSpawnRecord> & { templateId?: unknown };
+    const templateId = this.resolveMonsterSpawnTemplateId(spawn);
+    const template = templateId ? this.contentService.getMonsterTemplate(templateId) : undefined;
+    if (!template) {
+      return raw;
+    }
+    return {
+      ...template,
+      ...spawn,
+      templateId,
+    };
+  }
+
+  private dehydrateEditableMapDocument(document: GmMapDocument): unknown {
+    return {
+      ...document,
+      monsterSpawns: document.monsterSpawns.map((spawn) => this.dehydrateMonsterSpawnRecord(spawn)),
+    };
+  }
+
+  private dehydrateMonsterSpawnRecord(spawn: GmMapMonsterSpawnRecord): unknown {
+    const templateId = typeof spawn.templateId === 'string' && spawn.templateId.trim().length > 0
+      ? spawn.templateId
+      : spawn.id;
+    const template = this.contentService.getMonsterTemplate(templateId);
+    if (!template) {
+      return spawn;
+    }
+    const persisted: Partial<GmMapMonsterSpawnRecord> = {
+      id: spawn.id,
+      x: spawn.x,
+      y: spawn.y,
+    };
+    if (templateId !== spawn.id) {
+      persisted.templateId = templateId;
+    }
+    if (spawn.name !== template.name) persisted.name = spawn.name;
+    if (spawn.char !== template.char) persisted.char = spawn.char;
+    if (spawn.color !== template.color) persisted.color = spawn.color;
+    if (spawn.grade !== template.grade) persisted.grade = spawn.grade;
+    if (spawn.hp !== template.hp) persisted.hp = spawn.hp;
+    if ((spawn.maxHp ?? spawn.hp) !== template.maxHp) persisted.maxHp = spawn.maxHp;
+    if (spawn.attack !== template.attack) persisted.attack = spawn.attack;
+    if ((spawn.count ?? spawn.maxAlive ?? 1) !== template.count) persisted.count = spawn.count;
+    if ((spawn.radius ?? 3) !== template.radius) persisted.radius = spawn.radius;
+    if ((spawn.maxAlive ?? 1) !== template.maxAlive) persisted.maxAlive = spawn.maxAlive;
+    if ((spawn.aggroRange ?? 6) !== template.aggroRange) persisted.aggroRange = spawn.aggroRange;
+    if ((spawn.viewRange ?? spawn.aggroRange ?? 6) !== template.viewRange) persisted.viewRange = spawn.viewRange;
+    if ((spawn.aggroMode ?? 'always') !== template.aggroMode) persisted.aggroMode = spawn.aggroMode;
+    if ((spawn.respawnTicks ?? spawn.respawnSec ?? 15) !== template.respawnTicks) {
+      persisted.respawnTicks = spawn.respawnTicks;
+      if (persisted.respawnTicks === undefined && spawn.respawnSec !== undefined) {
+        persisted.respawnSec = spawn.respawnSec;
+      }
+    }
+    if ((spawn.level ?? undefined) !== template.level) persisted.level = spawn.level;
+    if ((spawn.expMultiplier ?? 1) !== template.expMultiplier) persisted.expMultiplier = spawn.expMultiplier;
+    if (JSON.stringify(spawn.drops ?? []) !== JSON.stringify(template.drops)) {
+      persisted.drops = spawn.drops;
+    }
+    return persisted;
   }
 
   private normalizeEditableContainerRecord(input: unknown): GmMapContainerRecord | undefined {
@@ -2494,7 +2638,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     for (let radius = 0; radius <= Math.max(document.width, document.height); radius += 1) {
       for (let dy = -radius; dy <= radius; dy += 1) {
         for (let dx = -radius; dx <= radius; dx += 1) {
-          if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+          if (!isOffsetInRange(dx, dy, radius)) continue;
           const x = clamped.x + dx;
           const y = clamped.y + dy;
           if (x < 0 || x >= document.width || y < 0 || y >= document.height) continue;
@@ -2518,15 +2662,23 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   private tileDurability(mapId: string, type: TileType): number {
-    const profile = this.resolveTerrainDurabilityProfile(mapId, type);
+    const profileId = this.resolveTerrainProfileId(mapId);
+    const profile = this.resolveTerrainDurabilityProfile(profileId, type);
     if (!profile) {
       return 0;
     }
     return calculateTerrainDurability(profile.grade, profile.material);
   }
 
-  private resolveTerrainDurabilityProfile(mapId: string, type: TileType): TerrainDurabilityProfile | undefined {
-    return MAP_TERRAIN_DURABILITY_OVERRIDES[mapId]?.[type] ?? DEFAULT_TERRAIN_DURABILITY_BY_TILE[type];
+  private resolveTerrainProfileId(mapId: string): string {
+    return this.maps.get(mapId)?.source.terrainProfileId
+      ?? LEGACY_MAP_TERRAIN_PROFILE_IDS[mapId]
+      ?? mapId;
+  }
+
+  private resolveTerrainDurabilityProfile(profileId: string, type: TileType): TerrainDurabilityProfile | undefined {
+    return TERRAIN_DURABILITY_PROFILES[profileId as keyof typeof TERRAIN_DURABILITY_PROFILES]?.[type]
+      ?? DEFAULT_TERRAIN_DURABILITY_BY_TILE[type];
   }
 
   private destroyedTileType(type: TileType): TileType {
@@ -2537,6 +2689,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         return TileType.BrokenWindow;
       case TileType.Wall:
       case TileType.Stone:
+      case TileType.SpiritOre:
       case TileType.Door:
         return TileType.Floor;
       default:

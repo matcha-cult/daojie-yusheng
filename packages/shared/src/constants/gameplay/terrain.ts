@@ -40,6 +40,7 @@ export const TILE_TRAVERSAL_COST: Record<TileType, number> = {
   water: 400,
   tree: 400,
   stone: 400,
+  spirit_ore: 400,
 };
 
 /** 地形类型到地图字符的映射 */
@@ -60,6 +61,7 @@ export const TILE_TYPE_TO_MAP_CHAR: Record<TileType, string> = {
   water: '~',
   tree: 'T',
   stone: 'o',
+  spirit_ore: 'L',
 };
 
 /** 地形耐久度的品阶基础血量 */

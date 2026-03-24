@@ -66,7 +66,7 @@ export function isTileTypeWalkable(type: TileType): boolean {
 
 /** 判断地形是否阻挡视线 */
 export function doesTileTypeBlockSight(type: TileType): boolean {
-  return type === TileType.Wall || type === TileType.Tree || type === TileType.Stone;
+  return type === TileType.Wall || type === TileType.Tree || type === TileType.Stone || type === TileType.SpiritOre;
 }
 
 /** 根据移速属性计算每 tick 实际移动点数 */
