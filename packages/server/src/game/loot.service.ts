@@ -468,8 +468,12 @@ export class LootService {
   private buildGroundItemEntries(entries: LootEntry[]): GroundItemEntryView[] {
     return this.groupLootEntries(entries).map((entry) => ({
       itemKey: entry.itemKey,
+      itemId: entry.item.itemId,
       name: entry.item.name,
+      type: entry.item.type,
       count: entry.item.count,
+      grade: entry.item.grade,
+      groundLabel: entry.item.groundLabel,
     }));
   }
 
