@@ -11,6 +11,223 @@ cleanup() {
   if [[ -n "${SHARED_WATCH_PID:-}" ]]; then kill "$SHARED_WATCH_PID" 2>/dev/null || true; fi
 }
 
+kill_pid_if_running() {
+  local pid="$1"
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+  fi
+}
+
+collect_repo_dev_pids() {
+  ps -eo pid=,args= | awk -v repo_root="$PWD" '
+    index($0, repo_root) == 0 { next }
+    /packages\/server\/node_modules\/\.bin\/\.\.\/@nestjs\/cli\/bin\/nest\.js start --watch/ { print $1; next }
+    /packages\/server\/dist\/main/ { print $1; next }
+    /packages\/client\/node_modules\/\.bin\/\.\.\/vite\/bin\/vite\.js --host/ { print $1; next }
+    /packages\/shared\/node_modules\/\.bin\/\.\.\/typescript\/bin\/tsc --watch/ { print $1; next }
+    /pnpm\/bin\/pnpm\.cjs --filter @mud\/shared build --watch/ { print $1; next }
+    /pnpm\/bin\/pnpm\.cjs start:dev/ && /packages\/server/ { print $1; next }
+  '
+}
+
+kill_port_listener_if_needed() {
+  local port="$1"
+  local pid=""
+  pid="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$pid" ]]; then
+    return 0
+  fi
+
+  echo "==> 清理占用端口 ${port} 的残留进程: ${pid}"
+  kill_pid_if_running "$pid"
+  sleep 1
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+}
+
+cleanup_existing_local_dev_processes() {
+  echo "==> 清理本仓库残留的开发进程..."
+
+  mapfile -t repo_pids < <(collect_repo_dev_pids | sort -u)
+  for pid in "${repo_pids[@]}"; do
+    kill_pid_if_running "$pid"
+  done
+
+  sleep 1
+
+  for pid in "${repo_pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+  done
+
+  kill_port_listener_if_needed 3000
+  kill_port_listener_if_needed 5173
+}
+
+require_command() {
+  local command_name="$1"
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "!! 缺少命令: $command_name"
+    exit 1
+  fi
+}
+
+is_local_host() {
+  local host="${1:-localhost}"
+  [[ "$host" == "localhost" || "$host" == "127.0.0.1" || "$host" == "::1" ]]
+}
+
+is_tcp_port_open() {
+  local host="$1"
+  local port="$2"
+  node -e "
+    const net = require('node:net');
+    const host = process.argv[1];
+    const port = Number(process.argv[2]);
+    const socket = net.connect({ host, port });
+    const fail = () => {
+      socket.destroy();
+      process.exit(1);
+    };
+    socket.once('connect', () => {
+      socket.end();
+      process.exit(0);
+    });
+    socket.once('error', fail);
+    socket.setTimeout(1000, fail);
+  " "$host" "$port" >/dev/null 2>&1
+}
+
+docker_container_exists() {
+  local container_name="$1"
+  docker container inspect "$container_name" >/dev/null 2>&1
+}
+
+try_start_existing_container() {
+  local container_name="$1"
+  local display_name="$2"
+
+  if ! docker_container_exists "$container_name"; then
+    return 1
+  fi
+
+  echo "==> 启动已有本地 ${display_name} 容器: ${container_name}"
+  docker start "$container_name" >/dev/null
+  return 0
+}
+
+wait_for_service_healthy() {
+  local service_name="$1"
+  local display_name="$2"
+  local timeout_seconds="${3:-60}"
+  local elapsed=0
+
+  echo "==> 等待 ${display_name} 就绪..."
+
+  while (( elapsed < timeout_seconds )); do
+    local container_id=""
+    container_id="$(docker compose ps -q "$service_name" 2>/dev/null || true)"
+
+    if [[ -n "$container_id" ]]; then
+      local status=""
+      status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
+
+      case "$status" in
+        healthy|running)
+          echo "==> ${display_name} 已就绪"
+          return 0
+          ;;
+        exited|dead)
+          echo "!! ${display_name} 容器异常退出，请执行 docker compose logs ${service_name} 排查"
+          return 1
+          ;;
+      esac
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  echo "!! 等待 ${display_name} 超时，请执行 docker compose ps 或 docker compose logs ${service_name} 排查"
+  return 1
+}
+
+ensure_local_infra() {
+  if [[ "${SKIP_LOCAL_INFRA:-0}" == "1" ]]; then
+    echo "==> 已跳过基础设施自动启动 (SKIP_LOCAL_INFRA=1)"
+    return 0
+  fi
+
+  local needs_postgres=0
+  local needs_redis=0
+  local services=()
+
+  if is_local_host "${DB_HOST:-localhost}" && ! is_tcp_port_open "${DB_HOST:-localhost}" "${DB_PORT:-5432}"; then
+    needs_postgres=1
+    services+=("postgres")
+  fi
+
+  if is_local_host "${REDIS_HOST:-localhost}" && ! is_tcp_port_open "${REDIS_HOST:-localhost}" "${REDIS_PORT:-6379}"; then
+    needs_redis=1
+    services+=("redis")
+  fi
+
+  if (( needs_postgres == 0 && needs_redis == 0 )); then
+    echo "==> 本地 PostgreSQL / Redis 已可用，跳过容器启动"
+    return 0
+  fi
+
+  require_command docker
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "!! Docker 守护进程未运行，无法自动拉起本地基础设施"
+    echo "   请先启动 Docker Desktop 或 docker 服务，再重新执行 ./start.sh"
+    exit 1
+  fi
+
+  if (( needs_postgres == 1 )) && is_local_host "${DB_HOST:-localhost}"; then
+    if try_start_existing_container "mud-local-postgres" "PostgreSQL"; then
+      needs_postgres=0
+    fi
+  fi
+
+  if (( needs_redis == 1 )) && is_local_host "${REDIS_HOST:-localhost}"; then
+    if try_start_existing_container "mud-local-redis" "Redis"; then
+      needs_redis=0
+    fi
+  fi
+
+  services=()
+  if (( needs_postgres == 1 )); then
+    services+=("postgres")
+  fi
+  if (( needs_redis == 1 )); then
+    services+=("redis")
+  fi
+
+  if (( needs_postgres == 0 && needs_redis == 0 )); then
+    echo "==> 已恢复本地 PostgreSQL / Redis 容器"
+    return 0
+  fi
+
+  echo "==> 自动启动本地基础设施容器: ${services[*]}"
+  if ! docker compose up -d "${services[@]}"; then
+    echo "!! 基础设施容器启动失败"
+    echo "   如果你使用的是自带数据库/Redis，请通过 SKIP_LOCAL_INFRA=1 ./start.sh 跳过自动拉起"
+    exit 1
+  fi
+
+  if (( needs_postgres == 1 )); then
+    wait_for_service_healthy postgres "PostgreSQL"
+  fi
+
+  if (( needs_redis == 1 )); then
+    wait_for_service_healthy redis "Redis"
+  fi
+}
+
 case "$MODE" in
   docker)
     echo "==> Docker 模式启动..."
@@ -35,9 +252,13 @@ case "$MODE" in
     export DB_PORT="${DB_PORT:-5432}"
     export DB_USERNAME="${DB_USERNAME:-postgres}"
     export DB_PASSWORD="${DB_PASSWORD:-postgres}"
-    export DB_DATABASE="${DB_DATABASE:-daojie_yusheng}"
+    export DB_DATABASE="${DB_DATABASE:-mud_mmo}"
     export REDIS_HOST="${REDIS_HOST:-localhost}"
     export REDIS_PORT="${REDIS_PORT:-6379}"
+    export VITE_DEV_PROXY_TARGET="${VITE_DEV_PROXY_TARGET:-http://127.0.0.1:3000}"
+
+    ensure_local_infra
+    cleanup_existing_local_dev_processes
 
     echo "==> 启动共享包监听构建..."
     (pnpm --filter @mud/shared build --watch) &
@@ -48,7 +269,7 @@ case "$MODE" in
     SERVER_PID=$!
 
     echo "==> 启动客户端 (port 5173)..."
-    (cd packages/client && npx vite --host) &
+    (cd packages/client && npx vite --host --strictPort) &
     CLIENT_PID=$!
 
     trap cleanup INT TERM EXIT
@@ -68,6 +289,9 @@ case "$MODE" in
     echo "用法: ./start.sh [local|docker]"
     echo "  local  - 本地直接启动 (默认)"
     echo "  docker - Docker Compose 启动"
+    echo ""
+    echo "可选环境变量:"
+    echo "  SKIP_LOCAL_INFRA=1  跳过本地 PostgreSQL / Redis 自动拉起"
     exit 1
     ;;
 esac
