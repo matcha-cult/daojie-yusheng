@@ -154,6 +154,7 @@ function hydrateItemStack(snapshot: unknown, contentService: ContentService, cou
     type: isItemType(snapshot.type) ? snapshot.type : 'material',
     count,
     desc: typeof snapshot.desc === 'string' ? snapshot.desc : '',
+    groundLabel: typeof snapshot.groundLabel === 'string' && snapshot.groundLabel.length > 0 ? snapshot.groundLabel : undefined,
     grade: isTechniqueGrade(snapshot.grade) ? snapshot.grade : undefined,
     level: Number.isFinite(snapshot.level) ? Math.max(1, Math.floor(Number(snapshot.level))) : undefined,
     equipSlot: isEquipSlot(snapshot.equipSlot) ? snapshot.equipSlot : undefined,

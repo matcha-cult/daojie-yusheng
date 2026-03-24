@@ -63,6 +63,7 @@ export interface EditorItemCatalogEntry {
   itemId: string;
   name: string;
   type: ItemStack['type'];
+  groundLabel?: string;
   grade?: TechniqueGrade;
   level?: number;
   equipSlot?: ItemStack['equipSlot'];
@@ -509,6 +510,9 @@ export class ContentService implements OnModuleInit {
     for (const raw of this.readJsonEntries<RawItemTemplate>(this.itemsDir)) {
       const item: ItemTemplate = {
         ...raw,
+        groundLabel: typeof raw.groundLabel === 'string' && raw.groundLabel.trim().length > 0
+          ? raw.groundLabel.trim()
+          : undefined,
         grade: raw.grade,
         level: Number.isFinite(raw.level) ? Math.max(1, Math.floor(Number(raw.level))) : undefined,
         equipAttrs: this.normalizeItemAttrs(raw.equipAttrs),
@@ -728,6 +732,7 @@ export class ContentService implements OnModuleInit {
       type: item.type,
       count,
       desc: item.desc,
+      groundLabel: item.groundLabel,
       grade: item.grade,
       level: item.level,
       equipSlot: item.equipSlot,
@@ -823,6 +828,7 @@ export class ContentService implements OnModuleInit {
         itemId: item.itemId,
         name: item.name,
         type: item.type,
+        groundLabel: item.groundLabel,
         grade: item.grade,
         level: item.level,
         equipSlot: item.equipSlot,

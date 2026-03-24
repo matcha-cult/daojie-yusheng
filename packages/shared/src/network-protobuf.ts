@@ -5,7 +5,7 @@
 import protobuf from 'protobufjs';
 import { C2S, S2C, type ActionUpdateEntry, type GroundItemPilePatch, type S2C_ActionsUpdate, type S2C_AttrUpdate, type S2C_TechniqueUpdate, type S2C_Tick, type TechniqueUpdateEntry, type TickRenderEntity, type VisibleTilePatch } from './protocol';
 import type { NumericRatioDivisors, NumericStats } from './numeric';
-import type { ActionDef, Attributes, AttrBonus, GameTimeState, MapMeta, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestLine, TechniqueAttrCurves, TechniqueGrade, TechniqueLayerDef, TechniqueState, VisibleBuffState, VisibleTile } from './types';
+import type { ActionDef, Attributes, AttrBonus, GameTimeState, ItemType, MapMeta, NpcQuestMarker, ObservationInsight, PlayerRealmState, QuestLine, TechniqueAttrCurves, TechniqueGrade, TechniqueLayerDef, TechniqueState, VisibleBuffState, VisibleTile } from './types';
 
 const PROTO_SCHEMA = `
 syntax = "proto2";
@@ -72,6 +72,10 @@ message GroundItemEntryPayload {
   required string itemKey = 1;
   required string name = 2;
   required uint32 count = 3;
+  optional string itemId = 4;
+  optional string type = 5;
+  optional string grade = 6;
+  optional string groundLabel = 7;
 }
 
 message GroundItemPilePatchPayload {
@@ -682,6 +686,10 @@ function toWireTick(payload: S2C_Tick): Record<string, unknown> {
           itemKey: item.itemKey,
           name: item.name,
           count: item.count,
+          itemId: item.itemId,
+          type: item.type,
+          grade: item.grade,
+          groundLabel: item.groundLabel,
         }));
       }
       return encoded;
@@ -735,8 +743,16 @@ function fromWireTick(wire: Record<string, unknown>): S2C_Tick {
           : Array.isArray(patch.items)
             ? patch.items.map((item) => ({
                 itemKey: String((item as Record<string, unknown>).itemKey ?? ''),
+                itemId: String((item as Record<string, unknown>).itemId ?? ''),
                 name: String((item as Record<string, unknown>).name ?? ''),
+                type: String((item as Record<string, unknown>).type ?? 'material') as ItemType,
                 count: Number((item as Record<string, unknown>).count ?? 0),
+                grade: typeof (item as Record<string, unknown>).grade === 'string'
+                  ? String((item as Record<string, unknown>).grade) as TechniqueGrade
+                  : undefined,
+                groundLabel: typeof (item as Record<string, unknown>).groundLabel === 'string'
+                  ? String((item as Record<string, unknown>).groundLabel)
+                  : undefined,
               }))
             : undefined,
       } as GroundItemPilePatch;

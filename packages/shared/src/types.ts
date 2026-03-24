@@ -384,6 +384,7 @@ export interface ItemStack {
   type: ItemType;
   count: number;
   desc: string;
+  groundLabel?: string;
   grade?: TechniqueGrade;
   level?: number;
   equipSlot?: EquipSlot;
@@ -409,8 +410,12 @@ export type LootSourceKind = 'ground' | 'container';
 /** 地面物品条目视图 */
 export interface GroundItemEntryView {
   itemKey: string;
+  itemId: string;
   name: string;
+  type: ItemType;
   count: number;
+  grade?: TechniqueGrade;
+  groundLabel?: string;
 }
 
 /** 地面物品堆视图 */

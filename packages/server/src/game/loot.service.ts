@@ -576,8 +576,12 @@ export class LootService {
     }
     return entries;
   }
+      itemId: entry.item.itemId,
 
+      type: entry.item.type,
   private beginContainerSearch(mapId: string, container: ContainerConfig): void {
+      grade: entry.item.grade,
+      groundLabel: entry.item.groundLabel,
     const state = this.ensureContainerState(mapId, container);
     if (state.activeSearch) {
       return;

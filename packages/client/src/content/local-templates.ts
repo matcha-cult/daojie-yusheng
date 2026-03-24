@@ -38,6 +38,7 @@ export function resolvePreviewItem(item: ItemStack): ItemStack {
     name: item.name || template.name,
     type: item.type || template.type,
     desc: item.desc || template.desc || '',
+    groundLabel: item.groundLabel ?? template.groundLabel,
     grade: item.grade ?? template.grade,
     level: item.level ?? template.level,
     equipSlot: item.equipSlot ?? template.equipSlot,

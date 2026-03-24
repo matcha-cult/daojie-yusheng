@@ -6,7 +6,9 @@ import { IRenderer, SenseQiOverlayState, TargetingOverlayState } from './types';
 import {
   DEFAULT_AURA_LEVEL_BASE_VALUE,
   GameTimeState,
+  GroundItemEntryView,
   GroundItemPileView,
+  ItemType,
   NpcQuestMarker,
   TILE_VISUAL_BG_COLORS,
   TILE_VISUAL_GLYPHS,
@@ -14,6 +16,7 @@ import {
   normalizeAuraLevelBaseValue,
   SENSE_QI_OVERLAY_STYLE,
   Tile,
+  TechniqueGrade,
   TimePhaseId,
   VisibleBuffState,
 } from '@mud/shared';
@@ -41,6 +44,139 @@ interface TimeAtmosphereState {
   sky: [number, number, number, number];
   horizon: [number, number, number, number];
   vignetteAlpha: number;
+}
+
+type GroundItemTypePalette = {
+  fill: string;
+  stroke: string;
+  accent: string;
+  text: string;
+};
+
+type GroundItemGradePalette = {
+  border: string;
+  glow: string;
+  badgeFill: string;
+  badgeStroke: string;
+};
+
+const GROUND_ITEM_TYPE_PALETTES: Record<ItemType, GroundItemTypePalette> = {
+  equipment: {
+    fill: 'rgba(46, 38, 30, 0.88)',
+    stroke: 'rgba(205, 177, 128, 0.92)',
+    accent: 'rgba(135, 103, 63, 0.9)',
+    text: '#fff4dc',
+  },
+  material: {
+    fill: 'rgba(32, 45, 40, 0.88)',
+    stroke: 'rgba(123, 175, 135, 0.92)',
+    accent: 'rgba(88, 126, 96, 0.9)',
+    text: '#ecfff1',
+  },
+  consumable: {
+    fill: 'rgba(59, 34, 42, 0.88)',
+    stroke: 'rgba(217, 132, 168, 0.92)',
+    accent: 'rgba(164, 83, 117, 0.9)',
+    text: '#fff0f7',
+  },
+  quest_item: {
+    fill: 'rgba(54, 32, 24, 0.9)',
+    stroke: 'rgba(240, 185, 109, 0.94)',
+    accent: 'rgba(181, 121, 50, 0.9)',
+    text: '#fff5e3',
+  },
+  skill_book: {
+    fill: 'rgba(34, 35, 54, 0.9)',
+    stroke: 'rgba(139, 169, 240, 0.94)',
+    accent: 'rgba(86, 109, 182, 0.9)',
+    text: '#edf3ff',
+  },
+};
+
+const GROUND_ITEM_GRADE_PALETTES: Record<TechniqueGrade, GroundItemGradePalette> = {
+  mortal: {
+    border: 'rgba(188, 176, 149, 0.96)',
+    glow: 'rgba(188, 176, 149, 0.24)',
+    badgeFill: 'rgba(76, 66, 51, 0.96)',
+    badgeStroke: 'rgba(214, 200, 164, 0.82)',
+  },
+  yellow: {
+    border: 'rgba(245, 211, 111, 0.98)',
+    glow: 'rgba(245, 211, 111, 0.28)',
+    badgeFill: 'rgba(119, 86, 26, 0.96)',
+    badgeStroke: 'rgba(255, 228, 149, 0.88)',
+  },
+  mystic: {
+    border: 'rgba(111, 188, 255, 0.98)',
+    glow: 'rgba(111, 188, 255, 0.28)',
+    badgeFill: 'rgba(28, 70, 111, 0.96)',
+    badgeStroke: 'rgba(166, 216, 255, 0.88)',
+  },
+  earth: {
+    border: 'rgba(152, 199, 116, 0.98)',
+    glow: 'rgba(152, 199, 116, 0.28)',
+    badgeFill: 'rgba(56, 96, 38, 0.96)',
+    badgeStroke: 'rgba(199, 234, 169, 0.88)',
+  },
+  heaven: {
+    border: 'rgba(255, 156, 111, 0.98)',
+    glow: 'rgba(255, 156, 111, 0.32)',
+    badgeFill: 'rgba(121, 53, 27, 0.96)',
+    badgeStroke: 'rgba(255, 204, 182, 0.88)',
+  },
+  spirit: {
+    border: 'rgba(168, 142, 255, 0.98)',
+    glow: 'rgba(168, 142, 255, 0.32)',
+    badgeFill: 'rgba(72, 49, 126, 0.96)',
+    badgeStroke: 'rgba(214, 199, 255, 0.9)',
+  },
+  saint: {
+    border: 'rgba(255, 122, 167, 0.98)',
+    glow: 'rgba(255, 122, 167, 0.32)',
+    badgeFill: 'rgba(125, 35, 67, 0.96)',
+    badgeStroke: 'rgba(255, 196, 217, 0.9)',
+  },
+  emperor: {
+    border: 'rgba(255, 95, 95, 0.98)',
+    glow: 'rgba(255, 95, 95, 0.34)',
+    badgeFill: 'rgba(125, 22, 22, 0.96)',
+    badgeStroke: 'rgba(255, 187, 187, 0.92)',
+  },
+};
+
+const DEFAULT_GROUND_ITEM_GRADE: TechniqueGrade = 'mortal';
+const GROUND_ITEM_GRID_SIZE = 3;
+const GROUND_ITEM_ICON_POSITIONS = [
+  { col: 2, row: 2 },
+  { col: 1, row: 2 },
+  { col: 0, row: 2 },
+  { col: 2, row: 1 },
+  { col: 1, row: 1 },
+  { col: 0, row: 1 },
+  { col: 2, row: 0 },
+  { col: 1, row: 0 },
+  { col: 0, row: 0 },
+] as const;
+
+function resolveGroundItemLabel(entry: GroundItemEntryView): string {
+  const explicit = [...(entry.groundLabel?.trim() ?? '')].filter((char) => char.trim().length > 0).join('');
+  if (explicit) {
+    return explicit.slice(0, 2);
+  }
+  const chars = [...entry.name.trim()].filter((char) => char.trim().length > 0);
+  const hanChar = chars.find((char) => /[\u3400-\u9fff\uf900-\ufaff]/u.test(char));
+  if (hanChar) {
+    return hanChar;
+  }
+  const wordChar = chars.find((char) => /[A-Za-z0-9]/.test(char));
+  if (wordChar) {
+    return wordChar.toUpperCase();
+  }
+  return chars[0]?.slice(0, 1) ?? '?';
+}
+
+function resolveGroundItemGradePalette(grade?: TechniqueGrade): GroundItemGradePalette {
+  return GROUND_ITEM_GRADE_PALETTES[grade ?? DEFAULT_GROUND_ITEM_GRADE] ?? GROUND_ITEM_GRADE_PALETTES[DEFAULT_GROUND_ITEM_GRADE];
 }
 
 function easeOutCubic(t: number): number {
@@ -1072,40 +1208,168 @@ export class TextRenderer implements IRenderer {
       return;
     }
     const ctx = this.ctx;
-    const iconSize = Math.max(8, Math.floor(cellSize / 3));
-    const iconX = sx + cellSize - iconSize - Math.max(2, Math.floor(cellSize * 0.08));
-    const iconY = sy + cellSize - iconSize - Math.max(2, Math.floor(cellSize * 0.08));
-    const totalCount = pile.items.reduce((sum, entry) => sum + Math.max(0, entry.count), 0);
-    const countText = formatDisplayInteger(totalCount);
+    const slotSize = Math.max(8, Math.floor(cellSize / GROUND_ITEM_GRID_SIZE));
+    const gridSize = slotSize * GROUND_ITEM_GRID_SIZE;
+    const offsetX = sx + Math.max(0, cellSize - gridSize);
+    const offsetY = sy + Math.max(0, cellSize - gridSize);
+    const iconCount = Math.min(pile.items.length, GROUND_ITEM_ICON_POSITIONS.length);
+    const hiddenCount = Math.max(0, pile.items.length - GROUND_ITEM_ICON_POSITIONS.length);
+    const entries = hiddenCount > 0
+      ? [...pile.items.slice(0, GROUND_ITEM_ICON_POSITIONS.length - 1), {
+          itemKey: `${pile.sourceId}:overflow`,
+          itemId: '',
+          name: `其余 ${hiddenCount} 种`,
+          type: 'material' as const,
+          count: hiddenCount,
+          groundLabel: '余',
+        }]
+      : pile.items.slice(0, iconCount);
+
+    for (let index = 0; index < entries.length; index++) {
+      const position = GROUND_ITEM_ICON_POSITIONS[index];
+      const iconX = offsetX + position.col * slotSize;
+      const iconY = offsetY + position.row * slotSize;
+      this.drawGroundItemEntryIcon(iconX, iconY, slotSize, entries[index]);
+    }
+  }
+
+  private drawGroundItemEntryIcon(x: number, y: number, slotSize: number, entry: GroundItemEntryView): void {
+    if (!this.ctx) {
+      return;
+    }
+    const ctx = this.ctx;
+    const iconInset = Math.max(0.75, slotSize * 0.05);
+    const iconSize = Math.max(6, slotSize - iconInset * 2);
+    const iconX = x + iconInset;
+    const iconY = y + iconInset;
+    const typePalette = GROUND_ITEM_TYPE_PALETTES[entry.type] ?? GROUND_ITEM_TYPE_PALETTES.material;
+    const gradePalette = resolveGroundItemGradePalette(entry.grade);
+    const label = resolveGroundItemLabel(entry);
 
     ctx.save();
-    ctx.fillStyle = 'rgba(16, 11, 8, 0.82)';
-    ctx.strokeStyle = 'rgba(255, 229, 168, 0.92)';
-    ctx.lineWidth = 1;
+    ctx.shadowColor = gradePalette.glow;
+    ctx.shadowBlur = Math.max(2, slotSize * 0.24);
+    ctx.fillStyle = typePalette.fill;
+    ctx.strokeStyle = gradePalette.border;
+    ctx.lineWidth = Math.max(1, slotSize * 0.08);
+    this.drawGroundItemBasePlate(ctx, entry.type, iconX, iconY, iconSize, typePalette.accent);
+    ctx.restore();
+
+    ctx.save();
+    const fontSize = this.resolveGroundItemLabelFontSize(slotSize, label);
+    ctx.fillStyle = typePalette.text;
+    ctx.strokeStyle = 'rgba(12, 10, 8, 0.94)';
+    ctx.lineWidth = Math.max(1.6, fontSize * 0.18);
+    ctx.lineJoin = 'round';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${fontSize}px "Noto Serif SC", serif`;
+    ctx.strokeText(label, x + slotSize / 2, y + slotSize / 2 + slotSize * 0.02);
+    ctx.fillText(label, x + slotSize / 2, y + slotSize / 2 + slotSize * 0.02);
+    ctx.restore();
+
+    this.drawGroundItemCountBadge(x, y, slotSize, entry.count, gradePalette);
+  }
+
+  private drawGroundItemBasePlate(
+    ctx: CanvasRenderingContext2D,
+    type: ItemType,
+    x: number,
+    y: number,
+    size: number,
+    accentColor: string,
+  ): void {
+    const radius = Math.max(2, size * 0.18);
+
     ctx.beginPath();
-    ctx.roundRect(iconX, iconY, iconSize, iconSize, Math.max(2, iconSize * 0.24));
+    if (type === 'consumable') {
+      ctx.ellipse(x + size / 2, y + size / 2, size * 0.44, size * 0.4, 0, 0, Math.PI * 2);
+    } else if (type === 'material') {
+      ctx.moveTo(x + size * 0.24, y + size * 0.18);
+      ctx.lineTo(x + size * 0.72, y + size * 0.12);
+      ctx.lineTo(x + size * 0.88, y + size * 0.46);
+      ctx.lineTo(x + size * 0.68, y + size * 0.84);
+      ctx.lineTo(x + size * 0.3, y + size * 0.88);
+      ctx.lineTo(x + size * 0.12, y + size * 0.5);
+      ctx.closePath();
+    } else if (type === 'skill_book') {
+      ctx.roundRect(x + size * 0.08, y + size * 0.12, size * 0.84, size * 0.76, radius);
+    } else if (type === 'quest_item') {
+      ctx.moveTo(x + size / 2, y + size * 0.08);
+      ctx.lineTo(x + size * 0.88, y + size * 0.28);
+      ctx.lineTo(x + size * 0.76, y + size * 0.84);
+      ctx.lineTo(x + size * 0.24, y + size * 0.84);
+      ctx.lineTo(x + size * 0.12, y + size * 0.28);
+      ctx.closePath();
+    } else {
+      ctx.roundRect(x + size * 0.1, y + size * 0.1, size * 0.8, size * 0.8, radius);
+    }
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#f5d88e';
-    ctx.beginPath();
-    ctx.moveTo(iconX + iconSize * 0.28, iconY + iconSize * 0.2);
-    ctx.lineTo(iconX + iconSize * 0.72, iconY + iconSize * 0.2);
-    ctx.lineTo(iconX + iconSize * 0.8, iconY + iconSize * 0.78);
-    ctx.lineTo(iconX + iconSize * 0.2, iconY + iconSize * 0.78);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#fff5d9';
-    ctx.font = `bold ${Math.max(6, iconSize * 0.52)}px "Noto Serif SC", serif`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(15,12,10,0.95)';
-    ctx.strokeText(countText, sx + cellSize - 1, sy + cellSize - iconSize - 1);
-    ctx.fillText(countText, sx + cellSize - 1, sy + cellSize - iconSize - 1);
+    ctx.save();
+    ctx.fillStyle = accentColor;
+    if (type === 'equipment') {
+      ctx.fillRect(x + size * 0.18, y + size * 0.62, size * 0.64, Math.max(1, size * 0.08));
+      ctx.fillRect(x + size * 0.46, y + size * 0.2, Math.max(1, size * 0.08), size * 0.42);
+    } else if (type === 'material') {
+      ctx.beginPath();
+      ctx.arc(x + size * 0.52, y + size * 0.48, size * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (type === 'consumable') {
+      ctx.fillRect(x + size * 0.42, y + size * 0.18, size * 0.16, size * 0.18);
+      ctx.fillRect(x + size * 0.34, y + size * 0.34, size * 0.32, size * 0.34);
+    } else if (type === 'skill_book') {
+      ctx.fillRect(x + size * 0.24, y + size * 0.2, Math.max(1, size * 0.06), size * 0.52);
+      ctx.fillRect(x + size * 0.36, y + size * 0.3, size * 0.34, Math.max(1, size * 0.06));
+    } else if (type === 'quest_item') {
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size * 0.48, size * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
+  }
+
+  private drawGroundItemCountBadge(
+    x: number,
+    y: number,
+    slotSize: number,
+    count: number,
+    palette: GroundItemGradePalette,
+  ): void {
+    if (!this.ctx || count <= 1) {
+      return;
+    }
+    const ctx = this.ctx;
+    const countText = formatDisplayInteger(Math.max(0, count));
+    const badgeFont = Math.max(5, slotSize * 0.26);
+    ctx.save();
+    ctx.font = `bold ${badgeFont}px "Noto Serif SC", serif`;
+    const paddingX = Math.max(2, slotSize * 0.1);
+    const badgeHeight = Math.max(7, slotSize * 0.36);
+    const badgeWidth = Math.max(badgeHeight, ctx.measureText(countText).width + paddingX * 2);
+    const badgeX = x + slotSize - badgeWidth + Math.max(0, slotSize * 0.04);
+    const badgeY = y - Math.max(0, slotSize * 0.02);
+    ctx.fillStyle = palette.badgeFill;
+    ctx.strokeStyle = palette.badgeStroke;
+    ctx.lineWidth = Math.max(1, slotSize * 0.06);
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, badgeHeight / 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff9ed';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(countText, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 0.2);
+    ctx.restore();
+  }
+
+  private resolveGroundItemLabelFontSize(slotSize: number, label: string): number {
+    const textLength = [...label].length;
+    if (textLength >= 2) {
+      return Math.max(5.25, slotSize * 0.28);
+    }
+    return Math.max(6, slotSize * 0.4);
   }
 
   private drawOutlinedText(text: string, x: number, y: number, fill: string, stroke: string) {

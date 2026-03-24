@@ -615,6 +615,7 @@ export interface GmEditorItemOption {
   name: string;
   type: ItemType;
   grade?: TechniqueGrade;
+  groundLabel?: string;
   level?: number;
   equipSlot?: EquipSlot;
   desc?: string;
