@@ -178,7 +178,11 @@ export class Minimap {
   private readonly toggleBtn = document.getElementById('map-minimap-toggle') as HTMLButtonElement | null;
   private readonly openBtn = document.getElementById('map-minimap-open') as HTMLButtonElement | null;
   private readonly modal = document.getElementById('map-minimap-modal') as HTMLElement | null;
+  private readonly modalBody = document.querySelector('#map-minimap-modal .map-minimap-modal-body') as HTMLElement | null;
+  private readonly modalSidebar = document.querySelector('#map-minimap-modal .map-minimap-modal-sidebar') as HTMLElement | null;
+  private readonly modalWindow = document.getElementById('map-minimap-modal-window') as HTMLElement | null;
   private readonly modalTitle = document.getElementById('map-minimap-modal-title') as HTMLElement | null;
+  private readonly modalCatalogToggleBtn = document.getElementById('map-minimap-modal-catalog-toggle') as HTMLButtonElement | null;
   private readonly modalCloseBtn = document.getElementById('map-minimap-modal-close') as HTMLButtonElement | null;
   private readonly modalCanvas = document.getElementById('map-minimap-modal-canvas') as HTMLCanvasElement | null;
   private readonly modalList = document.getElementById('map-minimap-modal-list') as HTMLElement | null;
@@ -203,8 +207,11 @@ export class Minimap {
   private modalPanY = 0;
   private modalPanState: ModalPanState | null = null;
   private hoveredModalPoint: { x: number; y: number } | null = null;
+  private mobileCatalogOpen = false;
 
   constructor() {
+    this.mountModalToBody();
+
     this.toggleBtn?.addEventListener('click', () => {
       this.overlayVisible = !this.overlayVisible;
       this.render();
@@ -218,8 +225,47 @@ export class Minimap {
       this.openModal();
     });
 
+    this.overlayRoot?.addEventListener('click', () => {
+      if (this.modalOpen || !this.scene?.mapMeta || !this.scene.player) {
+        return;
+      }
+      this.openModal();
+    });
+
     this.modalCloseBtn?.addEventListener('click', () => {
       this.closeModal();
+    });
+
+    this.modalCatalogToggleBtn?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.mobileCatalogOpen = !this.mobileCatalogOpen;
+      this.syncResponsiveModalChrome();
+    });
+
+    this.modal?.addEventListener('click', () => {
+      if (!this.modalOpen) {
+        return;
+      }
+      this.closeModal();
+    });
+
+    this.modalWindow?.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+
+    this.modalBody?.addEventListener('click', (event) => {
+      if (!this.modalOpen || !this.isCompactViewport() || !this.mobileCatalogOpen) {
+        return;
+      }
+      const target = event.target as Node | null;
+      if (
+        (target && this.modalSidebar?.contains(target))
+        || (target && this.modalCatalogToggleBtn?.contains(target))
+      ) {
+        return;
+      }
+      this.mobileCatalogOpen = false;
+      this.syncResponsiveModalChrome();
     });
 
     this.modalTabAll?.addEventListener('click', () => {
@@ -253,6 +299,10 @@ export class Minimap {
       this.selectedMapId = mapId;
       this.baseKey = null;
       this.hoveredModalPoint = null;
+      if (this.isCompactViewport()) {
+        this.mobileCatalogOpen = false;
+        this.syncResponsiveModalChrome();
+      }
       this.closeMoveConfirm();
       this.resetModalViewport();
       this.renderCatalog();
@@ -373,7 +423,17 @@ export class Minimap {
     });
 
     this.modalCanvas?.addEventListener('click', (event) => {
-      if (!this.moveHandler || !this.modalOpen || event.button !== 0 || this.modalPanState) {
+      if (!this.modalOpen || event.button !== 0 || this.modalPanState) {
+        return;
+      }
+      if (this.isCompactViewport() && this.mobileCatalogOpen) {
+        this.mobileCatalogOpen = false;
+        this.syncResponsiveModalChrome();
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (!this.moveHandler) {
         return;
       }
       const display = this.getModalDisplayScene();
@@ -416,8 +476,33 @@ export class Minimap {
       if (!this.modalOpen) {
         return;
       }
+      this.syncResponsiveModalChrome();
       this.scheduleRender();
     });
+  }
+
+  private mountModalToBody(): void {
+    if (!this.modal || this.modal.parentElement === document.body) {
+      return;
+    }
+    document.body.appendChild(this.modal);
+  }
+
+  private isCompactViewport(): boolean {
+    return window.innerWidth <= 900;
+  }
+
+  private syncResponsiveModalChrome(): void {
+    const catalogVisible = this.isCompactViewport() ? this.mobileCatalogOpen : true;
+    if (this.modal) {
+      this.modal.dataset.mobileCatalogOpen = catalogVisible ? 'true' : 'false';
+    }
+    if (this.modalCatalogToggleBtn) {
+      this.modalCatalogToggleBtn.classList.toggle('active', catalogVisible);
+      this.modalCatalogToggleBtn.setAttribute('aria-expanded', catalogVisible ? 'true' : 'false');
+      this.modalCatalogToggleBtn.textContent = catalogVisible ? '收起' : '目录';
+      this.modalCatalogToggleBtn.title = catalogVisible ? '收起地图目录' : '展开地图目录';
+    }
   }
 
   /** 注册点击地图前往目标坐标的回调 */
@@ -513,12 +598,14 @@ export class Minimap {
       return;
     }
     this.modalOpen = true;
+    this.mobileCatalogOpen = !this.isCompactViewport();
     if (!this.selectedMapId) {
       this.selectedMapId = this.scene?.mapMeta?.id ?? null;
     }
     this.resetModalViewport();
     this.renderCatalog();
     this.refreshChrome();
+    this.syncResponsiveModalChrome();
     this.modal.classList.remove('hidden');
     this.modal.setAttribute('aria-hidden', 'false');
     this.scheduleRender();
@@ -526,12 +613,14 @@ export class Minimap {
 
   private closeModal(): void {
     this.modalOpen = false;
+    this.mobileCatalogOpen = false;
     this.hoveredModalPoint = null;
     this.cancelModalPan();
     this.closeMoveConfirm();
     detailModalHost.close(Minimap.DELETE_MEMORY_OWNER);
     this.modal?.classList.add('hidden');
     this.modal?.setAttribute('aria-hidden', 'true');
+    this.syncResponsiveModalChrome();
     this.refreshChrome();
     this.scheduleRender();
   }

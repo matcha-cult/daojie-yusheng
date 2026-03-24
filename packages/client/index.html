@@ -1363,7 +1363,8 @@
     .map-minimap {
       width: clamp(132px, 18vw, 204px);
       aspect-ratio: 1;
-      pointer-events: none;
+      pointer-events: auto;
+      cursor: pointer;
     }
     .map-minimap.hidden {
       display: none;
@@ -1454,6 +1455,7 @@
       display: flex;
       gap: 6px;
     }
+    .map-minimap-modal-catalog-toggle,
     .map-minimap-modal-close {
       min-width: 34px;
       height: 30px;
@@ -1464,6 +1466,17 @@
       font-size: var(--font-size-14);
       cursor: pointer;
     }
+    .map-minimap-modal-catalog-toggle {
+      display: none;
+      min-width: 52px;
+      padding: 0 10px;
+    }
+    .map-minimap-modal-catalog-toggle.active {
+      background: rgba(234, 210, 158, 0.16);
+      border-color: rgba(245, 227, 185, 0.32);
+      color: rgba(255, 244, 221, 0.96);
+    }
+    .map-minimap-modal-catalog-toggle:hover,
     .map-minimap-modal-close:hover {
       background: rgba(255, 255, 255, 0.1);
     }
@@ -2478,7 +2491,7 @@
     .detail-modal {
       position: fixed;
       inset: 0;
-      z-index: 160;
+      z-index: 320;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -4389,46 +4402,132 @@
         padding: 8px;
       }
       .map-side-rail {
-        flex-direction: row;
-        justify-content: space-between;
-        border: none;
-        border-bottom: 1px solid var(--wash-ink);
-        padding: 8px 12px;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        gap: clamp(8px, 2.4vw, 12px);
+        padding: clamp(6px, 2vw, 10px) 4px;
+        overflow: hidden;
       }
-      .map-side-rail.right {
-        border-top: 1px solid var(--wash-ink);
+      .map-side-rail.left {
+        border-right: var(--map-rail-border);
         border-bottom: none;
       }
+      .map-side-rail.right {
+        border-left: var(--map-rail-border);
+        border-top: none;
+      }
+      .map-minimap-modal {
+        z-index: 260;
+        background: rgba(3, 4, 6, 0.46);
+        padding: 6px;
+      }
+      .map-minimap-modal-window {
+        left: 6px;
+        top: 6px;
+        transform: none;
+        width: calc(100vw - 12px);
+        height: calc(100dvh - 12px);
+        max-width: none;
+        max-height: none;
+        border-radius: 14px;
+      }
+      .map-minimap-modal-header {
+        padding: 10px;
+      }
+      .map-minimap-modal-body {
+        display: block;
+        padding: 8px;
+      }
+      .map-minimap-modal-catalog-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .map-minimap-modal-sidebar {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 8px;
+        z-index: 3;
+        max-height: min(42vh, 320px);
+        padding: 10px;
+        border: 1px solid rgba(236, 222, 192, 0.24);
+        border-radius: 12px;
+        background: linear-gradient(180deg, rgba(20, 18, 16, 0.96), rgba(10, 10, 12, 0.96));
+        box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(6px);
+        gap: 8px;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+      }
+      .map-minimap-modal[data-mobile-catalog-open="false"] .map-minimap-modal-sidebar {
+        opacity: 0;
+        transform: translateY(-10px);
+        pointer-events: none;
+      }
+      .map-minimap-modal[data-mobile-catalog-open="true"] .map-minimap-modal-sidebar {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .map-minimap-modal-toolbar {
+        justify-content: stretch;
+      }
+      .map-minimap-modal-toolbar > * {
+        flex: 1 1 auto;
+      }
+      .map-minimap-modal-list {
+        max-height: min(28vh, 180px);
+        padding-right: 0;
+      }
+      .map-minimap-modal-stage {
+        min-height: 0;
+        height: 100%;
+        position: relative;
+        z-index: 1;
+      }
+      .map-minimap-modal-canvas {
+        touch-action: none;
+      }
+      #game-stage {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+        min-height: 0;
+      }
       .map-tool-controls {
-        flex-direction: row;
-        gap: 10px;
-        padding: 8px 12px;
+        flex-direction: column;
+        gap: clamp(6px, 2vw, 10px);
+        padding: clamp(8px, 2.2vw, 10px) clamp(4px, 1.2vw, 6px);
+        border-radius: 14px;
+        transform: scale(clamp(0.68, 0.82 + 0.2vw, 0.92));
+        transform-origin: center top;
       }
       .map-zoom-slider {
-        writing-mode: horizontal-tb;
-        direction: ltr;
-        inline-size: 112px;
-        block-size: 18px;
-        cursor: ew-resize;
+        writing-mode: vertical-lr;
+        direction: rtl;
+        inline-size: clamp(84px, 16vh, 118px);
+        block-size: clamp(12px, 3vw, 16px);
+        cursor: ns-resize;
       }
       .map-side-tool-top {
-        flex-direction: row;
+        flex-direction: column;
         align-items: center;
-        justify-content: space-between;
-        align-self: auto;
-        gap: 18px;
+        justify-content: flex-start;
+        align-self: stretch;
+        gap: clamp(8px, 2vw, 12px);
         padding-top: 0;
       }
       .map-side-tool-center {
-        flex: 0 0 auto;
-        width: auto;
+        flex: 1 1 auto;
+        width: 100%;
       }
       .map-side-info-stack {
-        flex-direction: row;
+        flex-direction: column;
         justify-content: space-between;
-        align-self: auto;
-        flex: 0 1 auto;
-        gap: 18px;
+        align-self: stretch;
+        flex: 1 1 auto;
+        gap: clamp(10px, 2.4vw, 14px);
         padding: 0;
       }
       .split-tab-btn {
@@ -4656,6 +4755,7 @@
                 <div id="map-minimap-modal-header" class="map-minimap-modal-header">
                   <div id="map-minimap-modal-title" class="map-minimap-modal-title">舆图</div>
                   <div class="map-minimap-modal-actions">
+                    <button id="map-minimap-modal-catalog-toggle" class="map-minimap-modal-catalog-toggle" type="button" aria-expanded="false">目录</button>
                     <button id="map-minimap-modal-close" class="map-minimap-modal-close" type="button">关</button>
                   </div>
                 </div>
