@@ -13,6 +13,7 @@ import {
   type GmEditorCatalogRes,
   type GmEditorItemOption,
   type GmEditorTechniqueOption,
+  type GmPlayerUpdateSection,
   ATTR_KEYS,
   ATTR_KEY_LABELS,
   type AutoBattleSkillConfig,
@@ -62,6 +63,7 @@ const loginSubmitBtn = document.getElementById('login-submit') as HTMLButtonElem
 const loginErrorEl = document.getElementById('login-error') as HTMLDivElement;
 const statusBarEl = document.getElementById('status-bar') as HTMLDivElement;
 const playerSearchInput = document.getElementById('player-search') as HTMLInputElement;
+const playerSortSelect = document.getElementById('player-sort') as HTMLSelectElement;
 const playerListEl = document.getElementById('player-list') as HTMLDivElement;
 const spawnCountInput = document.getElementById('spawn-count') as HTMLInputElement;
 const editorEmptyEl = document.getElementById('editor-empty') as HTMLDivElement;
@@ -72,14 +74,18 @@ const editorMetaEl = document.getElementById('editor-meta') as HTMLDivElement;
 const editorContentEl = document.getElementById('editor-content') as HTMLDivElement;
 const editorVisualPanelEl = document.getElementById('editor-visual-panel') as HTMLDivElement;
 const editorPersistedPanelEl = document.getElementById('editor-persisted-panel') as HTMLDivElement;
-const editorTabAttributesBtn = document.getElementById('editor-tab-attributes') as HTMLButtonElement;
+const editorTabBasicBtn = document.getElementById('editor-tab-basic') as HTMLButtonElement;
+const editorTabPositionBtn = document.getElementById('editor-tab-position') as HTMLButtonElement;
+const editorTabRealmBtn = document.getElementById('editor-tab-realm') as HTMLButtonElement;
 const editorTabTechniquesBtn = document.getElementById('editor-tab-techniques') as HTMLButtonElement;
 const editorTabItemsBtn = document.getElementById('editor-tab-items') as HTMLButtonElement;
+const editorTabQuestsBtn = document.getElementById('editor-tab-quests') as HTMLButtonElement;
 const editorTabPersistedBtn = document.getElementById('editor-tab-persisted') as HTMLButtonElement;
 const playerJsonEl = document.getElementById('player-json') as HTMLTextAreaElement;
 const playerPersistedJsonEl = document.getElementById('player-persisted-json') as HTMLTextAreaElement;
 const applyRawJsonBtn = document.getElementById('apply-raw-json') as HTMLButtonElement;
 const savePlayerBtn = document.getElementById('save-player') as HTMLButtonElement;
+const refreshPlayerBtn = document.getElementById('refresh-player') as HTMLButtonElement;
 const resetPlayerBtn = document.getElementById('reset-player') as HTMLButtonElement;
 const removeBotBtn = document.getElementById('remove-bot') as HTMLButtonElement;
 
@@ -140,6 +146,8 @@ const suggestionTabBtn = document.getElementById('gm-tab-suggestions') as HTMLBu
 const worldTabBtn = document.getElementById('gm-tab-world') as HTMLButtonElement;
 const suggestionListEl = document.getElementById('gm-suggestion-list') as HTMLElement;
 
+type PlayerSortMode = 'realm-desc' | 'realm-asc' | 'online' | 'map' | 'name';
+
 let token = sessionStorage.getItem(GM_ACCESS_TOKEN_STORAGE_KEY) ?? '';
 let state: GmStateRes | null = null;
 let suggestions: Suggestion[] = [];
@@ -155,8 +163,9 @@ let pollTimer: number | null = null;
 let currentTab: 'server' | 'players' | 'suggestions' | 'world' = 'server';
 let currentServerTab: 'overview' | 'traffic' | 'cpu' = 'overview';
 let currentCpuBreakdownSort: 'total' | 'count' | 'avg' = 'total';
-let currentEditorTab: 'attributes' | 'techniques' | 'items' | 'persisted' = 'attributes';
+let currentEditorTab: GmPlayerUpdateSection | 'persisted' = 'basic';
 let currentInventoryAddType: (typeof ITEM_TYPES)[number] = 'material';
+let currentPlayerSort: PlayerSortMode = (playerSortSelect.value as PlayerSortMode) || 'realm-desc';
 let lastPlayerListStructureKey: string | null = null;
 let lastEditorStructureKey: string | null = null;
 let lastSuggestionStructureKey: string | null = null;
@@ -237,10 +246,52 @@ function getPlayerPresenceMeta(player: Pick<GmManagedPlayerSummary, 'meta'>): {
 
 function getFilteredPlayers(data: GmStateRes): GmManagedPlayerSummary[] {
   const keyword = playerSearchInput.value.trim().toLowerCase();
-  return data.players.filter((player) => {
+  const filtered = data.players.filter((player) => {
     if (!keyword) return true;
     return [player.id, player.name, player.mapId, player.meta.userId ?? '']
       .some((value) => value.toLowerCase().includes(keyword));
+  });
+  return sortPlayers(filtered);
+}
+
+function comparePlayerName(left: GmManagedPlayerSummary, right: GmManagedPlayerSummary): number {
+  return left.name.localeCompare(right.name, 'zh-CN');
+}
+
+function comparePlayerRealm(left: GmManagedPlayerSummary, right: GmManagedPlayerSummary): number {
+  if (left.realmLv !== right.realmLv) {
+    return right.realmLv - left.realmLv;
+  }
+  return comparePlayerName(left, right);
+}
+
+function sortPlayers(players: GmManagedPlayerSummary[]): GmManagedPlayerSummary[] {
+  return [...players].sort((left, right) => {
+    switch (currentPlayerSort) {
+      case 'realm-asc':
+        return comparePlayerRealm(right, left);
+      case 'online':
+        if (left.meta.online !== right.meta.online) {
+          return left.meta.online ? -1 : 1;
+        }
+        if (left.realmLv !== right.realmLv) {
+          return right.realmLv - left.realmLv;
+        }
+        return comparePlayerName(left, right);
+      case 'map':
+        if (left.mapId !== right.mapId) {
+          return left.mapId.localeCompare(right.mapId, 'zh-CN');
+        }
+        if (left.realmLv !== right.realmLv) {
+          return right.realmLv - left.realmLv;
+        }
+        return comparePlayerName(left, right);
+      case 'name':
+        return comparePlayerName(left, right);
+      case 'realm-desc':
+      default:
+        return comparePlayerRealm(left, right);
+    }
   });
 }
 
@@ -249,7 +300,7 @@ function getPlayerIdentityLine(player: GmManagedPlayerSummary): string {
 }
 
 function getPlayerStatsLine(player: GmManagedPlayerSummary): string {
-  return `HP ${player.hp}/${player.maxHp} · QI ${player.qi} · ${player.dead ? '已死亡' : '存活'} · ${player.autoBattle ? '自动战斗开' : '自动战斗关'}`;
+  return `${player.realmLabel} · HP ${player.hp}/${player.maxHp} · QI ${player.qi} · ${player.dead ? '已死亡' : '存活'} · ${player.autoBattle ? '自动战斗开' : '自动战斗关'}`;
 }
 
 function getPlayerRowMarkup(player: GmManagedPlayerSummary): string {
@@ -274,7 +325,7 @@ function patchPlayerRow(button: HTMLButtonElement, player: GmManagedPlayerSummar
   presenceEl.classList.toggle('online', presence.className === 'online');
   presenceEl.classList.toggle('offline', presence.className === 'offline');
   presenceEl.textContent = presence.label;
-  button.querySelector<HTMLElement>('[data-role="meta"]')!.textContent = `${player.meta.isBot ? '机器人' : '玩家'} · ${player.mapId} · (${player.x}, ${player.y})`;
+  button.querySelector<HTMLElement>('[data-role="meta"]')!.textContent = `${player.meta.isBot ? '机器人' : '玩家'} · ${player.realmLabel} · ${player.mapId} · (${player.x}, ${player.y})`;
   button.querySelector<HTMLElement>('[data-role="identity"]')!.textContent = getPlayerIdentityLine(player);
   button.querySelector<HTMLElement>('[data-role="stats"]')!.textContent = getPlayerStatsLine(player);
 }
@@ -872,17 +923,41 @@ function patchSuggestionCard(card: HTMLElement, suggestion: Suggestion): void {
   completeBtn.style.display = completed ? 'none' : '';
 }
 
-function switchEditorTab(tab: 'attributes' | 'techniques' | 'items' | 'persisted'): void {
+function getEditorTabLabel(tab: GmPlayerUpdateSection | 'persisted'): string {
+  switch (tab) {
+    case 'basic':
+      return '基础';
+    case 'position':
+      return '位置';
+    case 'realm':
+      return '境界';
+    case 'techniques':
+      return '功法';
+    case 'items':
+      return '物品';
+    case 'quests':
+      return '任务';
+    case 'persisted':
+      return '持久化 JSON';
+  }
+}
+
+function switchEditorTab(tab: GmPlayerUpdateSection | 'persisted'): void {
   currentEditorTab = tab;
-  editorTabAttributesBtn.classList.toggle('active', tab === 'attributes');
+  editorTabBasicBtn.classList.toggle('active', tab === 'basic');
+  editorTabPositionBtn.classList.toggle('active', tab === 'position');
+  editorTabRealmBtn.classList.toggle('active', tab === 'realm');
   editorTabTechniquesBtn.classList.toggle('active', tab === 'techniques');
   editorTabItemsBtn.classList.toggle('active', tab === 'items');
+  editorTabQuestsBtn.classList.toggle('active', tab === 'quests');
   editorTabPersistedBtn.classList.toggle('active', tab === 'persisted');
   editorVisualPanelEl.classList.toggle('hidden', tab === 'persisted');
   editorPersistedPanelEl.classList.toggle('hidden', tab !== 'persisted');
   editorContentEl.querySelectorAll<HTMLElement>('[data-editor-tab]').forEach((section) => {
     section.classList.toggle('hidden', section.dataset.editorTab !== tab);
   });
+  savePlayerBtn.textContent = tab === 'persisted' ? '高级区不直接保存' : `保存${getEditorTabLabel(tab)}`;
+  savePlayerBtn.disabled = tab === 'persisted' || !selectedPlayerId;
 }
 
 function setStatus(message: string, isError = false): void {
@@ -1305,7 +1380,7 @@ function readonlyCodeBlock(title: string, path: string, value: unknown): string 
   `;
 }
 
-function renderEditorTabSection(tab: 'attributes' | 'techniques' | 'items', content: string): string {
+function renderEditorTabSection(tab: GmPlayerUpdateSection, content: string): string {
   return `<div data-editor-tab="${tab}">${content}</div>`;
 }
 
@@ -1489,12 +1564,12 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     : '<div class="editor-note">当前没有任务数据。</div>';
 
   return `
-    ${renderEditorTabSection('attributes', `
+    ${renderEditorTabSection('basic', `
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
           <div class="editor-section-title">基础资料</div>
-          <div class="editor-section-note">人物本体、坐标、资源与运行时开关。</div>
+          <div class="editor-section-note">人物本体、资源数值与运行时开关。</div>
         </div>
         <div class="editor-chip-list" data-preview="base-chips">
           ${getEditorBodyChipMarkup(player, draft)}
@@ -1502,44 +1577,18 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
       </div>
       <div class="editor-grid">
         ${textField('角色名', 'name', draft.name)}
-        ${selectField('地图', 'mapId', draft.mapId, mapIds.map((mapId) => ({ value: mapId, label: mapId })))}
-        ${numberField('X', 'x', draft.x)}
-        ${numberField('Y', 'y', draft.y)}
-        ${selectField('朝向', 'facing', draft.facing, GM_FACING_OPTIONS)}
-        ${numberField('视野', 'viewRange', draft.viewRange)}
-        ${selectField('主修功法', 'cultivatingTechId', draft.cultivatingTechId ?? '', getLearnedTechniqueOptions(techniques, true))}
         ${numberField('HP', 'hp', draft.hp)}
-        ${numberField('最大 HP', 'maxHp', draft.maxHp)}
         ${numberField('QI', 'qi', draft.qi)}
-        ${selectField('当前境界', 'realmLv', typeof draft.realmLv === 'number' ? draft.realmLv : 1, getRealmCatalogOptions())}
-        ${numberField('当前境界经验', 'realm.progress', draft.realm?.progress)}
         <div class="editor-field wide">
           <span>角色标识</span>
           <div class="editor-code">ID: ${escapeHtml(draft.id)}</div>
         </div>
       </div>
       <div class="editor-toggle-row" style="margin-top: 10px;">
-        ${checkboxField('机器人', 'isBot', draft.isBot)}
         ${checkboxField('死亡', 'dead', draft.dead)}
         ${checkboxField('自动战斗', 'autoBattle', draft.autoBattle)}
         ${checkboxField('自动反击', 'autoRetaliate', draft.autoRetaliate !== false)}
         ${checkboxField('锁定战斗目标', 'combatTargetLocked', draft.combatTargetLocked)}
-        ${checkboxField('可突破', 'breakthroughReady', draft.breakthroughReady)}
-      </div>
-    </section>
-
-    <section class="editor-section">
-      <div class="editor-section-head">
-        <div>
-          <div class="editor-section-title">基础属性</div>
-          <div class="editor-section-note">六维基础属性与突破线索。</div>
-        </div>
-      </div>
-      <div class="editor-stat-grid">
-        ${ATTR_KEYS.map((key) => numberField(ATTR_KEY_LABELS[key], `baseAttrs.${key}`, draft.baseAttrs[key])).join('')}
-      </div>
-      <div class="editor-grid compact" style="margin-top: 10px;">
-        ${stringArrayField('已揭示突破条件 ID', 'revealedBreakthroughRequirementIds', draft.revealedBreakthroughRequirementIds, 'wide')}
       </div>
     </section>
 
@@ -1569,8 +1618,47 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         ${readonlyCodeBlock('最终属性', 'finalAttrs', draft.finalAttrs ?? {})}
         ${readonlyCodeBlock('数值属性', 'numericStats', draft.numericStats ?? {})}
         ${readonlyCodeBlock('比率分母', 'ratioDivisors', draft.ratioDivisors ?? {})}
-        ${readonlyCodeBlock('境界状态', 'realm', draft.realm ?? {})}
         ${readonlyCodeBlock('动作列表', 'actions', draft.actions ?? [])}
+      </div>
+    </section>
+    `)}
+
+    ${renderEditorTabSection('position', `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">位置与朝向</div>
+          <div class="editor-section-note">地图传送、坐标修正与视野范围。</div>
+        </div>
+      </div>
+      <div class="editor-grid">
+        ${selectField('地图', 'mapId', draft.mapId, mapIds.map((mapId) => ({ value: mapId, label: mapId })))}
+        ${numberField('X', 'x', draft.x)}
+        ${numberField('Y', 'y', draft.y)}
+        ${selectField('朝向', 'facing', draft.facing, GM_FACING_OPTIONS)}
+        ${numberField('视野', 'viewRange', draft.viewRange)}
+      </div>
+    </section>
+    `)}
+
+    ${renderEditorTabSection('realm', `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">境界进度</div>
+          <div class="editor-section-note">当前境界、进度与突破线索。</div>
+        </div>
+      </div>
+      <div class="editor-grid">
+        ${selectField('当前境界', 'realmLv', typeof draft.realmLv === 'number' ? draft.realmLv : 1, getRealmCatalogOptions())}
+        ${numberField('当前境界经验', 'realm.progress', draft.realm?.progress)}
+      </div>
+      <div class="editor-stat-grid" style="margin-top: 10px;">
+        ${ATTR_KEYS.map((key) => numberField(ATTR_KEY_LABELS[key], `baseAttrs.${key}`, draft.baseAttrs[key])).join('')}
+      </div>
+      <div class="editor-grid compact" style="margin-top: 10px;">
+        ${stringArrayField('已揭示突破条件 ID', 'revealedBreakthroughRequirementIds', draft.revealedBreakthroughRequirementIds, 'wide')}
+        ${readonlyCodeBlock('境界状态', 'realm', draft.realm ?? {})}
       </div>
     </section>
     `)}
@@ -1579,10 +1667,13 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
     <section class="editor-section">
       <div class="editor-section-head">
         <div>
-          <div class="editor-section-title">自动战斗</div>
-          <div class="editor-section-note">编辑自动技能列表。</div>
+          <div class="editor-section-title">修炼与自动战斗</div>
+          <div class="editor-section-note">主修功法与自动技能列表。</div>
         </div>
         <button class="small-btn" type="button" data-action="add-auto-skill">新增自动技能</button>
+      </div>
+      <div class="editor-grid compact" style="margin-bottom: 10px;">
+        ${selectField('主修功法', 'cultivatingTechId', draft.cultivatingTechId ?? '', getLearnedTechniqueOptions(techniques, true), 'wide')}
       </div>
       <div class="editor-card-list">${autoBattleMarkup}</div>
     </section>
@@ -1605,17 +1696,6 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         </div>
       </div>
       <div class="editor-card-list">${techniqueMarkup}</div>
-    </section>
-
-    <section class="editor-section">
-      <div class="editor-section-head">
-        <div>
-          <div class="editor-section-title">任务</div>
-          <div class="editor-section-note">任务链、奖励和发放者数据。</div>
-        </div>
-        <button class="small-btn" type="button" data-action="add-quest">新增任务</button>
-      </div>
-      <div class="editor-card-list">${questMarkup}</div>
     </section>
     `)}
 
@@ -1655,6 +1735,19 @@ function renderVisualEditor(player: GmManagedPlayerRecord, draft: PlayerState): 
         </div>
       </div>
       <div class="editor-card-list">${equipmentMarkup}</div>
+    </section>
+    `)}
+
+    ${renderEditorTabSection('quests', `
+    <section class="editor-section">
+      <div class="editor-section-head">
+        <div>
+          <div class="editor-section-title">任务</div>
+          <div class="editor-section-note">任务链、奖励和发放者数据。</div>
+        </div>
+        <button class="small-btn" type="button" data-action="add-quest">新增任务</button>
+      </div>
+      <div class="editor-card-list">${questMarkup}</div>
     </section>
     `)}
   `;
@@ -1750,6 +1843,8 @@ function renderEditor(data: GmStateRes): void {
     loadingPlayerDetailId = null;
     playerJsonEl.value = '';
     playerPersistedJsonEl.value = '';
+    savePlayerBtn.disabled = true;
+    refreshPlayerBtn.disabled = true;
     removeBotBtn.style.display = 'none';
     removeBotBtn.disabled = true;
     clearEditorRenderCache();
@@ -1763,6 +1858,8 @@ function renderEditor(data: GmStateRes): void {
     editorPanelEl.classList.add('hidden');
     playerJsonEl.value = '';
     playerPersistedJsonEl.value = '';
+    savePlayerBtn.disabled = true;
+    refreshPlayerBtn.disabled = true;
     removeBotBtn.style.display = 'none';
     removeBotBtn.disabled = true;
     clearEditorRenderCache();
@@ -1797,6 +1894,7 @@ function renderEditor(data: GmStateRes): void {
   setTextLikeValue(playerJsonEl, formatJson(draftSnapshot));
   setTextLikeValue(playerPersistedJsonEl, formatJson(detail.persistedSnapshot));
   switchEditorTab(currentEditorTab);
+  refreshPlayerBtn.disabled = false;
 
   removeBotBtn.style.display = detail.meta.isBot ? '' : 'none';
   removeBotBtn.disabled = !detail.meta.isBot;
@@ -2024,7 +2122,7 @@ function logout(message?: string): void {
   playerPersistedJsonEl.value = '';
   worldViewer.stopPolling();
   switchTab('server');
-  switchEditorTab('attributes');
+  switchEditorTab('basic');
   loginErrorEl.textContent = message ?? '';
   setStatus('');
   showLogin();
@@ -2107,10 +2205,44 @@ async function applyRawJson(): Promise<void> {
     editorDirty = true;
     lastEditorStructureKey = null;
     renderEditor(state!);
-    switchEditorTab('attributes');
+    switchEditorTab('basic');
     setStatus('原始 JSON 已应用到可视化编辑区');
   } catch {
     setStatus('原始 JSON 解析失败', true);
+  }
+}
+
+function getCurrentEditorSaveSection(): GmPlayerUpdateSection | null {
+  return currentEditorTab === 'persisted' ? null : currentEditorTab;
+}
+
+async function refreshSelectedPlayer(): Promise<void> {
+  const selected = getSelectedPlayer();
+  if (!selected) {
+    setStatus('请先选择角色', true);
+    return;
+  }
+
+  if (editorDirty && !window.confirm('刷新会丢弃当前未保存的修改。继续吗？')) {
+    return;
+  }
+
+  refreshPlayerBtn.disabled = true;
+  selectedPlayerDetail = null;
+  loadingPlayerDetailId = selected.id;
+  draftSnapshot = null;
+  draftSourcePlayerId = null;
+  editorDirty = false;
+  clearEditorRenderCache();
+  render();
+
+  try {
+    await loadState(true, true);
+    setStatus(`已刷新 ${selected.name} 的角色详情`);
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : '刷新角色详情失败', true);
+  } finally {
+    refreshPlayerBtn.disabled = false;
   }
 }
 
@@ -2118,6 +2250,11 @@ async function saveSelectedPlayer(): Promise<void> {
   const selected = getSelectedPlayer();
   if (!selected) {
     setStatus('请先选择角色', true);
+    return;
+  }
+  const section = getCurrentEditorSaveSection();
+  if (!section) {
+    setStatus('持久化 JSON 标签不直接保存，请先应用到可视化标签', true);
     return;
   }
 
@@ -2131,10 +2268,10 @@ async function saveSelectedPlayer(): Promise<void> {
   try {
     await request<{ ok: true }>(`/gm/players/${encodeURIComponent(selected.id)}`, {
       method: 'PUT',
-      body: JSON.stringify({ snapshot: draftSnapshot } satisfies GmUpdatePlayerReq),
+      body: JSON.stringify({ snapshot: draftSnapshot, section } satisfies GmUpdatePlayerReq),
     });
     editorDirty = false;
-    await delayRefresh(`已提交 ${selected.name} 的修改`);
+    await delayRefresh(`已提交 ${selected.name} 的${getEditorTabLabel(section)}修改`);
   } catch (error) {
     setStatus(error instanceof Error ? error.message : '保存失败', true);
   } finally {
@@ -2452,6 +2589,12 @@ playerSearchInput.addEventListener('input', () => {
     });
   }
 });
+playerSortSelect.addEventListener('change', () => {
+  currentPlayerSort = (playerSortSelect.value as PlayerSortMode) || 'realm-desc';
+  lastPlayerListStructureKey = null;
+  if (!state) return;
+  renderPlayerList(state);
+});
 playerTabBtn.addEventListener('click', () => switchTab('players'));
 suggestionTabBtn.addEventListener('click', () => switchTab('suggestions'));
 serverTabBtn.addEventListener('click', () => switchTab('server'));
@@ -2470,9 +2613,12 @@ loginForm.addEventListener('submit', (event) => {
 applyRawJsonBtn.addEventListener('click', () => {
   applyRawJson().catch(() => {});
 });
-editorTabAttributesBtn.addEventListener('click', () => switchEditorTab('attributes'));
+editorTabBasicBtn.addEventListener('click', () => switchEditorTab('basic'));
+editorTabPositionBtn.addEventListener('click', () => switchEditorTab('position'));
+editorTabRealmBtn.addEventListener('click', () => switchEditorTab('realm'));
 editorTabTechniquesBtn.addEventListener('click', () => switchEditorTab('techniques'));
 editorTabItemsBtn.addEventListener('click', () => switchEditorTab('items'));
+editorTabQuestsBtn.addEventListener('click', () => switchEditorTab('quests'));
 editorTabPersistedBtn.addEventListener('click', () => switchEditorTab('persisted'));
 
 document.getElementById('refresh-state')?.addEventListener('click', () => {
@@ -2499,6 +2645,9 @@ gmPasswordForm.addEventListener('submit', (event) => {
 });
 savePlayerBtn.addEventListener('click', () => {
   saveSelectedPlayer().catch(() => {});
+});
+refreshPlayerBtn.addEventListener('click', () => {
+  refreshSelectedPlayer().catch(() => {});
 });
 resetPlayerBtn.addEventListener('click', () => {
   resetSelectedPlayer().catch(() => {});

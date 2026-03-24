@@ -19,6 +19,7 @@ import {
   GmMapRuntimeRes,
   GmManagedPlayerRecord,
   GmManagedPlayerSummary,
+  GmPlayerUpdateSection,
   GmRuntimeEntity,
   GmStateRes,
   GmUpdateMapTimeReq,
@@ -57,6 +58,7 @@ type GmCommand =
       type: 'updatePlayer';
       playerId: string;
       snapshot: PlayerState;
+      section?: GmPlayerUpdateSection;
     }
   | {
       type: 'resetPlayer';
@@ -198,13 +200,14 @@ export class GmService {
   }
 
   /** 入队玩家状态更新命令（在线走 tick 队列，离线直接写库） */
-  async enqueuePlayerUpdate(playerId: string, snapshot: PlayerState): Promise<string | null> {
+  async enqueuePlayerUpdate(playerId: string, snapshot: PlayerState, section?: GmPlayerUpdateSection): Promise<string | null> {
     const runtime = this.playerService.getPlayer(playerId);
     if (runtime) {
       this.enqueue(runtime.mapId, {
         type: 'updatePlayer',
         playerId,
         snapshot: this.clonePlayer(snapshot),
+        section,
       });
       return null;
     }
@@ -213,7 +216,7 @@ export class GmService {
     if (!entity) return '目标玩家不存在';
 
     const player = this.hydrateStoredPlayer(entity);
-    const error = this.applyPlayerSnapshot(player, snapshot, false);
+    const error = this.applyPlayerSnapshot(player, this.mergePlayerSnapshot(player, snapshot, section), false);
     if (error) return error;
 
     await this.persistOfflinePlayer(entity, player);
@@ -305,7 +308,7 @@ export class GmService {
   applyCommand(command: GmCommand): string | null {
     switch (command.type) {
       case 'updatePlayer':
-        return this.applyQueuedPlayerUpdate(command.playerId, command.snapshot);
+        return this.applyQueuedPlayerUpdate(command.playerId, command.snapshot, command.section);
       case 'resetPlayer':
         return this.applyQueuedResetPlayer(command.playerId);
       case 'spawnBots':
@@ -315,12 +318,12 @@ export class GmService {
     }
   }
 
-  private applyQueuedPlayerUpdate(playerId: string, snapshot: PlayerState): string | null {
+  private applyQueuedPlayerUpdate(playerId: string, snapshot: PlayerState, section?: GmPlayerUpdateSection): string | null {
     const player = this.playerService.getPlayer(playerId);
     if (!player) return '目标玩家不存在';
-    const error = this.applyPlayerSnapshot(player, snapshot, true);
+    const error = this.applyPlayerSnapshot(player, this.mergePlayerSnapshot(player, snapshot, section), true);
     if (error) return error;
-    this.markDirty(player.id, ['attr', 'inv', 'equip', 'tech', 'actions', 'quest']);
+    this.markDirty(player.id, this.getDirtyFlagsForSection(section));
     return null;
   }
 
@@ -350,9 +353,16 @@ export class GmService {
     online: boolean,
     updatedAt: Date | undefined,
   ): GmManagedPlayerSummary {
+    const realmLv = Math.max(1, Math.floor(player.realm?.realmLv ?? player.realmLv ?? 1));
+    const realmLabel = player.realm?.displayName
+      ?? player.realm?.name
+      ?? player.realmName
+      ?? `Lv.${realmLv}`;
     return {
       id: player.id,
       name: player.name,
+      realmLv,
+      realmLabel,
       mapId: player.mapId,
       x: player.x,
       y: player.y,
@@ -496,6 +506,7 @@ export class GmService {
     player.x = nextX;
     player.y = nextY;
     player.facing = this.normalizeDirection(snapshot.facing);
+    player.viewRange = this.normalizePositiveInt(snapshot.viewRange, player.viewRange);
     player.baseAttrs = this.normalizeAttributes(snapshot.baseAttrs);
     player.bonuses = this.cloneArray<AttrBonus>(snapshot.bonuses);
     player.temporaryBuffs = this.normalizeTemporaryBuffs(snapshot.temporaryBuffs);
@@ -677,6 +688,81 @@ export class GmService {
   private markDirty(playerId: string, flags: DirtyFlag[]): void {
     for (const flag of flags) {
       this.playerService.markDirty(playerId, flag);
+    }
+  }
+
+  private mergePlayerSnapshot(
+    player: PlayerState,
+    snapshot: PlayerState,
+    section?: GmPlayerUpdateSection,
+  ): PlayerState {
+    if (!section) {
+      return this.clonePlayer(snapshot);
+    }
+
+    const merged = this.clonePlayer(player);
+    switch (section) {
+      case 'basic':
+        merged.name = snapshot.name;
+        merged.hp = snapshot.hp;
+        merged.maxHp = snapshot.maxHp;
+        merged.qi = snapshot.qi;
+        merged.dead = snapshot.dead;
+        merged.autoBattle = snapshot.autoBattle;
+        merged.autoRetaliate = snapshot.autoRetaliate;
+        merged.autoIdleCultivation = snapshot.autoIdleCultivation;
+        merged.combatTargetId = snapshot.combatTargetId;
+        merged.combatTargetLocked = snapshot.combatTargetLocked;
+        merged.bonuses = this.cloneArray<AttrBonus>(snapshot.bonuses);
+        merged.temporaryBuffs = this.normalizeTemporaryBuffs(snapshot.temporaryBuffs);
+        break;
+      case 'position':
+        merged.mapId = snapshot.mapId;
+        merged.x = snapshot.x;
+        merged.y = snapshot.y;
+        merged.facing = snapshot.facing;
+        merged.viewRange = snapshot.viewRange;
+        break;
+      case 'realm':
+        merged.baseAttrs = this.normalizeAttributes(snapshot.baseAttrs);
+        merged.realmLv = snapshot.realmLv;
+        merged.realm = snapshot.realm ? this.cloneObject(snapshot.realm) : undefined;
+        merged.revealedBreakthroughRequirementIds = Array.isArray(snapshot.revealedBreakthroughRequirementIds)
+          ? [...snapshot.revealedBreakthroughRequirementIds]
+          : [];
+        break;
+      case 'techniques':
+        merged.techniques = this.cloneArray<TechniqueState>(snapshot.techniques);
+        merged.autoBattleSkills = this.cloneArray<AutoBattleSkillConfig>(snapshot.autoBattleSkills);
+        merged.cultivatingTechId = snapshot.cultivatingTechId;
+        break;
+      case 'items':
+        merged.inventory = this.contentService.normalizeInventory(this.normalizeInventory(snapshot.inventory));
+        merged.equipment = this.contentService.normalizeEquipment(this.normalizeEquipment(snapshot.equipment));
+        break;
+      case 'quests':
+        merged.quests = this.cloneArray<QuestState>(snapshot.quests);
+        break;
+    }
+    return merged;
+  }
+
+  private getDirtyFlagsForSection(section?: GmPlayerUpdateSection): DirtyFlag[] {
+    switch (section) {
+      case 'basic':
+        return ['attr', 'actions'];
+      case 'position':
+        return ['attr', 'actions'];
+      case 'realm':
+        return ['attr', 'actions', 'tech'];
+      case 'techniques':
+        return ['tech', 'actions', 'attr'];
+      case 'items':
+        return ['inv', 'equip', 'attr'];
+      case 'quests':
+        return ['quest', 'actions'];
+      default:
+        return ['attr', 'inv', 'equip', 'tech', 'actions', 'quest'];
     }
   }
 

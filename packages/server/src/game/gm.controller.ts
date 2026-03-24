@@ -161,7 +161,7 @@ export class GmController {
     if (!body?.snapshot) {
       throw new BadRequestException('缺少玩家快照');
     }
-    const error = await this.gmService.enqueuePlayerUpdate(playerId, body.snapshot);
+    const error = await this.gmService.enqueuePlayerUpdate(playerId, body.snapshot, body.section);
     if (error) {
       throw new BadRequestException(error);
     }

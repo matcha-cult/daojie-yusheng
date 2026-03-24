@@ -1281,11 +1281,18 @@
     <section class="layout-section">
       <div class="section-head">
         <div class="section-title">角色册</div>
-        <div class="section-subtitle">支持按名字、ID、用户 ID、地图搜索</div>
+        <div class="section-subtitle">支持按名字、ID、用户 ID、地图搜索，也可按境界、在线状态、地图等排序</div>
       </div>
       <div class="section-body">
         <div class="filter-row">
           <input id="player-search" class="search-input" type="text" placeholder="搜索玩家 / 用户 / 地图" />
+          <select id="player-sort" class="search-input" style="flex:0 0 210px;">
+            <option value="realm-desc">境界从高到低</option>
+            <option value="realm-asc">境界从低到高</option>
+            <option value="online">在线优先</option>
+            <option value="map">按地图</option>
+            <option value="name">按名字</option>
+          </select>
         </div>
         <div id="player-list" class="player-list"></div>
       </div>
@@ -1293,8 +1300,8 @@
 
     <section class="layout-section">
       <div class="section-head">
-        <div class="section-title">全量数据编辑</div>
-        <div class="section-subtitle">可视化分区编辑，原始 JSON 退到高级区</div>
+        <div class="section-title">分区数据编辑</div>
+        <div class="section-subtitle">按位置、境界、功法、物品、任务等分开查看与保存，原始 JSON 保留在高级区</div>
       </div>
       <div class="section-body">
         <div id="editor-empty" class="empty-hint">从左侧选择一个角色后，可查看并修改其完整数据。</div>
@@ -1307,15 +1314,19 @@
           </div>
           <div id="editor-meta" class="meta-row"></div>
           <div class="button-row" style="margin-bottom: 10px;">
-            <button id="save-player" class="small-btn primary" type="button">保存修改</button>
+            <button id="save-player" class="small-btn primary" type="button">保存当前标签</button>
+            <button id="refresh-player" class="small-btn" type="button">刷新当前玩家</button>
             <button id="reset-player" class="small-btn" type="button">回出生点</button>
             <button id="remove-bot" class="small-btn danger" type="button">移除该机器人</button>
           </div>
-          <div class="editor-note">常用数据可直接在下方分区编辑。在线玩家通常会在下一次 tick 后反映到客户端。</div>
+          <div class="editor-note">当前保存只会提交所在标签的数据。刷新当前玩家会丢弃未保存草稿，并重新拉取服务端详情。</div>
           <div class="workspace-tabs editor-tabs">
-            <button id="editor-tab-attributes" class="workspace-tab active" type="button">属性</button>
+            <button id="editor-tab-basic" class="workspace-tab active" type="button">基础</button>
+            <button id="editor-tab-position" class="workspace-tab" type="button">位置</button>
+            <button id="editor-tab-realm" class="workspace-tab" type="button">境界</button>
             <button id="editor-tab-techniques" class="workspace-tab" type="button">功法</button>
             <button id="editor-tab-items" class="workspace-tab" type="button">物品</button>
+            <button id="editor-tab-quests" class="workspace-tab" type="button">任务</button>
             <button id="editor-tab-persisted" class="workspace-tab" type="button">持久化 JSON</button>
           </div>
           <div id="editor-visual-panel" class="editor-tab-panel">

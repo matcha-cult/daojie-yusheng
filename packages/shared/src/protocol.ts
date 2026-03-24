@@ -570,6 +570,8 @@ export interface GmManagedPlayerMeta {
 export interface GmManagedPlayerSummary {
   id: string;
   name: string;
+  realmLv: number;
+  realmLabel: string;
   mapId: string;
   x: number;
   y: number;
@@ -636,8 +638,17 @@ export interface GmEditorCatalogRes {
   realmLevels: GmEditorRealmOption[];
 }
 
+export type GmPlayerUpdateSection =
+  | 'basic'
+  | 'position'
+  | 'realm'
+  | 'techniques'
+  | 'items'
+  | 'quests';
+
 export interface GmUpdatePlayerReq {
   snapshot: PlayerState;
+  section?: GmPlayerUpdateSection;
 }
 
 export interface GmSpawnBotsReq {
