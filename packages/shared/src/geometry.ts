@@ -1,6 +1,7 @@
 /**
- * 格子距离计算工具：欧氏距离平方、范围判定、曼哈顿距离。
+ * 格子距离计算工具：支持按共享常量切换范围判定口径。
  */
+import { GAME_RANGE_DISTANCE_METRIC, type GridDistanceMetric } from './constants/gameplay/distance';
 import type { GridPoint } from './targeting';
 
 /** 两点间欧氏距离的平方 */
@@ -10,12 +11,64 @@ export function distanceSquared(from: GridPoint, to: GridPoint): number {
   return dx * dx + dy * dy;
 }
 
-/** 判断目标是否在指定范围内（欧氏距离） */
-export function isPointInRange(origin: GridPoint, target: GridPoint, range: number): boolean {
-  return distanceSquared(origin, target) <= range * range;
-}
-
 /** 两点间曼哈顿距离 */
 export function manhattanDistance(from: GridPoint, to: GridPoint): number {
   return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+}
+
+/** 两点间切比雪夫距离。 */
+export function chebyshevDistance(from: GridPoint, to: GridPoint): number {
+  return Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+}
+
+/** 偏移量对应的格距。 */
+export function offsetDistance(dx: number, dy: number, metric: GridDistanceMetric = GAME_RANGE_DISTANCE_METRIC): number {
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  switch (metric) {
+    case 'euclidean':
+      return Math.hypot(absX, absY);
+    case 'chebyshev':
+      return Math.max(absX, absY);
+    case 'manhattan':
+    default:
+      return absX + absY;
+  }
+}
+
+/** 两点间格距，默认按共享常量口径计算。 */
+export function gridDistance(
+  from: GridPoint,
+  to: GridPoint,
+  metric: GridDistanceMetric = GAME_RANGE_DISTANCE_METRIC,
+): number {
+  return offsetDistance(to.x - from.x, to.y - from.y, metric);
+}
+
+/** 判断给定偏移是否在指定范围内。 */
+export function isOffsetInRange(
+  dx: number,
+  dy: number,
+  range: number,
+  metric: GridDistanceMetric = GAME_RANGE_DISTANCE_METRIC,
+): boolean {
+  switch (metric) {
+    case 'euclidean':
+      return dx * dx + dy * dy <= range * range;
+    case 'chebyshev':
+      return Math.max(Math.abs(dx), Math.abs(dy)) <= range;
+    case 'manhattan':
+    default:
+      return Math.abs(dx) + Math.abs(dy) <= range;
+  }
+}
+
+/** 判断目标是否在指定范围内。 */
+export function isPointInRange(
+  origin: GridPoint,
+  target: GridPoint,
+  range: number,
+  metric: GridDistanceMetric = GAME_RANGE_DISTANCE_METRIC,
+): boolean {
+  return isOffsetInRange(target.x - origin.x, target.y - origin.y, range, metric);
 }

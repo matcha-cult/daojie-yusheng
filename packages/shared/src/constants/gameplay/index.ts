@@ -14,6 +14,7 @@
  * - `realm`：境界阶段与境界模板。
  * - `equipment`：装备系统通用枚举常量。
  * - `navigation`：寻路与移动流程常量。
+ * - `distance`：格距与范围判定规则。
  */
 export * from './core';
 export * from './world';
@@ -27,4 +28,5 @@ export * from './technique';
 export * from './realm';
 export * from './equipment';
 export * from './navigation';
+export * from './distance';
 export * from './combat';

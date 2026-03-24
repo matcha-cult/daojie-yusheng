@@ -8,6 +8,7 @@ import {
   GameTimeState,
   GroundItemEntryView,
   GroundItemPileView,
+  isOffsetInRange,
   ItemType,
   NpcQuestMarker,
   TILE_VISUAL_BG_COLORS,
@@ -262,6 +263,7 @@ export class TextRenderer implements IRenderer {
   private attackTrails: AttackTrail[] = [];
   private nextFloatingTextId = 1;
   private nextAttackTrailId = 1;
+  private lastMotionSyncToken?: number;
   private previousVisibleTileKeys = new Set<string>();
   private hiddenTileFadeStartedAt = new Map<string, number>();
   private visibleTileFadeStartedAt = new Map<string, number>();
@@ -290,6 +292,7 @@ export class TextRenderer implements IRenderer {
     this.containerTileKeys.clear();
     this.floatingTexts = [];
     this.attackTrails = [];
+    this.lastMotionSyncToken = undefined;
     this.previousVisibleTileKeys.clear();
     this.hiddenTileFadeStartedAt.clear();
     this.visibleTileFadeStartedAt.clear();
@@ -415,10 +418,9 @@ export class TextRenderer implements IRenderer {
           if (this.targetingOverlay) {
             const dx = gx - this.targetingOverlay.originX;
             const dy = gy - this.targetingOverlay.originY;
-            const distanceSq = dx * dx + dy * dy;
             const hovered = gx === this.targetingOverlay.hoverX && gy === this.targetingOverlay.hoverY;
             const affected = this.targetingAffectedKeys.has(key);
-            const inCastRange = distanceSq > 0 && distanceSq <= this.targetingOverlay.range * this.targetingOverlay.range;
+            const inCastRange = (dx !== 0 || dy !== 0) && isOffsetInRange(dx, dy, this.targetingOverlay.range);
             if (inCastRange || affected) {
               ctx.fillStyle = affected
                 ? (hovered ? 'rgba(208, 76, 56, 0.42)' : 'rgba(198, 72, 48, 0.3)')
@@ -518,9 +520,11 @@ export class TextRenderer implements IRenderer {
     shiftY = 0,
     settleMotion = false,
     settleEntityId?: string,
+    motionSyncToken?: number,
   ) {
     const seen = new Set<string>();
     const cellSize = getCellSize();
+    const sameMotionSync = motionSyncToken !== undefined && motionSyncToken === this.lastMotionSyncToken;
     this.containerTileKeys = new Set(
       list
         .filter((entry) => entry.kind === 'container')
@@ -544,8 +548,13 @@ export class TextRenderer implements IRenderer {
           anim.oldWY = twy;
           anim.targetWX = twx;
           anim.targetWY = twy;
+        } else if (sameGrid && sameTarget && sameMotionSync) {
+          // 同一 tick 内重复同步同一份实体快照时，保留已有插值状态，避免动画被覆盖掉。
         } else if (sameGrid && sameTarget) {
-          // 重复同步同一帧的实体快照时，保留已有插值状态，避免动画被覆盖掉。
+          anim.oldWX = twx;
+          anim.oldWY = twy;
+          anim.targetWX = twx;
+          anim.targetWY = twy;
         } else if (sameGrid) {
           anim.oldWX = twx;
           anim.oldWY = twy;
@@ -589,6 +598,9 @@ export class TextRenderer implements IRenderer {
     }
     for (const id of this.entities.keys()) {
       if (!seen.has(id)) this.entities.delete(id);
+    }
+    if (motionSyncToken !== undefined) {
+      this.lastMotionSyncToken = motionSyncToken;
     }
   }
 
@@ -974,6 +986,7 @@ export class TextRenderer implements IRenderer {
     this.pathTargetKey = null;
     this.floatingTexts = [];
     this.attackTrails = [];
+    this.lastMotionSyncToken = undefined;
   }
 
   private getFloatingTextBurstOffset(index: number, count: number, cellSize: number): FloatingTextBurstOffset {

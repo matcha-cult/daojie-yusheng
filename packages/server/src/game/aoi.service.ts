@@ -2,7 +2,7 @@
  * AOI（Area of Interest）视野服务：基于 Shadowcasting 算法计算玩家可见区域
  */
 import { Injectable } from '@nestjs/common';
-import { PlayerState, VIEW_RADIUS, VisibleTile } from '@mud/shared';
+import { isOffsetInRange, PlayerState, VIEW_RADIUS, VisibleTile } from '@mud/shared';
 import { MapService } from './map.service';
 
 /** 视野快照：可见坐标集合与对应地块数据 */
@@ -129,8 +129,7 @@ export class AoiService {
         if (startSlope < rightSlope) continue;
         if (endSlope > leftSlope) break;
 
-        const distanceSq = deltaX * deltaX + deltaY * deltaY;
-        if (distanceSq <= radius * radius) {
+        if (isOffsetInRange(deltaX, deltaY, radius)) {
           visibleKeys.add(`${currentX},${currentY}`);
         }
 

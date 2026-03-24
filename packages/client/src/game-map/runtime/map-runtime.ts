@@ -181,7 +181,7 @@ export class MapRuntime implements MapRuntimeApi {
   private syncSceneFromStore(): void {
     const snapshot = this.store.getSnapshot();
     this.currentScene = this.sceneBuilder.build(snapshot);
-    this.renderer.syncScene(this.currentScene, snapshot.entityTransition);
+    this.renderer.syncScene(this.currentScene, snapshot.entityTransition, snapshot.tickTiming.startedAt);
     this.minimap.update(snapshot);
   }
 

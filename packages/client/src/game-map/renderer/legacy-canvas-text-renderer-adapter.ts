@@ -39,7 +39,7 @@ export class LegacyCanvasTextRendererAdapter {
     this.canvas.height = Math.max(1, Math.floor(height * dpr));
   }
 
-  syncScene(scene: MapSceneSnapshot, transition: MapEntityTransition | null): void {
+  syncScene(scene: MapSceneSnapshot, transition: MapEntityTransition | null, motionSyncToken?: number): void {
     this.renderer.setPathHighlight(scene.overlays.pathCells);
     this.renderer.setTargetingOverlay(scene.overlays.targeting);
     this.renderer.setSenseQiOverlay(scene.overlays.senseQi);
@@ -55,6 +55,7 @@ export class LegacyCanvasTextRendererAdapter {
       transition?.shiftY,
       transition?.settleMotion === true,
       settleEntityId,
+      motionSyncToken,
     );
   }
 

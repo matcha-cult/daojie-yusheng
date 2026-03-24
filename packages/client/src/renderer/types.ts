@@ -59,6 +59,7 @@ export interface IRenderer {
     shiftY?: number,
     settleMotion?: boolean,
     settleEntityId?: string,
+    motionSyncToken?: number,
   ): void;
   renderEntities(camera: Camera, progress?: number): void;
   addFloatingText(x: number, y: number, text: string, color?: string): void;

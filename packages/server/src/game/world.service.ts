@@ -13,11 +13,12 @@ import {
   createItemStackSignature,
   createNumericStats,
   DEFAULT_RATIO_DIVISOR,
-  distanceSquared,
   Direction,
   ElementKey,
   GameTimeState,
   getDamageTrailColor,
+  gridDistance,
+  isOffsetInRange,
   getRealmGapDamageMultiplier,
   isPointInRange,
   ItemStack,
@@ -678,7 +679,8 @@ export class WorldService {
       return this.performBasicAttack(player, target);
     }
 
-    const facing = this.stepToward(player.mapId, player, target.x, target.y, player.id);
+    const chaseRange = availableSkillDef && targetRef ? availableSkillDef.range : 1;
+    const facing = this.stepPlayerTowardAttackPosition(player, target, chaseRange);
     if (facing !== null) {
       player.facing = facing;
       const cultivation = this.techniqueService.interruptCultivation(player, 'move');
@@ -2807,15 +2809,15 @@ export class WorldService {
   private findNearestLivingMonster(player: PlayerState, maxDistance: number): RuntimeMonster | undefined {
     this.ensureMapInitialized(player.mapId);
     let best: RuntimeMonster | undefined;
-    let bestDistance = Number.MAX_SAFE_INTEGER;
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (const monster of this.monstersByMap.get(player.mapId) ?? []) {
       if (!monster.alive) continue;
-      const distanceSq = distanceSquared(player, monster);
-      if (distanceSq > maxDistance * maxDistance) continue;
+      const distance = gridDistance(player, monster);
+      if (!isPointInRange(player, monster, maxDistance)) continue;
       if (!this.aoiService.inView(player, monster.x, monster.y, maxDistance)) continue;
-      if (distanceSq < bestDistance) {
+      if (distance < bestDistance) {
         best = monster;
-        bestDistance = distanceSq;
+        bestDistance = distance;
       }
     }
     return best;
@@ -2823,15 +2825,15 @@ export class WorldService {
 
   private findNearestPlayer(monster: RuntimeMonster, players: PlayerState[], viewRange: number): PlayerState | undefined {
     let best: PlayerState | undefined;
-    let bestDistance = Number.MAX_SAFE_INTEGER;
+    let bestDistance = Number.POSITIVE_INFINITY;
     for (const player of players) {
       if (player.dead || player.mapId !== monster.mapId) continue;
-      const distanceSq = distanceSquared(player, monster);
-      if (distanceSq > viewRange * viewRange) continue;
+      const distance = gridDistance(player, monster);
+      if (!isPointInRange(player, monster, viewRange)) continue;
       if (!this.aoiService.inViewAt(monster.mapId, monster.x, monster.y, viewRange, player.x, player.y, monster.runtimeId)) continue;
-      if (distanceSq < bestDistance) {
+      if (distance < bestDistance) {
         best = player;
-        bestDistance = distanceSq;
+        bestDistance = distance;
       }
     }
     return best;
@@ -2919,14 +2921,92 @@ export class WorldService {
 
     for (const option of options) {
       if (option.x === actor.x && option.y === actor.y) continue;
-      if (!this.mapService.isWalkable(mapId, option.x, option.y, { actorType: 'monster' })) continue;
-      this.mapService.removeOccupant(mapId, actor.x, actor.y, occupancyId);
-      actor.x = option.x;
-      actor.y = option.y;
-      this.mapService.addOccupant(mapId, actor.x, actor.y, occupancyId, 'monster');
-      return option.facing;
+      if (this.moveActorTo(mapId, actor, option.x, option.y, occupancyId, 'monster')) {
+        return option.facing;
+      }
     }
     return null;
+  }
+
+  private stepPlayerTowardAttackPosition(
+    player: PlayerState,
+    target: ResolvedTarget,
+    range: number,
+  ): Direction | null {
+    const goals = this.collectAttackApproachGoals(player.mapId, target, Math.max(1, range), player.id);
+    if (goals.length === 0) {
+      return null;
+    }
+
+    const next = this.navigationService.findNextStepTowardClosestGoal(
+      player.mapId,
+      player.x,
+      player.y,
+      goals,
+      player.id,
+    );
+    if (!next || (next.x === player.x && next.y === player.y)) {
+      return null;
+    }
+
+    if (!this.moveActorTo(player.mapId, player, next.x, next.y, player.id, 'player')) {
+      return null;
+    }
+    return player.facing ?? null;
+  }
+
+  private collectAttackApproachGoals(
+    mapId: string,
+    target: ResolvedTarget,
+    range: number,
+    occupancyId: string,
+  ): Array<{ x: number; y: number }> {
+    const goals: Array<{ x: number; y: number }> = [];
+    for (let dy = -range; dy <= range; dy++) {
+      for (let dx = -range; dx <= range; dx++) {
+        const x = target.x + dx;
+        const y = target.y + dy;
+        if (!isOffsetInRange(dx, dy, range)) {
+          continue;
+        }
+        if (!this.mapService.canOccupy(mapId, x, y, { occupancyId, actorType: 'player' })) {
+          continue;
+        }
+        goals.push({ x, y });
+      }
+    }
+    goals.sort((left, right) => {
+      const leftDistance = gridDistance(left, target);
+      const rightDistance = gridDistance(right, target);
+      return leftDistance - rightDistance || left.y - right.y || left.x - right.x;
+    });
+    return goals;
+  }
+
+  private moveActorTo(
+    mapId: string,
+    actor: { x: number; y: number; facing?: Direction },
+    x: number,
+    y: number,
+    occupancyId: string,
+    actorType: 'player' | 'monster',
+  ): boolean {
+    if (!this.mapService.isWalkable(mapId, x, y, { occupancyId, actorType })) {
+      return false;
+    }
+    this.mapService.removeOccupant(mapId, actor.x, actor.y, occupancyId);
+    actor.facing = this.resolveFacing(actor.x, actor.y, x, y);
+    actor.x = x;
+    actor.y = y;
+    this.mapService.addOccupant(mapId, actor.x, actor.y, occupancyId, actorType);
+    return true;
+  }
+
+  private resolveFacing(fromX: number, fromY: number, toX: number, toY: number): Direction {
+    if (toX > fromX) return Direction.East;
+    if (toX < fromX) return Direction.West;
+    if (toY > fromY) return Direction.South;
+    return Direction.North;
   }
 
   private measureCpuSection<T>(key: string, label: string, work: () => T): T {
@@ -2954,7 +3034,7 @@ export class WorldService {
       for (let dx = -radius; dx <= radius; dx++) {
         const nx = monster.spawnX + dx;
         const ny = monster.spawnY + dy;
-        if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+        if (!isOffsetInRange(dx, dy, radius)) continue;
         if (this.mapService.isWalkable(mapId, nx, ny, { actorType: 'monster' })) {
           candidates.push({ x: nx, y: ny });
         }

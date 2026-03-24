@@ -12,7 +12,7 @@ import {
   LootWindowState,
   PlayerState,
   TechniqueGrade,
-  manhattanDistance,
+  isPointInRange,
 } from '@mud/shared';
 import { ContentService } from './content.service';
 import { InventoryService } from './inventory.service';
@@ -796,7 +796,7 @@ export class LootService {
   }
 
   private isPlayerWithinLootRange(player: PlayerState, x: number, y: number): boolean {
-    return manhattanDistance(player, { x, y }) <= 1;
+    return isPointInRange(player, { x, y }, 1);
   }
 
   private markTileViewersDirty(mapId: string, x: number, y: number, dirtyPlayers: Set<string>): void {

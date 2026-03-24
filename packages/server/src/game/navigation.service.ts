@@ -50,6 +50,11 @@ export interface NavigationStepResult {
   error?: string;
 }
 
+export interface NavigationGoalPoint {
+  x: number;
+  y: number;
+}
+
 interface PathMoveAttemptResult {
   moved: boolean;
   blocked: boolean;
@@ -279,6 +284,47 @@ export class NavigationService {
     return moved;
   }
 
+  findNextStepTowardClosestGoal(
+    mapId: string,
+    startX: number,
+    startY: number,
+    goals: NavigationGoalPoint[],
+    selfOccupancyId: string,
+  ): NavigationGoalPoint | null {
+    let bestPath: PathStep[] | null = null;
+    let bestCost = Number.POSITIVE_INFINITY;
+    let bestLength = Number.POSITIVE_INFINITY;
+    const seenGoals = new Set<string>();
+
+    for (const goal of goals) {
+      const goalKey = `${goal.x},${goal.y}`;
+      if (seenGoals.has(goalKey)) continue;
+      seenGoals.add(goalKey);
+      if (goal.x === startX && goal.y === startY) {
+        return { x: startX, y: startY };
+      }
+
+      const path = this.findPath(mapId, startX, startY, goal.x, goal.y, selfOccupancyId);
+      if (!path || path.length === 0) {
+        continue;
+      }
+
+      const cost = this.measurePathCost(mapId, path);
+      if (!Number.isFinite(cost)) {
+        continue;
+      }
+
+      if (cost < bestCost || (cost === bestCost && path.length < bestLength)) {
+        bestPath = path;
+        bestCost = cost;
+        bestLength = path.length;
+      }
+    }
+
+    const next = bestPath?.[0];
+    return next ? { x: next.x, y: next.y } : null;
+  }
+
   private syncPath(player: PlayerState, state: MoveTargetState): boolean {
     const next = state.path[0];
     if (!next) {
@@ -462,5 +508,17 @@ export class NavigationService {
 
   private toIndex(x: number, y: number, width: number): number {
     return y * width + x;
+  }
+
+  private measurePathCost(mapId: string, path: PathStep[]): number {
+    let totalCost = 0;
+    for (const step of path) {
+      const cost = this.mapService.getTraversalCost(mapId, step.x, step.y);
+      if (!Number.isFinite(cost)) {
+        return Number.POSITIVE_INFINITY;
+      }
+      totalCost += cost;
+    }
+    return totalCost;
   }
 }
