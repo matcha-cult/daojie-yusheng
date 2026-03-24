@@ -226,9 +226,16 @@ interface PersistedTileRuntimeRecord {
   resources?: Record<string, PersistedTileRuntimeResourceRecord>;
 }
 
+interface PersistedMapTimeState {
+  totalTicks?: number;
+  config?: MapTimeConfig;
+  tickSpeed?: number;
+}
+
 interface PersistedTileRuntimeSnapshot {
-  version: 1;
+  version: 1 | 2;
   maps: Record<string, PersistedTileRuntimeRecord[]>;
+  time?: Record<string, PersistedMapTimeState>;
 }
 
 type OccupantKind = 'player' | 'monster';
@@ -278,6 +285,9 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   private auraStates: Map<string, Map<string, AuraRuntimeState>> = new Map();
   private persistedAuraStates: Map<string, Map<string, AuraRuntimeState>> = new Map();
   private auraStatesDirty = false;
+  private mapTimeStates: Map<string, PersistedMapTimeState> = new Map();
+  private persistedMapTimeStates: Map<string, PersistedMapTimeState> = new Map();
+  private mapTimeStatesDirty = false;
   private watchers: fs.FSWatcher[] = [];
   private mapsDir = resolveServerDataPath('maps');
   private readonly tileRuntimeStatePath = resolveServerDataPath('runtime', 'map-tile-runtime-state.json');
@@ -313,6 +323,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   private loadPersistedTileRuntimeStates() {
     this.persistedDynamicTileStates.clear();
     this.persistedAuraStates.clear();
+    this.persistedMapTimeStates.clear();
     if (!fs.existsSync(this.tileRuntimeStatePath)) {
       this.loadLegacyPersistedTileRuntimeStates();
       return;
@@ -328,6 +339,7 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
 
       let terrainStateCount = 0;
       let resourceStateCount = 0;
+      let timeStateCount = 0;
       for (const [mapId, rawRecords] of Object.entries(rawMaps)) {
         if (!Array.isArray(rawRecords)) {
           continue;
@@ -382,8 +394,22 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      if (terrainStateCount > 0 || resourceStateCount > 0) {
-        this.logger.log(`已加载地块运行时状态：地形 ${terrainStateCount} 条，资源 ${resourceStateCount} 条`);
+      const rawTimeStates = snapshot?.time;
+      if (rawTimeStates && typeof rawTimeStates === 'object') {
+        for (const [mapId, rawState] of Object.entries(rawTimeStates)) {
+          const normalized = this.normalizePersistedMapTimeState(rawState);
+          if (!normalized) {
+            continue;
+          }
+          this.persistedMapTimeStates.set(mapId, normalized);
+          timeStateCount += 1;
+        }
+      }
+
+      if (terrainStateCount > 0 || resourceStateCount > 0 || timeStateCount > 0) {
+        this.logger.log(
+          `已加载地块运行时状态：地形 ${terrainStateCount} 条，资源 ${resourceStateCount} 条，地图时间 ${timeStateCount} 条`,
+        );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -679,13 +705,13 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   persistTileRuntimeStates() {
-    if (!this.dynamicTileStatesDirty && !this.auraStatesDirty) {
+    if (!this.dynamicTileStatesDirty && !this.auraStatesDirty && !this.mapTimeStatesDirty) {
       return;
     }
 
     try {
       const snapshot: PersistedTileRuntimeSnapshot = {
-        version: 1,
+        version: 2,
         maps: {},
       };
 
@@ -741,10 +767,41 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      const allTimeMapIds = [...new Set([
+        ...this.persistedMapTimeStates.keys(),
+        ...this.mapTimeStates.keys(),
+      ])]
+        .filter((mapId) => this.maps.has(mapId))
+        .sort((left, right) => left.localeCompare(right, 'zh-CN'));
+
+      for (const mapId of allTimeMapIds) {
+        const state = this.mapTimeStates.get(mapId) ?? this.persistedMapTimeStates.get(mapId);
+        if (!state) {
+          continue;
+        }
+
+        const record: PersistedMapTimeState = {};
+        if (typeof state.totalTicks === 'number' && Number.isFinite(state.totalTicks)) {
+          record.totalTicks = Math.max(0, Math.floor(state.totalTicks));
+        }
+        if (state.config) {
+          record.config = this.normalizeMapTimeConfig(state.config);
+        }
+        if (typeof state.tickSpeed === 'number' && Number.isFinite(state.tickSpeed) && state.tickSpeed !== 1) {
+          record.tickSpeed = Math.max(0, Math.min(100, state.tickSpeed));
+        }
+        if (record.totalTicks === undefined && !record.config && record.tickSpeed === undefined) {
+          continue;
+        }
+        snapshot.time ??= {};
+        snapshot.time[mapId] = record;
+      }
+
       fs.mkdirSync(path.dirname(this.tileRuntimeStatePath), { recursive: true });
       fs.writeFileSync(this.tileRuntimeStatePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf-8');
       this.dynamicTileStatesDirty = false;
       this.auraStatesDirty = false;
+      this.mapTimeStatesDirty = false;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`地块运行时持久化失败: ${message}`);
@@ -1114,6 +1171,32 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
     return Number.isInteger(value) && Number(value) > 0
       ? Number(value)
       : TERRAIN_DESTROYED_RESTORE_TICKS;
+  }
+
+  private getStoredMapTimeState(mapId: string): PersistedMapTimeState | undefined {
+    return this.mapTimeStates.get(mapId) ?? this.persistedMapTimeStates.get(mapId);
+  }
+
+  private normalizePersistedMapTimeState(raw: unknown): PersistedMapTimeState | null {
+    if (!raw || typeof raw !== 'object') {
+      return null;
+    }
+
+    const candidate = raw as Partial<PersistedMapTimeState>;
+    const totalTicks = Number.isFinite(candidate.totalTicks)
+      ? Math.max(0, Math.floor(Number(candidate.totalTicks)))
+      : undefined;
+    const config = candidate.config && typeof candidate.config === 'object'
+      ? this.normalizeMapTimeConfig(candidate.config)
+      : undefined;
+    const tickSpeed = typeof candidate.tickSpeed === 'number' && Number.isFinite(candidate.tickSpeed)
+      ? Math.max(0, Math.min(100, candidate.tickSpeed))
+      : undefined;
+    if (totalTicks === undefined && !config && tickSpeed === undefined) {
+      return null;
+    }
+
+    return { totalTicks, config, tickSpeed };
   }
 
   private shouldKeepAuraRuntimeState(state: AuraRuntimeState): boolean {
@@ -1689,25 +1772,94 @@ export class MapService implements OnModuleInit, OnModuleDestroy {
   }
 
   getMapTimeConfig(mapId: string): MapTimeConfig {
+    const runtimeConfig = this.getStoredMapTimeState(mapId)?.config;
+    if (runtimeConfig) {
+      return JSON.parse(JSON.stringify(runtimeConfig)) as MapTimeConfig;
+    }
     const source = this.maps.get(mapId)?.source.time;
     return source
       ? JSON.parse(JSON.stringify(source)) as MapTimeConfig
       : JSON.parse(JSON.stringify(DEFAULT_MAP_TIME_CONFIG)) as MapTimeConfig;
   }
 
-  /** GM 运行时修改地图时间配置（不持久化，重启恢复默认） */
+  getMapTimeTicks(mapId: string): number | null {
+    const totalTicks = this.getStoredMapTimeState(mapId)?.totalTicks;
+    return typeof totalTicks === 'number' && Number.isFinite(totalTicks)
+      ? Math.max(0, Math.floor(totalTicks))
+      : null;
+  }
+
+  setMapTimeTicks(mapId: string, totalTicks: number): void {
+    const normalizedTicks = Number.isFinite(totalTicks) ? Math.max(0, Math.floor(totalTicks)) : 0;
+    const current = this.getStoredMapTimeState(mapId);
+    if (current?.totalTicks === normalizedTicks) {
+      return;
+    }
+
+    this.mapTimeStates.set(mapId, {
+      totalTicks: normalizedTicks,
+      config: current?.config ? this.normalizeMapTimeConfig(current.config) : undefined,
+      tickSpeed: current?.tickSpeed,
+    });
+    this.persistedMapTimeStates.delete(mapId);
+    this.mapTimeStatesDirty = true;
+  }
+
+  getPersistedMapTickSpeed(mapId: string): number | null {
+    const tickSpeed = this.getStoredMapTimeState(mapId)?.tickSpeed;
+    return typeof tickSpeed === 'number' && Number.isFinite(tickSpeed)
+      ? Math.max(0, Math.min(100, tickSpeed))
+      : null;
+  }
+
+  setPersistedMapTickSpeed(mapId: string, tickSpeed: number): void {
+    const normalizedTickSpeed = Math.max(0, Math.min(100, tickSpeed));
+    const current = this.getStoredMapTimeState(mapId);
+    const nextTickSpeed = normalizedTickSpeed === 1 ? undefined : normalizedTickSpeed;
+    if ((current?.tickSpeed ?? undefined) === nextTickSpeed) {
+      return;
+    }
+
+    this.mapTimeStates.set(mapId, {
+      totalTicks: current?.totalTicks,
+      config: current?.config ? this.normalizeMapTimeConfig(current.config) : undefined,
+      tickSpeed: nextTickSpeed,
+    });
+    this.persistedMapTimeStates.delete(mapId);
+    this.mapTimeStatesDirty = true;
+  }
+
+  /** GM 运行时修改地图时间配置（持久化到运行时状态，重启后保留） */
   updateMapTimeConfig(mapId: string, patch: { scale?: number; offsetTicks?: number }): string | null {
     const map = this.maps.get(mapId);
     if (!map) return '目标地图不存在';
-    if (!map.source.time) {
-      map.source.time = JSON.parse(JSON.stringify(DEFAULT_MAP_TIME_CONFIG)) as MapTimeConfig;
-    }
+    const nextConfig = this.getMapTimeConfig(mapId);
+    let changed = false;
     if (typeof patch.scale === 'number' && patch.scale >= 0) {
-      map.source.time!.scale = patch.scale;
+      if (nextConfig.scale !== patch.scale) {
+        nextConfig.scale = patch.scale;
+        changed = true;
+      }
     }
     if (typeof patch.offsetTicks === 'number' && Number.isFinite(patch.offsetTicks)) {
-      map.source.time!.offsetTicks = Math.round(patch.offsetTicks);
+      const normalizedOffset = Math.round(patch.offsetTicks);
+      if (nextConfig.offsetTicks !== normalizedOffset) {
+        nextConfig.offsetTicks = normalizedOffset;
+        changed = true;
+      }
     }
+    if (!changed) {
+      return null;
+    }
+
+    const current = this.getStoredMapTimeState(mapId);
+    this.mapTimeStates.set(mapId, {
+      totalTicks: current?.totalTicks,
+      config: this.normalizeMapTimeConfig(nextConfig),
+      tickSpeed: current?.tickSpeed,
+    });
+    this.persistedMapTimeStates.delete(mapId);
+    this.mapTimeStatesDirty = true;
     return null;
   }
 

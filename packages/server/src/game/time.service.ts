@@ -32,14 +32,27 @@ export class TimeService {
   /** 推进指定地图的世界时间 tick */
   advanceMapTicks(mapId: string, ticks = 1): number {
     const safeTicks = Number.isFinite(ticks) ? Math.max(0, Math.floor(ticks)) : 0;
-    const next = (this.mapTicks.get(mapId) ?? 0) + safeTicks;
+    const next = this.getTotalTicks(mapId) + safeTicks;
     this.mapTicks.set(mapId, next);
+    this.mapService.setMapTimeTicks(mapId, next);
     return next;
   }
 
   /** 获取地图当前累计 tick 数 */
   getTotalTicks(mapId: string): number {
-    return Math.max(0, Math.floor(this.mapTicks.get(mapId) ?? 0));
+    const current = this.mapTicks.get(mapId);
+    if (typeof current === 'number' && Number.isFinite(current)) {
+      return Math.max(0, Math.floor(current));
+    }
+
+    const persisted = this.mapService.getMapTimeTicks(mapId);
+    if (typeof persisted === 'number' && Number.isFinite(persisted)) {
+      const normalized = Math.max(0, Math.floor(persisted));
+      this.mapTicks.set(mapId, normalized);
+      return normalized;
+    }
+
+    return 0;
   }
 
   /** 构建玩家当前时间状态（含光照、黑暗层数、有效视野） */

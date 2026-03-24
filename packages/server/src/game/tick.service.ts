@@ -206,6 +206,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`启动恢复离线挂机失败: ${message}`);
     } finally {
+      this.restoreMapTickSpeeds();
       this.ensureMapTicks();
       this.logger.log(`Tick 引擎已启动，地图数: ${this.timers.size}`);
     }
@@ -230,8 +231,15 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
 
   /** 设置地图 tick 倍率，0 = 暂停 */
   setMapTickSpeed(mapId: string, speed: number): void {
+    this.applyMapTickSpeed(mapId, speed, true);
+  }
+
+  private applyMapTickSpeed(mapId: string, speed: number, persist: boolean): void {
     const clamped = Math.max(0, Math.min(100, speed));
     this.mapTickSpeed.set(mapId, clamped);
+    if (persist) {
+      this.mapService.setPersistedMapTickSpeed(mapId, clamped);
+    }
     if (clamped === 0) {
       this.pausedMaps.add(mapId);
     } else {
@@ -241,6 +249,16 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
         this.lastTickTime.set(mapId, Date.now());
         this.scheduleNextTick(mapId, this.getEffectiveInterval(mapId));
       }
+    }
+  }
+
+  private restoreMapTickSpeeds(): void {
+    for (const mapId of this.mapService.getAllMapIds()) {
+      const persistedSpeed = this.mapService.getPersistedMapTickSpeed(mapId);
+      if (persistedSpeed === null) {
+        continue;
+      }
+      this.applyMapTickSpeed(mapId, persistedSpeed, false);
     }
   }
 

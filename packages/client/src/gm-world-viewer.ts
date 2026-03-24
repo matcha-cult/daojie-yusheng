@@ -580,18 +580,11 @@ export class GmWorldViewer {
     if (!this.currentMapId) return;
     const clamped = Math.max(0, Math.min(100, speed));
     try {
-      await Promise.all([
-        this.request<{ ok: true }>(`/gm/maps/${this.currentMapId}/tick`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ speed: clamped } satisfies GmUpdateMapTickReq),
-        }),
-        this.request<{ ok: true }>(`/gm/maps/${this.currentMapId}/time`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scale: 1 } satisfies GmUpdateMapTimeReq),
-        }),
-      ]);
+      await this.request<{ ok: true }>(`/gm/maps/${this.currentMapId}/tick`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speed: clamped } satisfies GmUpdateMapTickReq),
+      });
       this.speedDraft = null;
       this.setStatus(`时间速度已设为 ${clamped === 0 ? '暂停' : `${clamped}x`}`);
       await this.loadRuntime();
