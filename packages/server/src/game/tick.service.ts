@@ -512,10 +512,13 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
       const startX = player.x;
       const startY = player.y;
       const timeUpdate = this.measureCpuSection('time_effects', '时间与环境效果', () => (
-        this.timeService.syncPlayerTimeEffects(player)
+        this.timeService.syncPlayerTimeEffects(player, { advanceChronology: true })
       ));
       if (timeUpdate.changed) {
         this.playerService.markDirty(player.id, 'actions');
+      }
+      if (timeUpdate.chronologyDayChanged) {
+        this.playerService.markDirty(player.id, 'attr');
       }
       const phaseDispatch = this.equipmentEffectService.syncTimePhase(player, timeUpdate.state.phase);
       if (phaseDispatch.dirty.length > 0) {
@@ -1078,6 +1081,9 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           ratioDivisors,
           maxHp: player.maxHp,
           qi: player.qi,
+          boneAgeBaseYears: player.boneAgeBaseYears,
+          lifeElapsedTicks: player.lifeElapsedTicks,
+          lifespanYears: player.lifespanYears ?? null,
           realm: player.realm,
         });
         if (update) {
@@ -1428,6 +1434,15 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
     }
     if (!previous || previous.qi !== nextState.qi) {
       patch.qi = nextState.qi;
+    }
+    if (!previous || previous.boneAgeBaseYears !== nextState.boneAgeBaseYears) {
+      patch.boneAgeBaseYears = nextState.boneAgeBaseYears;
+    }
+    if (!previous || previous.lifeElapsedTicks !== nextState.lifeElapsedTicks) {
+      patch.lifeElapsedTicks = nextState.lifeElapsedTicks;
+    }
+    if (!previous || previous.lifespanYears !== nextState.lifespanYears) {
+      patch.lifespanYears = nextState.lifespanYears;
     }
     if (!previous || !this.isStructuredEqual(previous.realm, nextState.realm)) {
       patch.realm = nextState.realm ? JSON.parse(JSON.stringify(nextState.realm)) as typeof nextState.realm : null;

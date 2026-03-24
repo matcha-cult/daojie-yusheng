@@ -17,6 +17,12 @@ export const DISCONNECT_RETAIN_TIME = 120;
 /** 离线玩家在世界中保留的默认时长（秒） */
 export const DEFAULT_OFFLINE_PLAYER_TIMEOUT_SEC = 48 * 60 * 60;
 
+/** 新角色默认骨龄（岁） */
+export const DEFAULT_BONE_AGE_YEARS = 15;
+
+/** 一年按多少游戏日折算 */
+export const GAME_YEAR_DAYS = 365;
+
 /** 复活后 HP 比例 */
 export const RESPAWN_HP_RATIO = 0.5;
 

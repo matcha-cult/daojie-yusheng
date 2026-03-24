@@ -1327,6 +1327,11 @@ socket.onAttrUpdate((data) => {
     myPlayer.ratioDivisors = latestAttrUpdate.ratioDivisors ?? myPlayer.ratioDivisors;
     myPlayer.maxHp = latestAttrUpdate.maxHp ?? myPlayer.maxHp;
     myPlayer.qi = latestAttrUpdate.qi ?? myPlayer.qi;
+    myPlayer.boneAgeBaseYears = latestAttrUpdate.boneAgeBaseYears ?? myPlayer.boneAgeBaseYears;
+    myPlayer.lifeElapsedTicks = latestAttrUpdate.lifeElapsedTicks ?? myPlayer.lifeElapsedTicks;
+    myPlayer.lifespanYears = latestAttrUpdate.lifespanYears === undefined
+      ? myPlayer.lifespanYears
+      : latestAttrUpdate.lifespanYears;
     if (latestAttrUpdate.numericStats?.viewRange !== undefined) {
       myPlayer.viewRange = Math.max(1, Math.round(latestAttrUpdate.numericStats.viewRange || myPlayer.viewRange));
     }
@@ -1603,24 +1608,6 @@ function resolveTitleLabel(player: PlayerState): string {
   return '见习弟子';
 }
 
-function resolveObjectiveLabel(player: PlayerState): string {
-  const ready = player.quests.find((entry) => entry.status === 'ready');
-  if (ready) return `交付 ${ready.title}`;
-  const active = player.quests.find((entry) => entry.status === 'active');
-  return active ? `${active.targetName} ${active.progress}/${active.required}` : '暂无主目标';
-}
-
-function resolveThreatLabel(player: PlayerState): string {
-  const monsters = latestEntities
-    .filter((entity) => entity.kind === 'monster')
-    .map((entity) => manhattanDistance({ x: entity.wx, y: entity.wy }, player));
-  if (monsters.length === 0) return '平稳';
-  const nearest = Math.min(...monsters);
-  if (nearest <= 2) return '近身威胁';
-  if (nearest <= 5) return '附近有敌';
-  return '远处异动';
-}
-
 function refreshUiChrome() {
   refreshHudChrome();
   if (!myPlayer) return;
@@ -1643,8 +1630,6 @@ function refreshHudChrome() {
     mapDanger: resolveMapDanger(),
     realmLabel: myPlayer.realm?.displayName ?? resolveRealmLabel(myPlayer),
     realmReviewLabel: myPlayer.realm?.review ?? myPlayer.realmReview,
-    objectiveLabel: resolveObjectiveLabel(myPlayer),
-    threatLabel: resolveThreatLabel(myPlayer),
     titleLabel: resolveTitleLabel(myPlayer),
   });
 }

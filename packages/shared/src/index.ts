@@ -22,3 +22,4 @@ export * from './item-stack';
 export * from './network-protobuf';
 export * from './map-document';
 export * from './aura';
+export * from './age';

@@ -17,9 +17,13 @@ import {
   AutoBattleSkillConfig,
   QuestState,
   DEFAULT_BASE_ATTRS,
+  DEFAULT_BONE_AGE_YEARS,
   DEFAULT_INVENTORY_CAPACITY,
   DEFAULT_PLAYER_MAP_ID,
   Direction,
+  normalizeBoneAgeBaseYears,
+  normalizeLifeElapsedTicks,
+  normalizeLifespanYears,
   VIEW_RADIUS,
 } from '@mud/shared';
 import { Socket } from 'socket.io';
@@ -218,6 +222,9 @@ export class PlayerService {
     if (state.inWorld === undefined) state.inWorld = true;
     if (!state.actions) state.actions = [];
     if (state.senseQiActive === undefined) state.senseQiActive = false;
+    state.boneAgeBaseYears = normalizeBoneAgeBaseYears(state.boneAgeBaseYears ?? DEFAULT_BONE_AGE_YEARS);
+    state.lifeElapsedTicks = normalizeLifeElapsedTicks(state.lifeElapsedTicks);
+    state.lifespanYears = normalizeLifespanYears(state.lifespanYears);
     state.idleTicks = 0;
     if (state.facing === undefined) state.facing = Direction.South;
     if (!state.viewRange) state.viewRange = VIEW_RADIUS;
@@ -244,6 +251,9 @@ export class PlayerService {
       maxHp: state.maxHp,
       qi: state.qi,
       dead: state.dead,
+      boneAgeBaseYears: state.boneAgeBaseYears,
+      lifeElapsedTicks: state.lifeElapsedTicks,
+      lifespanYears: state.lifespanYears,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
       temporaryBuffs: persisted.temporaryBuffs as any,
@@ -297,6 +307,9 @@ export class PlayerService {
         maxHp: state.maxHp,
         qi: state.qi,
         dead: state.dead,
+        boneAgeBaseYears: state.boneAgeBaseYears,
+        lifeElapsedTicks: state.lifeElapsedTicks,
+        lifespanYears: state.lifespanYears,
         baseAttrs: state.baseAttrs as any,
         bonuses: state.bonuses as any,
         temporaryBuffs: persisted.temporaryBuffs as any,
@@ -570,6 +583,9 @@ export class PlayerService {
       maxHp: entity.maxHp,
       qi: entity.qi ?? 0,
       dead: entity.dead,
+      boneAgeBaseYears: normalizeBoneAgeBaseYears(entity.boneAgeBaseYears),
+      lifeElapsedTicks: normalizeLifeElapsedTicks(entity.lifeElapsedTicks),
+      lifespanYears: normalizeLifespanYears(entity.lifespanYears),
       baseAttrs: (entity.baseAttrs ?? { ...DEFAULT_BASE_ATTRS }) as Attributes,
       bonuses: (entity.bonuses ?? []) as AttrBonus[],
       temporaryBuffs: this.normalizeTemporaryBuffs(hydrateTemporaryBuffSnapshots(entity.temporaryBuffs, this.contentService)),
@@ -656,6 +672,9 @@ export class PlayerService {
       maxHp: state.maxHp,
       qi: state.qi,
       dead: state.dead,
+      boneAgeBaseYears: state.boneAgeBaseYears,
+      lifeElapsedTicks: state.lifeElapsedTicks,
+      lifespanYears: state.lifespanYears,
       baseAttrs: state.baseAttrs as any,
       bonuses: state.bonuses as any,
       temporaryBuffs: persisted.temporaryBuffs as any,

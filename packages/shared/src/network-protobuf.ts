@@ -217,6 +217,10 @@ message AttrUpdatePayload {
   optional uint32 qi = 7;
   optional string realmJson = 8;
   optional bool clearRealm = 9;
+  optional uint32 boneAgeBaseYears = 10;
+  optional double lifeElapsedTicks = 11;
+  optional uint32 lifespanYears = 12;
+  optional bool clearLifespanYears = 13;
 }
 
 message AttributesPayload {
@@ -848,6 +852,13 @@ function toWireAttrUpdate(payload: S2C_AttrUpdate): Record<string, unknown> {
   if (payload.ratioDivisors) wire.ratioDivisors = toWireRatioDivisors(payload.ratioDivisors);
   if (payload.maxHp !== undefined) wire.maxHp = payload.maxHp;
   if (payload.qi !== undefined) wire.qi = payload.qi;
+  if (payload.boneAgeBaseYears !== undefined) wire.boneAgeBaseYears = payload.boneAgeBaseYears;
+  if (payload.lifeElapsedTicks !== undefined) wire.lifeElapsedTicks = payload.lifeElapsedTicks;
+  if (payload.lifespanYears === null) {
+    wire.clearLifespanYears = true;
+  } else if (payload.lifespanYears !== undefined) {
+    wire.lifespanYears = payload.lifespanYears;
+  }
   if (payload.realm === null) {
     wire.clearRealm = true;
   } else if (payload.realm !== undefined) {
@@ -865,6 +876,13 @@ function fromWireAttrUpdate(wire: Record<string, unknown>): S2C_AttrUpdate {
   if (hasOwn(wire, 'ratioDivisors')) payload.ratioDivisors = fromWireRatioDivisors(wire.ratioDivisors as Record<string, unknown>);
   if (hasOwn(wire, 'maxHp')) payload.maxHp = Number(wire.maxHp ?? 0);
   if (hasOwn(wire, 'qi')) payload.qi = Number(wire.qi ?? 0);
+  if (hasOwn(wire, 'boneAgeBaseYears')) payload.boneAgeBaseYears = Number(wire.boneAgeBaseYears ?? 0);
+  if (hasOwn(wire, 'lifeElapsedTicks')) payload.lifeElapsedTicks = Number(wire.lifeElapsedTicks ?? 0);
+  if (wire.clearLifespanYears === true) {
+    payload.lifespanYears = null;
+  } else if (hasOwn(wire, 'lifespanYears')) {
+    payload.lifespanYears = Number(wire.lifespanYears ?? 0);
+  }
   if (wire.clearRealm === true) {
     payload.realm = null;
   } else if (typeof wire.realmJson === 'string') {

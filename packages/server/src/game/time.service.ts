@@ -8,7 +8,9 @@ import {
   GAME_TIME_PHASES,
   GameTimeState,
   MapTimeConfig,
+  normalizeLifeElapsedTicks,
   PlayerState,
+  resolveLifeElapsedDays,
   TemporaryBuffState,
   TimePhaseDefinition,
   WORLD_DARKNESS_BUFF_DURATION,
@@ -21,6 +23,10 @@ interface TimedEntity {
   mapId: string;
   viewRange: number;
   temporaryBuffs?: TemporaryBuffState[];
+}
+
+interface SyncPlayerTimeEffectsOptions {
+  advanceChronology?: boolean;
 }
 
 @Injectable()
@@ -64,16 +70,23 @@ export class TimeService {
     return this.buildTimeState(monster.mapId, Math.max(1, monster.viewRange));
   }
 
-  /** 同步玩家的黑暗 Buff 并返回时间状态和是否有变化 */
-  syncPlayerTimeEffects(player: PlayerState): { state: GameTimeState; changed: boolean } {
+  /** 同步玩家的黑暗 Buff 与时间衍生状态，并返回是否产生展示变化 */
+  syncPlayerTimeEffects(
+    player: PlayerState,
+    options: SyncPlayerTimeEffectsOptions = {},
+  ): { state: GameTimeState; changed: boolean; chronologyDayChanged: boolean } {
     const previousRange = this.getEffectiveViewRangeFromBuff(player.viewRange, player.temporaryBuffs);
     const previousStacks = this.getDarknessStacks(player.temporaryBuffs);
+    const chronologyDayChanged = options.advanceChronology === true
+      ? this.advancePlayerChronology(player)
+      : false;
     const state = this.buildPlayerTimeState(player);
     player.temporaryBuffs ??= [];
     this.syncDarknessBuff(player, state.darknessStacks);
     return {
       state,
       changed: previousRange !== state.effectiveViewRange || previousStacks !== state.darknessStacks,
+      chronologyDayChanged,
     };
   }
 
@@ -149,6 +162,20 @@ export class TimeService {
     if (lightPercent >= 65) return 3;
     if (lightPercent >= 55) return 4;
     return 5;
+  }
+
+  private advancePlayerChronology(player: PlayerState): boolean {
+    const previousTicks = normalizeLifeElapsedTicks(player.lifeElapsedTicks);
+    const previousDays = resolveLifeElapsedDays(previousTicks);
+    const timeScale = this.getTimeScale(this.mapService.getMapTimeConfig(player.mapId));
+    if (timeScale <= 0) {
+      player.lifeElapsedTicks = previousTicks;
+      return false;
+    }
+
+    const nextTicks = previousTicks + timeScale;
+    player.lifeElapsedTicks = nextTicks;
+    return resolveLifeElapsedDays(nextTicks) !== previousDays;
   }
 
   private applyVisionMultiplier(baseViewRange: number, stacks: number): number {

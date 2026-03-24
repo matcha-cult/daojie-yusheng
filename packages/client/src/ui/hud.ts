@@ -3,7 +3,7 @@
  * 显示名称、坐标、地图、境界、气血/灵力/修炼进度条及突破按钮
  */
 
-import { PlayerState } from '@mud/shared';
+import { PlayerState, resolveCharacterAge } from '@mud/shared';
 import { formatDisplayCurrentMax, formatDisplayInteger } from '../utils/number';
 
 interface HUDMeta {
@@ -14,6 +14,8 @@ interface HUDMeta {
   realmProgressLabel?: string;
   objectiveLabel?: string;
   threatLabel?: string;
+  boneAgeLabel?: string;
+  lifespanLabel?: string;
   titleLabel?: string;
 }
 
@@ -51,8 +53,8 @@ export class HUD {
     this.titleDiv.textContent = meta?.titleLabel ?? '无号散修';
     this.posDiv.textContent = `(${player.x}, ${player.y})`;
     this.mapDiv.textContent = meta?.mapDanger ? `${meta.mapName ?? player.mapId} · ${meta.mapDanger}` : (meta?.mapName ?? player.mapId);
-    this.objectiveDiv.textContent = meta?.objectiveLabel ?? '暂无';
-    this.threatDiv.textContent = meta?.threatLabel ?? '平稳';
+    this.objectiveDiv.textContent = meta?.boneAgeLabel ?? this.buildBoneAgeLabel(player);
+    this.threatDiv.textContent = meta?.lifespanLabel ?? (player.lifespanYears == null ? '???' : `${formatDisplayInteger(player.lifespanYears)} 岁`);
 
     const realmLabel = meta?.realmLabel ?? player.realm?.displayName ?? player.realmName ?? player.realmStage ?? '-';
     this.realmValue.textContent = realmLabel;
@@ -85,5 +87,12 @@ export class HUD {
     const ratio = max <= 0 ? 0 : Math.max(0, Math.min(1, value / max));
     bar.style.width = `${Math.round(ratio * 100)}%`;
     text.textContent = formatDisplayCurrentMax(Math.max(0, Math.round(value)), Math.max(0, Math.round(max)));
+  }
+
+  private buildBoneAgeLabel(player: PlayerState): string {
+    const age = resolveCharacterAge(player);
+    return age.days > 0
+      ? `${formatDisplayInteger(age.years)} 岁零 ${formatDisplayInteger(age.days)} 天`
+      : `${formatDisplayInteger(age.years)} 岁`;
   }
 }

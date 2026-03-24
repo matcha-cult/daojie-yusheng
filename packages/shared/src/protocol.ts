@@ -354,6 +354,9 @@ export interface S2C_AttrUpdate {
   ratioDivisors?: NumericRatioDivisors;
   maxHp?: number;
   qi?: number;
+  boneAgeBaseYears?: number;
+  lifeElapsedTicks?: number;
+  lifespanYears?: number | null;
   realm?: PlayerRealmState | null;
 }
 

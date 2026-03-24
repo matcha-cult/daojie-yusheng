@@ -7,7 +7,13 @@ import {
   Column,
   UpdateDateColumn,
 } from 'typeorm';
-import { DEFAULT_BASE_ATTRS, DEFAULT_INVENTORY_CAPACITY, Direction, VIEW_RADIUS } from '@mud/shared';
+import {
+  DEFAULT_BASE_ATTRS,
+  DEFAULT_BONE_AGE_YEARS,
+  DEFAULT_INVENTORY_CAPACITY,
+  Direction,
+  VIEW_RADIUS,
+} from '@mud/shared';
 
 /** 玩家表，主键为 "userId:角色名" 格式的复合 ID */
 @Entity('players')
@@ -50,6 +56,18 @@ export class PlayerEntity {
 
   @Column({ type: 'boolean', default: false })
   dead!: boolean;
+
+  /** 角色初始骨龄（岁） */
+  @Column({ type: 'int', default: DEFAULT_BONE_AGE_YEARS })
+  boneAgeBaseYears!: number;
+
+  /** 在世界中累计经历的有效时序 tick */
+  @Column({ type: 'double precision', default: 0 })
+  lifeElapsedTicks!: number;
+
+  /** 寿元上限（当前预留） */
+  @Column({ type: 'int', nullable: true })
+  lifespanYears!: number | null;
 
   /** 基础属性（力量、敏捷等） */
   @Column({ type: 'jsonb', default: () => `'${JSON.stringify(DEFAULT_BASE_ATTRS)}'` })

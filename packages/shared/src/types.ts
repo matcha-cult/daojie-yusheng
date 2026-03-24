@@ -778,6 +778,9 @@ export interface PlayerState {
   realmStage?: string;
   realmReview?: string;
   breakthroughReady?: boolean;
+  boneAgeBaseYears?: number;
+  lifeElapsedTicks?: number;
+  lifespanYears?: number | null;
   mapId: string;
   x: number;
   y: number;
