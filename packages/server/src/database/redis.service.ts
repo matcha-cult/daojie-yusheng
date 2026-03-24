@@ -56,6 +56,7 @@ export class RedisService implements OnModuleDestroy {
       autoBattleSkills: JSON.stringify(state.autoBattleSkills),
       autoRetaliate: state.autoRetaliate === false ? '0' : '1',
       autoIdleCultivation: state.autoIdleCultivation === false ? '0' : '1',
+      autoSwitchCultivation: state.autoSwitchCultivation === true ? '1' : '0',
       cultivatingTechId: state.cultivatingTechId ?? '',
       online: state.online === true ? '1' : '0',
       inWorld: state.inWorld === false ? '0' : '1',

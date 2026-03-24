@@ -213,6 +213,7 @@ export class PlayerService {
     if (!state.autoBattleSkills) state.autoBattleSkills = [];
     if (state.autoRetaliate === undefined) state.autoRetaliate = true;
     if (state.autoIdleCultivation === undefined) state.autoIdleCultivation = true;
+    if (state.autoSwitchCultivation === undefined) state.autoSwitchCultivation = false;
     if (state.online === undefined) state.online = false;
     if (state.inWorld === undefined) state.inWorld = true;
     if (!state.actions) state.actions = [];
@@ -256,6 +257,7 @@ export class PlayerService {
       autoBattleSkills: state.autoBattleSkills as any,
       autoRetaliate: state.autoRetaliate,
       autoIdleCultivation: state.autoIdleCultivation,
+      autoSwitchCultivation: state.autoSwitchCultivation === true,
       cultivatingTechId: state.cultivatingTechId ?? null,
       online: state.online === true,
       inWorld: state.inWorld !== false,
@@ -308,6 +310,7 @@ export class PlayerService {
         autoBattleSkills: state.autoBattleSkills as any,
         autoRetaliate: state.autoRetaliate,
         autoIdleCultivation: state.autoIdleCultivation,
+        autoSwitchCultivation: state.autoSwitchCultivation === true,
         cultivatingTechId: state.cultivatingTechId ?? null,
         online: state.online === true,
         inWorld: state.inWorld !== false,

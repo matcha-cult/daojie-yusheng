@@ -406,6 +406,7 @@ export interface S2C_ActionsUpdate {
   autoBattle?: boolean;
   autoRetaliate?: boolean;
   autoIdleCultivation?: boolean;
+  autoSwitchCultivation?: boolean;
   senseQiActive?: boolean;
 }
 

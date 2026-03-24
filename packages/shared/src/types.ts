@@ -767,6 +767,7 @@ export interface PlayerState {
   senseQiActive?: boolean;
   autoRetaliate?: boolean;
   autoIdleCultivation?: boolean;
+  autoSwitchCultivation?: boolean;
   realmLv?: number;
   realmName?: string;
   realmStage?: string;

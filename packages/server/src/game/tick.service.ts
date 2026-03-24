@@ -1091,6 +1091,7 @@ export class TickService implements OnModuleInit, OnModuleDestroy {
           autoBattle: player.autoBattle,
           autoRetaliate: player.autoRetaliate,
           autoIdleCultivation: player.autoIdleCultivation,
+          autoSwitchCultivation: player.autoSwitchCultivation,
           senseQiActive: player.senseQiActive,
         };
         socket.emit(S2C.ActionsUpdate, update);

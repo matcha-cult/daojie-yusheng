@@ -178,7 +178,8 @@ message ActionsUpdatePayload {
   optional bool autoBattle = 2;
   optional bool autoRetaliate = 3;
   optional bool autoIdleCultivation = 4;
-  optional bool senseQiActive = 5;
+  optional bool autoSwitchCultivation = 5;
+  optional bool senseQiActive = 6;
 }
 
 message ActionUpdateEntryPayload {
@@ -803,6 +804,7 @@ function toWireActionsUpdate(payload: S2C_ActionsUpdate): Record<string, unknown
   if (payload.autoBattle !== undefined) wire.autoBattle = payload.autoBattle;
   if (payload.autoRetaliate !== undefined) wire.autoRetaliate = payload.autoRetaliate;
   if (payload.autoIdleCultivation !== undefined) wire.autoIdleCultivation = payload.autoIdleCultivation;
+  if (payload.autoSwitchCultivation !== undefined) wire.autoSwitchCultivation = payload.autoSwitchCultivation;
   if (payload.senseQiActive !== undefined) wire.senseQiActive = payload.senseQiActive;
   return wire;
 }
@@ -816,6 +818,7 @@ function fromWireActionsUpdate(wire: Record<string, unknown>): S2C_ActionsUpdate
   if (hasOwn(wire, 'autoBattle')) payload.autoBattle = Boolean(wire.autoBattle);
   if (hasOwn(wire, 'autoRetaliate')) payload.autoRetaliate = Boolean(wire.autoRetaliate);
   if (hasOwn(wire, 'autoIdleCultivation')) payload.autoIdleCultivation = Boolean(wire.autoIdleCultivation);
+  if (hasOwn(wire, 'autoSwitchCultivation')) payload.autoSwitchCultivation = Boolean(wire.autoSwitchCultivation);
   if (hasOwn(wire, 'senseQiActive')) payload.senseQiActive = Boolean(wire.senseQiActive);
   return payload;
 }

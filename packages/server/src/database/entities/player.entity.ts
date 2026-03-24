@@ -103,6 +103,10 @@ export class PlayerEntity {
   @Column({ type: 'boolean', default: true })
   autoIdleCultivation!: boolean;
 
+  /** 主修功法圆满后是否自动切换下一门功法 */
+  @Column({ type: 'boolean', default: false })
+  autoSwitchCultivation!: boolean;
+
   /** 当前正在修炼的功法 ID */
   @Column({ type: 'varchar', nullable: true })
   cultivatingTechId!: string | null;

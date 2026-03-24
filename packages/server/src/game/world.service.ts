@@ -346,6 +346,14 @@ export class WorldService {
         : '开启后，无行为和移动持续 60 息会自动开始修炼。',
       cooldownLeft: 0,
     }, {
+      id: 'toggle:auto_switch_cultivation',
+      name: player.autoSwitchCultivation === true ? '修满自动切换已开' : '修满自动切换已关',
+      type: 'toggle',
+      desc: player.autoSwitchCultivation === true
+        ? '当前主修功法圆满后，会自动切到功法列表中的下一门未圆满功法。'
+        : '关闭后，主修功法圆满时不会自动切换下一门功法。',
+      cooldownLeft: 0,
+    }, {
       id: 'cultivation:toggle',
       name: this.techniqueService.hasCultivationBuff(player) ? '停止修炼' : '开始修炼',
       type: 'toggle',
@@ -468,6 +476,20 @@ export class WorldService {
         messages: [{
           playerId: player.id,
           text: player.autoIdleCultivation ? '已开启闲置自动修炼。' : '已关闭闲置自动修炼。',
+          kind: 'quest',
+        }],
+        dirty: ['actions'],
+      };
+    }
+
+    if (actionId === 'toggle:auto_switch_cultivation') {
+      player.autoSwitchCultivation = player.autoSwitchCultivation === true ? false : true;
+      return {
+        messages: [{
+          playerId: player.id,
+          text: player.autoSwitchCultivation === true
+            ? '已开启功法修满自动切换。'
+            : '已关闭功法修满自动切换。',
           kind: 'quest',
         }],
         dirty: ['actions'],

@@ -457,6 +457,7 @@ export class GmService {
       autoBattleSkills: this.cloneArray<AutoBattleSkillConfig>(entity.autoBattleSkills),
       autoRetaliate: entity.autoRetaliate ?? true,
       autoIdleCultivation: entity.autoIdleCultivation ?? true,
+      autoSwitchCultivation: entity.autoSwitchCultivation === true,
       actions: [],
       cultivatingTechId: entity.cultivatingTechId ?? undefined,
       idleTicks: 0,
@@ -519,6 +520,7 @@ export class GmService {
     player.autoIdleCultivation = snapshot.autoIdleCultivation !== undefined
       ? snapshot.autoIdleCultivation !== false
       : player.autoIdleCultivation !== false;
+    player.autoSwitchCultivation = snapshot.autoSwitchCultivation === true;
     player.idleTicks = 0;
     player.revealedBreakthroughRequirementIds = Array.isArray(snapshot.revealedBreakthroughRequirementIds)
       ? snapshot.revealedBreakthroughRequirementIds.filter((entry): entry is string => typeof entry === 'string')
@@ -621,6 +623,7 @@ export class GmService {
       autoBattleSkills: player.autoBattleSkills as any,
       autoRetaliate: player.autoRetaliate,
       autoIdleCultivation: player.autoIdleCultivation,
+      autoSwitchCultivation: player.autoSwitchCultivation === true,
       cultivatingTechId: player.cultivatingTechId ?? null,
       online: player.online === true,
       inWorld: player.inWorld !== false,
@@ -711,6 +714,7 @@ export class GmService {
         merged.autoBattle = snapshot.autoBattle;
         merged.autoRetaliate = snapshot.autoRetaliate;
         merged.autoIdleCultivation = snapshot.autoIdleCultivation;
+        merged.autoSwitchCultivation = snapshot.autoSwitchCultivation;
         merged.combatTargetId = snapshot.combatTargetId;
         merged.combatTargetLocked = snapshot.combatTargetLocked;
         merged.bonuses = this.cloneArray<AttrBonus>(snapshot.bonuses);

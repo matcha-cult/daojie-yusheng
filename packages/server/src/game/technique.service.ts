@@ -179,16 +179,17 @@ export class TechniqueService {
         this.initializePlayerProgression(player);
       });
     }
-    const technique = this.measureCpuSection('cultivation_resolve', '修炼: 主修解析', () => (
-      this.resolveCultivatingTechnique(player)
-    ));
-    if (!technique) {
-      return this.clearInvalidCultivation(player);
-    }
     const cultivationBuff = this.measureCpuSection('cultivation_resolve', '修炼: 主修解析', () => (
       this.getCultivationBuff(player)
     ));
     if (!cultivationBuff) return EMPTY_CULTIVATION_RESULT;
+    const cultivationTarget = this.measureCpuSection('cultivation_resolve', '修炼: 主修解析', () => (
+      this.resolveActiveCultivatingTechnique(player)
+    ));
+    if (!cultivationTarget.technique) {
+      return this.clearInvalidCultivation(player);
+    }
+    const technique = cultivationTarget.technique;
     this.refreshCultivationBuff(cultivationBuff, technique.name);
 
     const numericStats = this.measureCpuSection('cultivation_stats', '修炼: 数值采集', () => (
@@ -199,8 +200,8 @@ export class TechniqueService {
     ));
     const realmExpBonus = Math.max(0, numericStats.playerExpRate) / 10000;
     const techniqueExpBonus = Math.max(0, numericStats.techniqueExpRate) / 10000;
-    const dirty = new Set<TechniqueDirtyFlag>();
-    const messages: TechniqueMessage[] = [];
+    const dirty = new Set<TechniqueDirtyFlag>(cultivationTarget.dirty);
+    const messages: TechniqueMessage[] = [...cultivationTarget.messages];
 
     const realmResult = this.measureCpuSection('cultivation_realm', '修炼: 境界推进', () => (
       this.advanceRealmProgress(
@@ -505,7 +506,8 @@ export class TechniqueService {
       return { changed: false, gained: 0, dirty: [], messages: [] };
     }
 
-    const technique = this.resolveCultivatingTechnique(player);
+    const resolvedTarget = this.resolveActiveCultivatingTechnique(player);
+    const technique = resolvedTarget.technique;
     if (!technique) {
       const cleared = this.clearInvalidCultivation(player);
       return {
@@ -518,13 +520,19 @@ export class TechniqueService {
 
     const maxLevel = getTechniqueMaxLevel(technique.layers);
     if (technique.level >= maxLevel || technique.expToNext <= 0 || baseGain <= 0) {
-      return { changed: false, gained: 0, techniqueName: technique.name, dirty: [], messages: [] };
+      return {
+        changed: resolvedTarget.dirty.length > 0,
+        gained: 0,
+        techniqueName: technique.name,
+        dirty: resolvedTarget.dirty,
+        messages: resolvedTarget.messages,
+      };
     }
 
     const gain = this.applyRateBonus(baseGain, expBonus, minimumGain);
     const previousLevel = technique.level;
     const previousExp = technique.exp;
-    const messages: TechniqueMessage[] = [];
+    const messages: TechniqueMessage[] = [...resolvedTarget.messages];
     technique.exp += gain;
 
     while (technique.expToNext > 0 && technique.exp >= technique.expToNext && technique.level < maxLevel) {
@@ -541,15 +549,29 @@ export class TechniqueService {
     }
 
     if (technique.level === previousLevel && technique.exp === previousExp) {
-      return { changed: false, gained: 0, techniqueName: technique.name, dirty: [], messages: [] };
+      return {
+        changed: resolvedTarget.dirty.length > 0,
+        gained: 0,
+        techniqueName: technique.name,
+        dirty: resolvedTarget.dirty,
+        messages,
+      };
     }
 
-    const dirty = new Set<TechniqueDirtyFlag>(['tech']);
+    const dirty = new Set<TechniqueDirtyFlag>(['tech', ...resolvedTarget.dirty]);
     if (technique.level !== previousLevel) {
       this.applyTechniqueBonuses(player);
       this.attrService.recalcPlayer(player);
       dirty.add('attr');
       dirty.add('actions');
+    }
+
+    const switchedAfterCompletion = this.resolveActiveCultivatingTechnique(player);
+    if (switchedAfterCompletion.technique && switchedAfterCompletion.technique.techId !== technique.techId) {
+      for (const flag of switchedAfterCompletion.dirty) {
+        dirty.add(flag);
+      }
+      messages.push(...switchedAfterCompletion.messages);
     }
 
     return {
@@ -566,6 +588,54 @@ export class TechniqueService {
       return null;
     }
     return player.techniques.find((entry) => entry.techId === player.cultivatingTechId) ?? null;
+  }
+
+  private resolveActiveCultivatingTechnique(player: PlayerState): { technique: TechniqueState | null; dirty: TechniqueDirtyFlag[]; messages: TechniqueMessage[] } {
+    const technique = this.resolveCultivatingTechnique(player);
+    if (!technique) {
+      return { technique: null, dirty: [], messages: [] };
+    }
+    if (player.autoSwitchCultivation !== true || !this.isTechniqueMaxed(technique)) {
+      return { technique, dirty: [], messages: [] };
+    }
+
+    const nextTechnique = this.findNextCultivatingTechnique(player, technique.techId);
+    if (!nextTechnique) {
+      return { technique, dirty: [], messages: [] };
+    }
+
+    player.cultivatingTechId = nextTechnique.techId;
+    const cultivationBuff = this.getCultivationBuff(player);
+    if (cultivationBuff) {
+      this.refreshCultivationBuff(cultivationBuff, nextTechnique.name);
+    }
+
+    return {
+      technique: nextTechnique,
+      dirty: ['tech', 'actions'],
+      messages: [{
+        text: `${technique.name} 已修至圆满，已自动切换为主修 ${nextTechnique.name}。`,
+        kind: 'quest',
+      }],
+    };
+  }
+
+  private findNextCultivatingTechnique(player: PlayerState, currentTechId: string): TechniqueState | null {
+    const currentIndex = player.techniques.findIndex((entry) => entry.techId === currentTechId);
+    if (currentIndex < 0 || player.techniques.length <= 1) {
+      return null;
+    }
+    for (let offset = 1; offset < player.techniques.length; offset += 1) {
+      const candidate = player.techniques[(currentIndex + offset) % player.techniques.length];
+      if (candidate && !this.isTechniqueMaxed(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  private isTechniqueMaxed(technique: Pick<TechniqueState, 'level' | 'layers'>): boolean {
+    return technique.level >= getTechniqueMaxLevel(technique.layers);
   }
 
   private getCultivationBuff(player: PlayerState): TemporaryBuffState | undefined {
